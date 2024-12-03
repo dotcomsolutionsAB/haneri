@@ -47,11 +47,15 @@ class CartController extends Controller
             $user_id =  $user->id;
         }
 
-        $cartItems = CartModel::with(['product', 'variant']) // Assuming relationships are defined
+        $cartItems = CartModel::with(['user', 'product', 'variant']) // Assuming relationships are defined
         ->where('user_id', $user_id)
         ->get()
         ->map(function ($cartItem) {
         // Make sure to hide the unwanted fields from the product and variant
+        if ($cartItem->user) {
+            $cartItem->user->makeHidden(['id', 'created_at', 'updated_at']);
+        }
+
         if ($cartItem->product) {
             $cartItem->product->makeHidden(['id', 'created_at', 'updated_at']);
         }

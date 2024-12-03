@@ -9,6 +9,10 @@ class ProductFeatureModel extends Model
     //
     protected $table = 't_product_features';
 
+    protected $fillable = [
+        'product_id', 'feature_name', 'is_filterable'
+    ];
+
     /**
      * Relation to Product table
      * Foreign Key: product_id

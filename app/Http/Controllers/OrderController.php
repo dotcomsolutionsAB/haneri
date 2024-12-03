@@ -135,12 +135,21 @@ class OrderController extends Controller
         }
 
         // Fetch all orders for the user
-        $orders = OrderModel::where('user_id', $user_id)->get()
-            ->map(function ($order) {
-                // Optionally hide fields from the order
-                $order->makeHidden(['id', 'created_at', 'updated_at']);
-                return $order;
-            });
+        $orders = OrderModel::with(['items', 'user'])
+                            -> where('user_id', $user_id)
+                            ->get()
+                            ->map(function ($order) {
+                            // Make sure to hide the unwanted fields from the user and items
+                            if ($order->items) {
+                                $order->items->makeHidden(['id', 'created_at', 'updated_at']);
+                            }
+                            if ($order->user) {
+                                $order->user->makeHidden(['id', 'created_at', 'updated_at']);
+                            }
+                            // Optionally hide fields from the order
+                            $order->makeHidden(['id', 'created_at', 'updated_at']);
+                            return $order;
+                        });
 
         return $orders->isNotEmpty()
             ? response()->json(['message' => 'Orders fetched successfully!', 'data' => $orders, 'count' => count($orders)], 200)
@@ -153,15 +162,29 @@ class OrderController extends Controller
         $user = Auth::user();
 
         // Fetch the order by ID for the user
-        $order = OrderModel::where('user_id', $user->id)->find($id);
+        $get_order = OrderModel::with(['items', 'user'])
+                            ->where('user_id', $user->id)
+                            ->get()
+                            ->map(function ($order) {
+                                // Make sure to hide the unwanted fields from the user and items
+                                if ($order->items) {
+                                    $order->items->makeHidden(['id', 'created_at', 'updated_at']);
+                                }
+                                if ($order->user) {
+                                    $order->user->makeHidden(['id', 'created_at', 'updated_at']);
+                                }
+                                // Optionally hide fields from the order
+                                $order->makeHidden(['id', 'created_at', 'updated_at']);
+                                return $order;
+                            });
 
-        if (!$order) {
+        if (!$get_order) {
             return response()->json(['message' => 'Order not found.'], 404);
         }
 
         // Hide unnecessary fields
-        $order->makeHidden(['id', 'created_at', 'updated_at']);
+        $get_order->makeHidden(['id', 'created_at', 'updated_at']);
 
-        return response()->json(['message' => 'Order details fetched successfully!', 'data' => $order], 200);
+        return response()->json(['message' => 'Order details fetched successfully!', 'data' => $get_order], 200);
     }
 }

@@ -8,6 +8,10 @@ class ProductVariantModel extends Model
 {
     //
     protected $table = 't_product_variants';
+
+    protected $fillable = [
+        'product_id', 'variant_type', 'variant_value', 'price'
+    ];
     
     /**
      * Relation to Product table
@@ -16,6 +20,6 @@ class ProductVariantModel extends Model
      */
     public function product()
     {
-        return $this->belongsTo(Product::class, 'product_id', 'id'); // product_id references id in Product table
+        return $this->belongsTo(ProductModel::class, 'product_id', 'id'); // product_id references id in Product table
     }
 }

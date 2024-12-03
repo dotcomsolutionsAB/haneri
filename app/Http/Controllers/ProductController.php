@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\ProductModel;
+use App\Models\ProductFeatureModel;
+use App\Models\ProductVariantModel;
 
 class ProductController extends Controller
 {
@@ -13,9 +15,9 @@ class ProductController extends Controller
     {
         $request->validate([
             'name' => 'required|string',
-            'brand_id' => 'required|integer',
-            'category_id' => 'required|integer',
-            'photo_id' => 'nullable|integer',
+            'brand_id' => 'required|integer|exists:t_brands,id',
+            'category_id' => 'required|integer|exists:t_categories,id',
+            'photo_id' => 'nullable|integer|exists:t_uploads,id',
             'price' => 'required|numeric',
             'discount_price' => 'nullable|numeric',
             'hsn' => 'required|string',
@@ -26,6 +28,16 @@ class ProductController extends Controller
             'slug' => 'required|string|unique:t_products,slug',
             'description' => 'required|string',
             'is_active' => 'required|boolean',
+            // Validate product features
+            'features' => 'nullable|array',
+            'features.*.feature_name' => 'required_with:features|string',
+            'features.*.feature_value' => 'required_with:features|string',
+            'features.*.is_filterable' => 'nullable|boolean',
+            // Validate product variants
+            'variants' => 'nullable|array',
+            'variants.*.variant_type' => 'required_with:variants|string',
+            'variants.*.variant_value' => 'required_with:variants|string',
+            'variants.*.price' => 'required_with:variants|numeric',
         ]);
 
         $product = ProductModel::create([
@@ -45,6 +57,30 @@ class ProductController extends Controller
             'is_active' => $request->input('is_active'),
         ]);
 
+        // Add product features
+        if ($request->has('features') && is_array($request->input('features'))) {
+            foreach ($request->input('features') as $feature) {
+                ProductFeatureModel::create([
+                    'product_id' => $product->id,
+                    'feature_name' => $feature['feature_name'],
+                    'feature_value' => $feature['feature_value'],
+                    'is_filterable' => $feature['is_filterable'] ?? false,
+                ]);
+            }
+        }
+
+        // Add product variants
+        if ($request->has('variants') && is_array($request->input('variants'))) {
+            foreach ($request->input('variants') as $variant) {
+                ProductVariantModel::create([
+                    'product_id' => $product->id,
+                    'variant_type' => $variant['variant_type'],
+                    'variant_value' => $variant['variant_value'],
+                    'price' => $variant['price'],
+                ]);
+            }
+        }
+
         unset($product['id'], $product['created_at'], $product['updated_at']);
 
         return response()->json(['message' => 'Product created successfully!', 'data' => $product], 201);
@@ -54,7 +90,7 @@ class ProductController extends Controller
     public function index()
     {
         $products = ProductModel::with(['photo', 'variants', 'features', 'brand', 'category'])
-        ->select('name', 'brand_id', 'category_id', 'price', 'discount_price', 'slug', 'description', 'is_active')
+        ->select('id', 'name', 'brand_id', 'category_id', 'price', 'discount_price', 'slug', 'description', 'is_active')
         ->get()
         ->makeHidden(['id', 'created_at', 'updated_at']);
 
@@ -83,7 +119,7 @@ class ProductController extends Controller
     public function show($slug)
     {
         $product = ProductModel::with(['photo', 'variants', 'features', 'brand', 'category'])
-        ->select('name', 'brand_id', 'category_id', 'price', 'discount_price', 'slug', 'description', 'is_active')
+        ->select('id', 'name', 'brand_id', 'category_id', 'price', 'discount_price', 'slug', 'description', 'is_active')
         ->where('slug', $slug)
         ->first();
 
@@ -119,9 +155,9 @@ class ProductController extends Controller
 
         $request->validate([
             'name' => 'sometimes|string',
-            'brand_id' => 'sometimes|integer',
-            'category_id' => 'sometimes|integer',
-            'photo_id' => 'nullable|integer',
+            'brand_id' => 'sometimes|integer|exists:t_brands,id',
+            'category_id' => 'sometimes|integer|exists:t_categories,id',
+            'photo_id' => 'nullable|integer|exists:t_uploads,id',
             'price' => 'sometimes|numeric',
             'discount_price' => 'nullable|numeric',
             'hsn' => 'sometimes|string',
@@ -132,8 +168,19 @@ class ProductController extends Controller
             'slug' => 'sometimes|string|unique:t_products,slug,' . $id,
             'description' => 'sometimes|string',
             'is_active' => 'sometimes|boolean',
+            // Validate product features
+            'features' => 'nullable|array',
+            'features.*.feature_name' => 'required_with:features|string',
+            'features.*.feature_value' => 'required_with:features|string',
+            'features.*.is_filterable' => 'nullable|boolean',
+            // Validate product variants
+            'variants' => 'nullable|array',
+            'variants.*.variant_type' => 'required_with:variants|string',
+            'variants.*.variant_value' => 'required_with:variants|string',
+            'variants.*.price' => 'required_with:variants|numeric',
         ]);
 
+        // Update the product
         $product->update([
             'name' => $request->input('name', $product->name),
             'brand_id' => $request->input('brand_id', $product->brand_id),
@@ -151,10 +198,42 @@ class ProductController extends Controller
             'is_active' => $request->input('is_active', $product->is_active),
         ]);
 
+        // Update product features
+        if ($request->has('data.features') && is_array($request->input('data.features'))) {
+            // Remove existing features if needed (optional)
+            ProductFeatureModel::where('product_id', $product->id)->delete();
+
+            // Add new features
+            foreach ($request->input('data.features') as $feature) {
+                ProductFeatureModel::create([
+                    'product_id' => $product->id,
+                    'feature_name' => $feature['feature_name'],
+                    'is_filterable' => $feature['is_filterable'] ?? false,
+                ]);
+            }
+        }
+
+        // Update product variants
+        if ($request->has('data.variants') && is_array($request->input('data.variants'))) {
+            // Remove existing variants if needed (optional)
+            ProductVariantModel::where('product_id', $product->id)->delete();
+
+            // Add new variants
+            foreach ($request->input('data.variants') as $variant) {
+                ProductVariantModel::create([
+                    'product_id' => $product->id,
+                    'variant_type' => $variant['variant_type'],
+                    'variant_value' => $variant['variant_value'],
+                    'price' => $variant['price'],
+                ]);
+            }
+        }
+        
         unset($product['id'], $product['created_at'], $product['updated_at']);
 
         return response()->json(['message' => 'Product updated successfully!', 'data' => $product], 200);
     }
+
 
     // Delete
     public function destroy($id)

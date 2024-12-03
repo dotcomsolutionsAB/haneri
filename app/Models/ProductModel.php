@@ -41,7 +41,7 @@ class ProductModel extends Model
      */
     public function features()
     {
-        return $this->hasMany(ProductVariantModel::class, 'product_id', 'id');
+        return $this->hasMany(ProductFeatureModel::class, 'product_id', 'id');
     }
 
      /**
