@@ -32,7 +32,7 @@ class CartController extends Controller
     }
 
     // View All Cart Items for a User
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user(); 
 
