@@ -14,8 +14,11 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             //
             $table->string('mobile')->unique()->after('password');
-            // $table->integer('address')->after('mobile');
             $table->enum('role', ['admin', 'customer', 'vendor'])->default('customer')->after('mobile');
+            $table->string('otp')->nullable()->after('role');
+            $table->timestamp('expires_at')->nullable()->after('otp');
+            $table->boolean('is_present')->default(true)->after('expires_at');
+            $table->string('price_type')->nullable()->after('is_present');
         });
     }
 

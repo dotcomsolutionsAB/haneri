@@ -16,7 +16,7 @@ return new class extends Migration
             // $table->foreignId('user_id')->constrained('users'); // User ID
             // $table->foreignId('product_id')->constrained('t_products'); // Product ID
             // $table->foreignId('variant_id')->nullable()->constrained('t_product_variants'); // Optional variant ID
-            $table->integer('user_id'); // User ID
+            $table->string('user_id'); // User ID
             $table->integer('product_id'); // Product ID
             $table->integer('variant_id')->nullable(); // Optional variant ID
             $table->integer('quantity')->default(1); // Quantity added to cart

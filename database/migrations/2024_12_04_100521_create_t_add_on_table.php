@@ -11,12 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('t_brands', function (Blueprint $table) {
+        Schema::create('t_add_on', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->integer('logo')->nullable(); // Path to logo image
-            $table->integer('custom_sort')->default(0); // Sorting priority
-            $table->text('description')->nullable(); // Description column    
+            $table->longText('value');
             $table->timestamps();
         });
     }
@@ -26,6 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('t_brands');
+        Schema::dropIfExists('add_on');
     }
 };

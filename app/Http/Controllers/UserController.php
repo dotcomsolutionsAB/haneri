@@ -40,7 +40,7 @@ class UserController extends Controller
         $user = Auth::user();
 
         return $user
-            ? response()->json(['message' => 'Profile fetched successfully!', 'data' => $user->makeHidden(['id', 'created_at', 'updated_at'])], 200)
+            ? response()->json(['message' => 'Profile fetched successfully!', 'data' => $user->makeHidden(['id', 'otp', 'expires_at', 'created_at', 'updated_at'])], 200)
             : response()->json(['message' => 'User not found.'], 404);
     }
 

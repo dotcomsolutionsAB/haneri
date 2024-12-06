@@ -10,8 +10,7 @@ class ProductModel extends Model
     protected $table = 't_products';
 
     protected $fillable = [
-        'name', 'brand_id', 'category_id', 'photo_id', 'price', 'discount_price',
-        'hsn', 'tax', 'min_qty', 'is_cod', 'weight', 'slug', 'description', 'is_active'
+        'name', 'brand_id', 'category_id', 'slug', 'description', 'is_active'
     ];
 
      /**

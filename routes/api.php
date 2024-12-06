@@ -17,7 +17,24 @@ use App\Http\Controllers\AddressController;
 //     return $request->user();
 // })->middleware('auth:sanctum');
 Route::post('/register', [UserController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login/{otp?}', [AuthController::class, 'login']);
+Route::post('/otp', [AuthController::class, 'generate_otp']);
+
+// Product Routes
+Route::prefix('products')->group(function () {
+    Route::get('/', [ProductController::class, 'index']);          // List all products
+    Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
+    Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
+    Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
+    Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
+});
+
+Route::prefix('cart')->group(function () {
+    Route::get('/', [CartController::class, 'index']);             // Get all cart items for a user
+    Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
+    Route::put('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
+    Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
+});
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -31,14 +48,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
 });
 
-    // Product Routes
-    Route::prefix('products')->group(function () {
-        Route::get('/', [ProductController::class, 'index']);          // List all products
-        Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
-        Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
-        Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
-        Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
-    });
+    // // Product Routes
+    // Route::prefix('products')->group(function () {
+    //     Route::get('/', [ProductController::class, 'index']);          // List all products
+    //     Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
+    //     Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
+    //     Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
+    //     Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
+    // });
 
     // Category Routes
     Route::prefix('categories')->group(function () {
@@ -58,13 +75,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/{id}', [BrandController::class, 'destroy']);   // Delete a brand (Admin only)
     });
 
-    // Cart Routes
-    Route::prefix('cart')->group(function () {
-        Route::get('/', [CartController::class, 'index']);             // Get all cart items for a user
-        Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
-        Route::put('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
-        Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
-    });
+    // // Cart Routes
+    // Route::prefix('cart')->group(function () {
+    //     Route::get('/', [CartController::class, 'index']);             // Get all cart items for a user
+    //     Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
+    //     Route::put('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
+    //     Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
+    // });
 
     // Order Routes
     Route::prefix('orders')->group(function () {

@@ -19,14 +19,6 @@ return new class extends Migration
             // $table->foreignId('photo_id')->nullable()->constrained('t_uploads'); // References the uploads table
             $table->integer('brand_id');
             $table->integer('category_id');
-            $table->integer('photo_id')->nullable(); 
-            $table->decimal('price', 8, 2); // Base price
-            $table->decimal('discount_price', 8, 2)->nullable();
-            $table->string('hsn'); // Harmonized System Number
-            $table->decimal('tax', 5, 2); // Tax percentage
-            $table->integer('min_qty')->default(1); // Minimum quantity to order
-            $table->boolean('is_cod')->default(true); // Supports cash on delivery
-            $table->decimal('weight', 8, 2)->nullable(); // Product weight in kg
             $table->string('slug')->unique(); // SEO-friendly URL
             $table->text('description');
             $table->boolean('is_active')->default(true); // Active or inactive status

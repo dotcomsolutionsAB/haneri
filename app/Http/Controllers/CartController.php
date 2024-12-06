@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CartModel;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Sanctum\PersonalAccessToken;
+use Str;
+use Illuminate\Support\Facades\Cookie;
+use Hash;
 
 class CartController extends Controller
 {
@@ -13,14 +17,73 @@ class CartController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'user_id' => 'required|integer|exists:users,id',
             'product_id' => 'required|integer|exists:t_products,id',
             'variant_id' => 'nullable|integer|exists:t_product_variants,id',
             'quantity' => 'required|integer|min:1',
         ]);
 
+        // Manually check for Bearer Token (optional)
+        $token = $request->bearerToken();
+        $user = null; // Initialize the $user variable to avoid "undefined variable" error
+
+        if ($token) {
+            $user = Auth::guard('sanctum')->user(); // Manually authenticate using Sanctum
+        }
+
+        if ($user) {
+            // If user is logged in, use their ID
+            $userId = $user->id;
+        } else {
+            // If user is not logged in, use cart ID from cookies
+            $cartData = $request->cookie('cart_id');
+            
+            // If no cart ID exists in the cookie, generate a new one
+            if (!$cartData) {
+                // $cartId = Str::random(32);
+                // $cartId = Str::uuid();
+
+                // Generate a UUID (random string) for the cart ID
+                do {
+                    $cartId = Str::uuid(); // or you can use Str::random(32)
+                } while (CartModel::where('user_id', $cartId)->exists()); // Check if the cart ID already exists in the database
+            
+                // Optional: Hash the cartId before storing for added security
+                $hashedCartId = Hash::make($cartId); // Hash the cart ID to ensure it is secure
+
+                // Store the generated cart ID in the user's cookies (expires in 24 hours)
+                Cookie::queue('cart_id', $cartId, 1440); // 1440 minutes = 24 hours
+                // Cookie::queue('cart_id', $cartId, 5); // 1440 minutes = 24 hours
+
+                // Store the current timestamp for expiration (24 hours)
+                // $timestamp = now()->timestamp;
+
+                // // Store cart data with timestamp in the cookie (expires in 24 hours)
+                // Cookie::queue('cart_data', json_encode(['cart_id' => $cartId, 'timestamp' => $timestamp]), 2); // 1440 minutes = 24 hours
+            }
+            else {
+                // Decode the cart data from cookie (cart_id and timestamp)
+                // $cartData = json_decode($cartData, true);
+
+                // if (json_last_error() !== JSON_ERROR_NONE) {
+                //     dd(json_last_error_msg()); // Shows the error message
+                // } else {
+                //     dd($cartData); // If no error, the decoded array will be shown
+                // }
+                // dd($cartData);
+
+                // // Use existing cart_id if it's not expired
+                // $cartId = $cartData['cart_id'];
+
+                // If cart ID exists, use the existing cart ID (no need to hash it here)
+                $cartId = $request->cookie('cart_id');
+                $hashedCartId = $cartId; // Set the hashed cart ID to the original cart ID for guest users
+            }
+
+            $userId = $cartId; // For guest users, set user ID as cart ID
+        }
+
         $cart = CartModel::create([
-            'user_id' => $request->input('user_id'),
+            'user_id' => $userId,
             'product_id' => $request->input('product_id'),
             'variant_id' => $request->input('variant_id', null),
             'quantity' => $request->input('quantity'),
@@ -34,18 +97,43 @@ class CartController extends Controller
     // View All Cart Items for a User
     public function index(Request $request)
     {
-        $user = Auth::user(); 
 
-        if ($user->role == 'admin') {
-            $request->validate([
-                'user_id' => 'required|integer|exists:users,id',
-            ]);  
-            $user_id =  $request->input('user_id');
+        // Manually check for Bearer Token (optional)
+        $token = $request->bearerToken();
+        $user = null; // Initialize the $user variable to avoid "undefined variable" error
+
+        if ($token) {
+            $user = Auth::guard('sanctum')->user(); // Manually authenticate using Sanctum
         }
 
-        else {
-            $user_id =  $user->id;
+        if ($user) {
+
+            if ($user->role == 'admin') {
+                $request->validate([
+                    'user_id' => 'required|integer|exists:users,id',
+                ]);  
+                $user_id =  $request->input('user_id');
+            }
+    
+            else {
+                $user_id =  $user->id;
+            }
+
+            $userId = $user->id;
+        } else {
+            // Retrieve the cart_id from cookies
+            $cartId = $request->cookie('cart_id');
+
+            // Check if the cart_id exists in the cookies
+            if (!$cartId) {
+                return response()->json(['message' => 'Cart ID not found.'], 404);
+            }
+
+            $user_id = $cartId;
         }
+
+        // Fetch cart items associated with this cart_id (for guest users)
+        $cartItems = CartModel::where('user_id', $user_id)->get();
 
         $cartItems = CartModel::with(['user', 'product', 'variant']) // Assuming relationships are defined
         ->where('user_id', $user_id)

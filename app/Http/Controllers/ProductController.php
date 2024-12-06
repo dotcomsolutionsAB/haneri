@@ -17,41 +17,35 @@ class ProductController extends Controller
             'name' => 'required|string',
             'brand_id' => 'required|integer|exists:t_brands,id',
             'category_id' => 'required|integer|exists:t_categories,id',
-            'photo_id' => 'nullable|integer|exists:t_uploads,id',
-            'price' => 'required|numeric',
-            'discount_price' => 'nullable|numeric',
-            'hsn' => 'required|string',
-            'tax' => 'required|numeric',
-            'min_qty' => 'required|integer|min:1',
-            'is_cod' => 'required|boolean',
-            'weight' => 'nullable|numeric',
             'slug' => 'required|string|unique:t_products,slug',
             'description' => 'required|string',
             'is_active' => 'required|boolean',
             // Validate product features
             'features' => 'nullable|array',
             'features.*.feature_name' => 'required_with:features|string',
-            'features.*.feature_value' => 'required_with:features|string',
             'features.*.is_filterable' => 'nullable|boolean',
             // Validate product variants
             'variants' => 'nullable|array',
+            'variants.*.photo_id' => 'nullable|integer|exists:t_uploads,id',  // Optional photo
+            'variants.*.min_qty' => 'nullable|integer|min:1',
+            'variants.*.is_cod' => 'nullable|boolean',  // Optional COD flag
+            'variants.*.weight' => 'nullable|numeric', // Optional weight
+            'variants.*.description' => 'nullable|string', // Optional description
             'variants.*.variant_type' => 'required_with:variants|string',
             'variants.*.variant_value' => 'required_with:variants|string',
-            'variants.*.price' => 'required_with:variants|numeric',
+            'variants.*.regular_price' => 'required_with:variants|numeric',
+            'variants.*.selling_price' => 'required_with:variants|numeric',
+            'variants.*.hsn' => 'required_with:variants|string',
+            'variants.*.regular_tax' => 'required_with:variants|numeric',
+            'variants.*.selling_tax' => 'required_with:variants|numeric',
+            'variants.*.video_url' => 'nullable|string',
+            'variants.*.product_pdf' => 'nullable|string',
         ]);
 
         $product = ProductModel::create([
             'name' => $request->input('name'),
             'brand_id' => $request->input('brand_id'),
             'category_id' => $request->input('category_id'),
-            'photo_id' => $request->input('photo_id', null),
-            'price' => $request->input('price'),
-            'discount_price' => $request->input('discount_price', null),
-            'hsn' => $request->input('hsn'),
-            'tax' => $request->input('tax'),
-            'min_qty' => $request->input('min_qty'),
-            'is_cod' => $request->input('is_cod'),
-            'weight' => $request->input('weight', null),
             'slug' => $request->input('slug'),
             'description' => $request->input('description'),
             'is_active' => $request->input('is_active'),
@@ -74,9 +68,20 @@ class ProductController extends Controller
             foreach ($request->input('variants') as $variant) {
                 ProductVariantModel::create([
                     'product_id' => $product->id,
+                    'photo_id' => $variant['photo_id'] ?? null,
+                    'min_qty' => $variant['min_qty'] ?? 1,
+                    'is_cod' => $variant['is_cod'] ?? true,  // Default true if not provided
+                    'weight' => $variant['weight'] ?? null,
+                    'description' => $variant['description'] ?? null,
                     'variant_type' => $variant['variant_type'],
                     'variant_value' => $variant['variant_value'],
-                    'price' => $variant['price'],
+                    'regular_price' => $variant['regular_price'],
+                    'selling_price' => $variant['selling_price'],
+                    'hsn' => $variant['hsn'],
+                    'regular_tax' => $variant['regular_tax'],
+                    'selling_tax' => $variant['selling_tax'],
+                    'video_url' => $variant['video_url'],
+                    'product_pdf' => $variant['product_pdf'],
                 ]);
             }
         }
@@ -90,7 +95,7 @@ class ProductController extends Controller
     public function index()
     {
         $products = ProductModel::with(['photo', 'variants', 'features', 'brand', 'category'])
-        ->select('id', 'name', 'brand_id', 'category_id', 'price', 'discount_price', 'slug', 'description', 'is_active')
+        ->select('id', 'name', 'brand_id', 'category_id', 'slug', 'description', 'is_active')
         ->get()
         ->makeHidden(['id', 'created_at', 'updated_at']);
 
@@ -99,9 +104,6 @@ class ProductController extends Controller
                 'name' => $product->name,
                 'brand' => $product->brand ? $product->brand->makeHidden(['id', 'created_at', 'updated_at']) : null,
                 'category' => $product->category ? $product->category->makeHidden(['id', 'created_at', 'updated_at']) : null,
-                'photo' => $product->photo ? $product->photo->makeHidden(['id', 'created_at', 'updated_at']) : null,
-                'price' => $product->price,
-                'discount_price' => $product->discount_price,
                 'slug' => $product->slug,
                 'description' => $product->description,
                 'is_active' => $product->is_active,
@@ -119,7 +121,7 @@ class ProductController extends Controller
     public function show($slug)
     {
         $product = ProductModel::with(['photo', 'variants', 'features', 'brand', 'category'])
-        ->select('id', 'name', 'brand_id', 'category_id', 'price', 'discount_price', 'slug', 'description', 'is_active')
+        ->select('id', 'name', 'brand_id', 'category_id', 'slug', 'description', 'is_active')
         ->where('slug', $slug)
         ->first();
 
@@ -157,14 +159,6 @@ class ProductController extends Controller
             'name' => 'sometimes|string',
             'brand_id' => 'sometimes|integer|exists:t_brands,id',
             'category_id' => 'sometimes|integer|exists:t_categories,id',
-            'photo_id' => 'nullable|integer|exists:t_uploads,id',
-            'price' => 'sometimes|numeric',
-            'discount_price' => 'nullable|numeric',
-            'hsn' => 'sometimes|string',
-            'tax' => 'sometimes|numeric',
-            'min_qty' => 'sometimes|integer|min:1',
-            'is_cod' => 'sometimes|boolean',
-            'weight' => 'nullable|numeric',
             'slug' => 'sometimes|string|unique:t_products,slug,' . $id,
             'description' => 'sometimes|string',
             'is_active' => 'sometimes|boolean',
@@ -175,9 +169,21 @@ class ProductController extends Controller
             'features.*.is_filterable' => 'nullable|boolean',
             // Validate product variants
             'variants' => 'nullable|array',
+            'variants.*.photo_id' => 'nullable|integer|exists:t_uploads,id',
+            'variants.*.min_qty' => 'sometimes|integer|min:1',
+            'variants.*.is_cod' => 'sometimes|boolean',
+            'variants.*.weight' => 'nullable|numeric',
+            'variants.*.description' => 'sometimes|string',
             'variants.*.variant_type' => 'required_with:variants|string',
             'variants.*.variant_value' => 'required_with:variants|string',
-            'variants.*.price' => 'required_with:variants|numeric',
+            'variants.*.discount_price' => 'nullable|numeric',
+            'variants.*.regular_price' => 'sometimes|numeric',
+            'variants.*.selling_price' => 'sometimes|numeric',
+            'variants.*.hsn' => 'sometimes|string',
+            'variants.*.regular_tax' => 'sometimes|numeric',
+            'variants.*.selling_price' => 'required_with:variants|numeric',
+            'variants.*.video_url' => 'sometimes|string',
+            'variants.*.product_pdf' => 'sometimes|string',
         ]);
 
         // Update the product
@@ -222,9 +228,20 @@ class ProductController extends Controller
             foreach ($request->input('data.variants') as $variant) {
                 ProductVariantModel::create([
                     'product_id' => $product->id,
+                    'photo_id' => $variant['photo_id'] ?? null,
+                    'min_qty' => $variant['min_qty'] ?? 1,
+                    'is_cod' => $variant['is_cod'] ?? true,  // Default true if not provided
+                    'weight' => $variant['weight'] ?? null,
+                    'description' => $variant['description'] ?? null,
                     'variant_type' => $variant['variant_type'],
                     'variant_value' => $variant['variant_value'],
-                    'price' => $variant['price'],
+                    'regular_price' => $variant['regular_price'],
+                    'selling_price' => $variant['selling_price'],
+                    'hsn' => $variant['hsn'],
+                    'regular_tax' => $variant['regular_tax'],
+                    'selling_tax' => $variant['selling_tax'],
+                    'video_url' => $variant['video_url'] ?? null,
+                    'product_pdf' => $variant['product_pdf'] ?? null,
                 ]);
             }
         }

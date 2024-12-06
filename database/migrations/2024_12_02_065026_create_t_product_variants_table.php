@@ -15,9 +15,21 @@ return new class extends Migration
             $table->id();
             // $table->foreignId('product_id')->constrained('t_products');
             $table->integer('product_id');
+            $table->integer('photo_id')->nullable(); 
+            $table->integer('min_qty')->default(1); // Minimum quantity to order
+            $table->boolean('is_cod')->default(true); // Supports cash on delivery
+            $table->decimal('weight', 8, 2)->nullable(); // Product weight in kg
+            $table->text('description')->nullable();
             $table->string('variant_type'); // e.g., 'color', 'size'
             $table->string('variant_value'); // e.g., 'Red', 'XL'
-            $table->decimal('price', 8, 2); // New column for variant price
+            $table->decimal('discount_price', 8, 2)->nullable();
+            $table->decimal('regular_price', 8, 2); // New column for variant price
+            $table->decimal('selling_price', 8, 2); // New column for variant price
+            $table->string('hsn'); // Harmonized System Number
+            $table->decimal('regular_tax', 5, 2); // Tax percentage
+            $table->decimal('selling_tax', 5, 2); // Tax percentage
+            $table->longText('video_url')->nullable();
+            $table->longText('product_pdf')->nullable();
             $table->timestamps();
         });
     }

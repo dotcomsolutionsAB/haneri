@@ -13,7 +13,7 @@ class BrandController extends Controller
     {
         $request->validate([
             'name' => 'required|string',
-            'logo' => 'nullable|string', // Path to logo image
+            'logo' => 'nullable|integer', // Path to logo image
             'custom_sort' => 'nullable|integer',
             'description' => 'nullable|string',
         ]);
