@@ -277,83 +277,97 @@ class ProductController extends Controller
         try {
             // URL of the CSV file from Google Sheets
             $get_product_csv_url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCT6XqtlJtx8Wcktt3fUH_0GUyvIy1o_zaIahnW56-V-Pbc_ms5CPQcFu8ToL7n6PfNTa3CGZ-IhLC/pub?gid=0&single=true&output=csv';
-        
+
             // Fetch the CSV content using file_get_contents
             $csvContent_product = file_get_contents($get_product_csv_url);
-        
+
             // Parse the CSV content using League\Csv\Reader
             $csv_product = Reader::createFromString($csvContent_product);
             $csv_product->setHeaderOffset(0); // Set the header offset
-        
+
             // Extract records from the CSV
             $records_csv = (new Statement())->process($csv_product);
-        
+
+            // Get the headers from the CSV
+            $headers = $csv_product->getHeader();
+
+            // Dynamically detect variant columns (prefixed with "v_")
+            $variantColumns = array_filter($headers, fn($header) => str_starts_with($header, 'v_'));
+
+            // Dynamically detect feature columns (prefixed with "Feature")
+            $featureColumns = array_filter($headers, fn($header) => str_starts_with($header, 'Feature'));
+
             // Initialize record count and error array
             $recordCount = 0;
+            $skippedCount = 0;
             $errors = [];
-        
-            // Define the variant columns
-            $variantColumns = ['v_Speed', 'v_Power', 'v_Weight']; // Modify according to your CSV structure
-        
+
             // Loop through each product row in the CSV
             foreach ($records_csv as $row) {
                 try {
+                    // Check if the product already exists
+                    $existingProduct = ProductModel::where('slug', Str::slug($row['Product Name']))->first();
+
+                    if ($existingProduct) {
+                        $skippedCount++;
+                        Log::info("Skipped duplicate product: {$row['Product Name']}");
+                        continue; // Skip this product if it already exists
+                    }
+
                     // Check if Brand exists, otherwise create a new Brand
                     $brand = BrandModel::firstOrCreate([
                         'name' => $row['Brand'], // Assuming 'Brand' column in the CSV has the brand name
                     ]);
-        
+
                     // Check if Category exists, otherwise create a new Category
                     $category = CategoryModel::firstOrCreate([
                         'name' => $row['Category'], // Assuming 'Category' column in the CSV has the category name
                     ]);
-        
+
                     // Insert the product
                     $product = ProductModel::create([
                         'name' => $row['Product Name'], // Product Name
                         'description' => $row['Description'], // Product Description
                         'brand_id' => $brand->id, // Link the product to the brand
                         'category_id' => $category->id, // Link the product to the category
-                        'slug' => Str::slug($row['Product Name']), // Generate SEO-friendly slug
+                        'slug' => Str::slug($row['Product Name']) . '-' . time(), // Generate SEO-friendly slug
                         'is_active' => true, // Set product status (this can be changed based on CSV data)
                     ]);
-        
-                    // Feature handling (Feature 1, Feature 2, ..., Feature N)
-                    $featureColumns = ['Feature 1', 'Feature 2', 'Feature 3', 'Feature 4', 'Feature 5', 'Feature 6', 'Feature 7', 'Feature 8', 'Feature 9', 'Feature 10'];
-        
+
+                    // Handle features dynamically
                     foreach ($featureColumns as $featureColumn) {
-                        $featureIndex = (int) filter_var($featureColumn, FILTER_SANITIZE_NUMBER_INT); // Extract the feature number (1, 2, 3, ...)
-        
                         // Make sure we have a value for this feature in the row
                         if (!empty($row[$featureColumn])) {
                             ProductFeatureModel::create([
                                 'product_id' => $product->id,
-                                'feature_name' => 'Feature ' . $featureIndex, // Feature name, e.g., 'Feature 1'
+                                'feature_name' => $featureColumn, // Use the column name as feature name
                                 'feature_value' => $row[$featureColumn], // Feature value
                                 'is_filterable' => false, // Set based on your logic
                             ]);
                         }
                     }
-        
-                    // Handling Product Variants (v_* columns for variants)
+
+                    // Handle variants dynamically
                     foreach ($variantColumns as $variantColumn) {
                         if (!empty($row[$variantColumn])) {
                             // Extract variant name (without "v_" prefix)
                             $variantType = str_replace('v_', '', $variantColumn);
-        
+
+                            $sellingPrice = !empty($row['Sale Price']) ? $row['Sale Price'] : 0000;
+
                             ProductVariantModel::create([
                                 'product_id' => $product->id,
                                 'variant_type' => $variantType, // Variant type e.g., 'Speed', 'Power'
                                 'variant_value' => $row[$variantColumn], // Value from CSV
                                 'regular_price' => $row['Regular Price'], // Map prices as required
-                                'selling_price' => $row['Sale Price'],
+                                'selling_price' => $sellingPrice,
                                 'hsn' => '1234', // Set your HSN code if available
                                 'regular_tax' => $row['Tax Rate'], // Use tax rate from the row
                                 'selling_tax' => $row['Tax Rate'],
                             ]);
                         }
                     }
-        
+
                     // Increment record count
                     $recordCount++;
                 } catch (\Exception $e) {
@@ -361,16 +375,17 @@ class ProductController extends Controller
                     $errors[] = "Error importing product '{$row['Product Name']}': " . $e->getMessage();
                 }
             }
-        
-            // Log total records processed and any errors
-            Log::info("Total products imported: {$recordCount}");
+
+            // Log total records processed, skipped, and any errors
+            Log::info("Total products imported: {$recordCount}, skipped: {$skippedCount}");
             if (!empty($errors)) {
                 Log::error("Errors encountered during import: " . implode(', ', $errors));
             }
-        
+
             return response()->json([
                 'message' => 'Products and related data imported successfully.',
                 'total_records' => $recordCount,
+                'skipped_records' => $skippedCount,
                 'errors' => $errors
             ]);
         } catch (\Exception $e) {
@@ -382,4 +397,5 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
 }

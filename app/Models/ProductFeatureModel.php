@@ -10,7 +10,7 @@ class ProductFeatureModel extends Model
     protected $table = 't_product_features';
 
     protected $fillable = [
-        'product_id', 'feature_name', 'is_filterable'
+        'product_id', 'feature_name', 'feature_value', 'is_filterable'
     ];
 
     /**
