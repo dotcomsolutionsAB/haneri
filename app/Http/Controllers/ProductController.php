@@ -128,7 +128,6 @@ class ProductController extends Controller
             // If an ID is provided, fetch just that product.
             if ($id) {
                 $product = ProductModel::with([
-                    'user:id,name,phone,city',
                     'brand:id,name',
                     'category:id,name',
                     'subIndustryDetails:id,name'
@@ -148,9 +147,8 @@ class ProductController extends Controller
                     return isset($uploads[$uid]) ? $uploads[$uid] : null;
                 }, $uploadIds);
 
-                // Build response data
+                // Build response data including related brand, category, sub-industry details.
                 $responseData = [
-                    'user'         => $product->user ? ['name' => $product->user->name, 'city' => $product->user->city] : null,
                     'brand'        => $product->brand ? $product->brand->name : null,
                     'category'     => $product->category ? $product->category->name : null,
                     'sub_industry' => $product->subIndustryDetails ? $product->subIndustryDetails->name : null,
@@ -164,20 +162,19 @@ class ProductController extends Controller
             }
 
             // For product listing, get filter inputs
-            $search    = $request->input('search');         // Single search filter
-            $isActive  = $request->input('is_active');        // Filter by active status (0 or 1)
-            $limit     = $request->input('limit', 10);         // Default limit to 10
-            $offset    = $request->input('offset', 0);          // Default offset to 0
+            $search   = $request->input('search');         // Search term for product name, HSN, brand name, or category name
+            $isActive = $request->input('is_active');        // Filter for active status (0 or 1)
+            $limit    = $request->input('limit', 10);         // Default limit to 10
+            $offset   = $request->input('offset', 0);          // Default offset to 0
 
-            // Build query with relationships
+            // Build query with relationships (exclude user relationship)
             $query = ProductModel::with([
-                'user:id,name,phone,city',
                 'brand:id,name',
                 'category:id,name',
                 'subIndustryDetails:id,name'
             ])->where('company_id', Auth::user()->company_id);
 
-            // Apply search filter (search in product name, HSN, brand name, or category name)
+            // Apply search filter (across product name, HSN, brand name, or category name)
             if (!empty($search)) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'LIKE', '%' . $search . '%')
@@ -191,12 +188,10 @@ class ProductController extends Controller
                 });
             }
 
-            // Apply is_active filter if provided (note: check for not null)
+            // Apply is_active filter if provided
             if (!is_null($isActive)) {
                 $query->where('is_active', $isActive);
             }
-
-            // Additional filters can be added here if needed
 
             // Get total record count before pagination
             $totalRecords = $query->count();
@@ -214,11 +209,14 @@ class ProductController extends Controller
                 ], 404);
             }
 
-            // Process images: Collect all image IDs from products and fetch file_url from t_uploads
-            $allImageIds = collect($products)->flatMap(function ($p) {
-                return explode(',', $p->image ?? '');
-            })->unique()->filter();
-
+            // Process images for each product:
+            // Collect all image IDs from products and fetch file_url from t_uploads.
+            $allImageIds = collect($products)
+                            ->flatMap(function ($p) {
+                                return explode(',', $p->image ?? '');
+                            })
+                            ->unique()
+                            ->filter();
             $uploads = UploadModel::whereIn('id', $allImageIds)->pluck('file_url', 'id');
 
             $products->transform(function ($prod) use ($uploads) {
@@ -228,7 +226,6 @@ class ProductController extends Controller
                 }, $uploadIds);
 
                 // Prepare additional relationship data
-                $prod->user = $prod->user ? ['name' => $prod->user->name, 'city' => $prod->user->city] : null;
                 $prod->brand = $prod->brand ? $prod->brand->name : null;
                 $prod->category = $prod->category ? $prod->category->name : null;
                 $prod->sub_industry = $prod->subIndustryDetails ? $prod->subIndustryDetails->name : null;
@@ -250,6 +247,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
 
 
     // View Single
