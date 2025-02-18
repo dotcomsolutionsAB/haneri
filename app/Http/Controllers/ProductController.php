@@ -98,30 +98,159 @@ class ProductController extends Controller
     }
 
     // View All
-    public function index()
+    // public function index()
+    // {
+    //     $products = ProductModel::with(['photo', 'variants', 'features', 'brand', 'category'])
+    //     ->select('id', 'name', 'brand_id', 'category_id', 'slug', 'description', 'is_active')
+    //     ->get()
+    //     ->makeHidden(['id', 'created_at', 'updated_at']);
+
+    //     $products = $products->map(function ($product) {
+    //         return [
+    //             'name' => $product->name,
+    //             'brand' => $product->brand ? $product->brand->makeHidden(['id', 'created_at', 'updated_at']) : null,
+    //             'category' => $product->category ? $product->category->makeHidden(['id', 'created_at', 'updated_at']) : null,
+    //             'slug' => $product->slug,
+    //             'description' => $product->description,
+    //             'is_active' => $product->is_active,
+    //             'variants' => $product->variants ? $product->variants->makeHidden(['id', 'created_at', 'updated_at']) : null,
+    //             'features' => $product->features ? $product->features->makeHidden(['id', 'created_at', 'updated_at']) : null,
+    //         ];
+    //     });
+
+    //     return $products->isNotEmpty()
+    //         ? response()->json(['message' => 'Fetch data successfully!', 'data' => $products, 'count' => count($products)], 200)
+    //         : response()->json(['message' => 'Sorry, No data Available'], 400);
+    // }
+    public function index(Request $request, $id = null)
     {
-        $products = ProductModel::with(['photo', 'variants', 'features', 'brand', 'category'])
-        ->select('id', 'name', 'brand_id', 'category_id', 'slug', 'description', 'is_active')
-        ->get()
-        ->makeHidden(['id', 'created_at', 'updated_at']);
+        try {
+            // If an ID is provided, fetch just that product.
+            if ($id) {
+                $product = ProductModel::with([
+                    'user:id,name,phone,city',
+                    'brand:id,name',
+                    'category:id,name',
+                    'subIndustryDetails:id,name'
+                ])->find($id);
 
-        $products = $products->map(function ($product) {
-            return [
-                'name' => $product->name,
-                'brand' => $product->brand ? $product->brand->makeHidden(['id', 'created_at', 'updated_at']) : null,
-                'category' => $product->category ? $product->category->makeHidden(['id', 'created_at', 'updated_at']) : null,
-                'slug' => $product->slug,
-                'description' => $product->description,
-                'is_active' => $product->is_active,
-                'variants' => $product->variants ? $product->variants->makeHidden(['id', 'created_at', 'updated_at']) : null,
-                'features' => $product->features ? $product->features->makeHidden(['id', 'created_at', 'updated_at']) : null,
-            ];
-        });
+                if (!$product) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Product not found!',
+                    ], 404);
+                }
 
-        return $products->isNotEmpty()
-            ? response()->json(['message' => 'Fetch data successfully!', 'data' => $products, 'count' => count($products)], 200)
-            : response()->json(['message' => 'Sorry, No data Available'], 400);
+                // Process images (assumes t_uploads has file_url stored already)
+                $uploadIds = $product->image ? explode(',', $product->image) : [];
+                $uploads = UploadModel::whereIn('id', $uploadIds)->pluck('file_url', 'id');
+                $product->image = array_map(function ($uid) use ($uploads) {
+                    return isset($uploads[$uid]) ? $uploads[$uid] : null;
+                }, $uploadIds);
+
+                // Build response data
+                $responseData = [
+                    'user'         => $product->user ? ['name' => $product->user->name, 'city' => $product->user->city] : null,
+                    'brand'        => $product->brand ? $product->brand->name : null,
+                    'category'     => $product->category ? $product->category->name : null,
+                    'sub_industry' => $product->subIndustryDetails ? $product->subIndustryDetails->name : null,
+                ] + $product->toArray();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Product details fetched successfully!',
+                    'data'    => collect($responseData)->except(['id', 'user_id', 'brand_id', 'category_id', 'created_at', 'updated_at']),
+                ], 200);
+            }
+
+            // For product listing, get filter inputs
+            $search    = $request->input('search');         // Single search filter
+            $isActive  = $request->input('is_active');        // Filter by active status (0 or 1)
+            $limit     = $request->input('limit', 10);         // Default limit to 10
+            $offset    = $request->input('offset', 0);          // Default offset to 0
+
+            // Build query with relationships
+            $query = ProductModel::with([
+                'user:id,name,phone,city',
+                'brand:id,name',
+                'category:id,name',
+                'subIndustryDetails:id,name'
+            ])->where('company_id', Auth::user()->company_id);
+
+            // Apply search filter (search in product name, HSN, brand name, or category name)
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'LIKE', '%' . $search . '%')
+                    ->orWhere('hsn', 'LIKE', '%' . $search . '%')
+                    ->orWhereHas('brand', function ($q2) use ($search) {
+                        $q2->where('name', 'LIKE', '%' . $search . '%');
+                    })
+                    ->orWhereHas('category', function ($q2) use ($search) {
+                        $q2->where('name', 'LIKE', '%' . $search . '%');
+                    });
+                });
+            }
+
+            // Apply is_active filter if provided (note: check for not null)
+            if (!is_null($isActive)) {
+                $query->where('is_active', $isActive);
+            }
+
+            // Additional filters can be added here if needed
+
+            // Get total record count before pagination
+            $totalRecords = $query->count();
+
+            // Apply pagination
+            $query->offset($offset)->limit($limit);
+            $products = $query->get();
+
+            if ($products->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No products found!',
+                    'data'    => [],
+                    'total_records' => 0,
+                ], 404);
+            }
+
+            // Process images: Collect all image IDs from products and fetch file_url from t_uploads
+            $allImageIds = collect($products)->flatMap(function ($p) {
+                return explode(',', $p->image ?? '');
+            })->unique()->filter();
+
+            $uploads = UploadModel::whereIn('id', $allImageIds)->pluck('file_url', 'id');
+
+            $products->transform(function ($prod) use ($uploads) {
+                $uploadIds = $prod->image ? explode(',', $prod->image) : [];
+                $prod->image = array_map(function ($uid) use ($uploads) {
+                    return isset($uploads[$uid]) ? $uploads[$uid] : null;
+                }, $uploadIds);
+
+                // Prepare additional relationship data
+                $prod->user = $prod->user ? ['name' => $prod->user->name, 'city' => $prod->user->city] : null;
+                $prod->brand = $prod->brand ? $prod->brand->name : null;
+                $prod->category = $prod->category ? $prod->category->name : null;
+                $prod->sub_industry = $prod->subIndustryDetails ? $prod->subIndustryDetails->name : null;
+
+                return $prod->makeHidden(['id', 'user_id', 'brand_id', 'category_id', 'created_at', 'updated_at']);
+            });
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Products fetched successfully!',
+                'data'    => $products,
+                'total_records' => $totalRecords,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Something went wrong: ' . $e->getMessage(),
+            ], 500);
+        }
     }
+
 
     // View Single
     public function show($slug)
