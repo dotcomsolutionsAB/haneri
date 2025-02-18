@@ -15,6 +15,13 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, $role): Response
     {
+        \Log::info('Authenticated role: ' . auth()->user()->role);
+        \Log::info('Allowed roles: ', $roles);
+
+        \Log::info('Request Route: ' . $request->path());
+        \Log::info('Authenticated User: ', ['id' => auth()->id(), 'role' => auth()->user()->role]);
+        \Log::info('Allowed Roles: ', $roles);
+
         if (auth()->check() && in_array(auth()->user()->role, $roles)) {
             return $next($request);
         }
