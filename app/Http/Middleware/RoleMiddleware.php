@@ -15,6 +15,10 @@ class RoleMiddleware
      */
     public function handle(Request $request, Closure $next, $role): Response
     {
-        return $next($request);
+        if (auth()->check() && in_array(auth()->user()->role, $roles)) {
+            return $next($request);
+        }
+
+        return response()->json(['message' => 'Unauthorized'], 403);
     }
 }
