@@ -125,12 +125,11 @@ class ProductController extends Controller
     public function index(Request $request, $id = null)
     {
         try {
-            // If an ID is provided, fetch just that product.
+            // ✅ Fetch single product by ID if provided
             if ($id) {
                 $product = ProductModel::with([
                     'brand:id,name',
                     'category:id,name',
-                    'subIndustryDetails:id,name'
                 ])->find($id);
 
                 if (!$product) {
@@ -140,66 +139,57 @@ class ProductController extends Controller
                     ], 404);
                 }
 
-                // Process images (assumes t_uploads has file_url stored already)
+                // ✅ Process images
                 $uploadIds = $product->image ? explode(',', $product->image) : [];
                 $uploads = UploadModel::whereIn('id', $uploadIds)->pluck('file_url', 'id');
-                $product->image = array_map(function ($uid) use ($uploads) {
-                    return isset($uploads[$uid]) ? $uploads[$uid] : null;
-                }, $uploadIds);
+                $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-                // Build response data including related brand, category, sub-industry details.
+                // ✅ Response Data
                 $responseData = [
-                    'brand'        => $product->brand ? $product->brand->name : null,
-                    'category'     => $product->category ? $product->category->name : null,
-                    'sub_industry' => $product->subIndustryDetails ? $product->subIndustryDetails->name : null,
+                    'brand'    => $product->brand?->name,
+                    'category' => $product->category?->name,
                 ] + $product->toArray();
 
                 return response()->json([
                     'success' => true,
                     'message' => 'Product details fetched successfully!',
-                    'data'    => collect($responseData)->except(['id', 'user_id', 'brand_id', 'category_id', 'created_at', 'updated_at']),
+                    'data'    => collect($responseData)->except(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']),
                 ], 200);
             }
 
-            // For product listing, get filter inputs
-            $search   = $request->input('search');         // Search term for product name, HSN, brand name, or category name
-            $isActive = $request->input('is_active');        // Filter for active status (0 or 1)
-            $limit    = $request->input('limit', 10);         // Default limit to 10
-            $offset   = $request->input('offset', 0);          // Default offset to 0
+            // ✅ Fetch multiple products with filters
+            $search   = $request->input('search'); // Search filter for name, brand, category
+            $isActive = $request->input('is_active'); // Active/Inactive filter
+            $limit    = $request->input('limit', 10); // Default limit to 10
+            $offset   = $request->input('offset', 0); // Default offset to 0
 
-            // Build query with relationships (exclude user relationship)
+            // ✅ Query with filters
             $query = ProductModel::with([
                 'brand:id,name',
                 'category:id,name',
-                'subIndustryDetails:id,name'
             ])->where('company_id', Auth::user()->company_id);
 
-            // Apply search filter (across product name, HSN, brand name, or category name)
+            // ✅ Apply search filter (search in `product name`, `brand name`, `category name`)
             if (!empty($search)) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'LIKE', '%' . $search . '%')
-                    ->orWhere('hsn', 'LIKE', '%' . $search . '%')
-                    ->orWhereHas('brand', function ($q2) use ($search) {
-                        $q2->where('name', 'LIKE', '%' . $search . '%');
-                    })
-                    ->orWhereHas('category', function ($q2) use ($search) {
-                        $q2->where('name', 'LIKE', '%' . $search . '%');
-                    });
+                    $q->where('name', 'LIKE', "%$search%")
+                    ->orWhereHas('brand', fn($q2) => $q2->where('name', 'LIKE', "%$search%"))
+                    ->orWhereHas('category', fn($q2) => $q2->where('name', 'LIKE', "%$search%"));
                 });
             }
 
-            // Apply is_active filter if provided
+            // ✅ Apply `is_active` filter if provided
             if (!is_null($isActive)) {
                 $query->where('is_active', $isActive);
             }
 
-            // Get total record count before pagination
+            // ✅ Get total records before pagination
             $totalRecords = $query->count();
 
-            // Apply pagination
-            $query->offset($offset)->limit($limit);
-            $products = $query->get();
+            // ✅ Apply pagination
+            $products = $query->offset($offset)->limit($limit)->get();
 
+            // ✅ Handle empty results
             if ($products->isEmpty()) {
                 return response()->json([
                     'success' => false,
@@ -209,30 +199,23 @@ class ProductController extends Controller
                 ], 404);
             }
 
-            // Process images for each product:
-            // Collect all image IDs from products and fetch file_url from t_uploads.
-            $allImageIds = collect($products)
-                            ->flatMap(function ($p) {
-                                return explode(',', $p->image ?? '');
-                            })
-                            ->unique()
-                            ->filter();
+            // ✅ Process images (fetch all image IDs and get URLs)
+            $allImageIds = $products->flatMap(fn($p) => explode(',', $p->image ?? ''))->unique()->filter();
             $uploads = UploadModel::whereIn('id', $allImageIds)->pluck('file_url', 'id');
 
+            // ✅ Transform product data
             $products->transform(function ($prod) use ($uploads) {
                 $uploadIds = $prod->image ? explode(',', $prod->image) : [];
-                $prod->image = array_map(function ($uid) use ($uploads) {
-                    return isset($uploads[$uid]) ? $uploads[$uid] : null;
-                }, $uploadIds);
+                $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-                // Prepare additional relationship data
-                $prod->brand = $prod->brand ? $prod->brand->name : null;
-                $prod->category = $prod->category ? $prod->category->name : null;
-                $prod->sub_industry = $prod->subIndustryDetails ? $prod->subIndustryDetails->name : null;
+                // ✅ Keep only required fields
+                $prod->brand = $prod->brand?->name;
+                $prod->category = $prod->category?->name;
 
-                return $prod->makeHidden(['id', 'user_id', 'brand_id', 'category_id', 'created_at', 'updated_at']);
+                return $prod->makeHidden(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']);
             });
 
+            // ✅ Return response
             return response()->json([
                 'success' => true,
                 'message' => 'Products fetched successfully!',
@@ -247,6 +230,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
 
 
 
