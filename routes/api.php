@@ -32,7 +32,7 @@ Route::post('/otp', [AuthController::class, 'generate_otp']);
 // });
 
 Route::prefix('cart')->group(function () {
-    Route::post('/get_products/{id?}', [CartController::class, 'index']);             // Get all cart items for a user
+    Route::get('/', [CartController::class, 'index']);             // Get all cart items for a user
     Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
     Route::put('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
     Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
@@ -52,7 +52,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::middleware('role:admin')->group(function () {
         // Product Routes
         Route::prefix('products')->group(function () {
-            Route::get('/', [ProductController::class, 'index']);          // List all products
+            Route::post('/get_products', [ProductController::class, 'index']);          // List all products
             Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
             Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
