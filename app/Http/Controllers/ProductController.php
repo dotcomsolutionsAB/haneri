@@ -9,7 +9,7 @@ use App\Models\ProductFeatureModel;
 use App\Models\ProductVariantModel;
 use App\Models\BrandModel;
 use App\Models\CategoryModel;
-
+use App\Models\UploadModel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -230,9 +230,6 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
-
-
 
     // View Single
     public function show($slug)

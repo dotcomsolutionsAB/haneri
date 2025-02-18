@@ -62,4 +62,9 @@ class ProductModel extends Model
     {
         return $this->belongsTo(CategoryModel::class, 'category_id', 'id'); // category_id references id in Category table
     }
+
+    public function upload()
+    {
+        return $this->belongsTo(CategoryModel::class, 'photo_id', 'id'); // photo_id references id in Category table
+    }
 }
