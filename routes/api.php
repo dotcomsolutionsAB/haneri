@@ -57,6 +57,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
+            Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
         });
     });
 
