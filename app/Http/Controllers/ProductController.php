@@ -130,6 +130,8 @@ class ProductController extends Controller
                 $product = ProductModel::with([
                     'brand:id,name',
                     'category:id,name',
+                    'features:product_id,feature_name,feature_value,is_filterable',
+                    'variants:product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,hsn,regular_tax,selling_tax,video_url,product_pdf'
                 ])->find($id);
 
                 if (!$product) {
@@ -148,6 +150,8 @@ class ProductController extends Controller
                 $responseData = [
                     'brand'    => $product->brand?->name,
                     'category' => $product->category?->name,
+                    'features' => $product->features,
+                    'variants' => $product->variants,
                 ] + $product->toArray();
 
                 return response()->json([
@@ -167,6 +171,8 @@ class ProductController extends Controller
             $query = ProductModel::with([
                 'brand:id,name',
                 'category:id,name',
+                'features:product_id,feature_name,feature_value,is_filterable',
+                'variants:product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,hsn,regular_tax,selling_tax,video_url,product_pdf'
             ]);
 
             // ✅ Apply search filter (search in `product name`, `brand name`, `category name`)
@@ -211,6 +217,8 @@ class ProductController extends Controller
                 // ✅ Keep only required fields
                 $prod->brand = $prod->brand?->name;
                 $prod->category = $prod->category?->name;
+                $prod->features = $prod->features;
+                $prod->variants = $prod->variants;
 
                 return $prod->makeHidden(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']);
             });
@@ -391,6 +399,7 @@ class ProductController extends Controller
             BrandModel::truncate();
             CategoryModel::truncate();
             ProductFeatureModel::truncate();
+            ProductVariantModel::truncate();
 
             // Fetch the CSV content using file_get_contents
             $csvContent_product = file_get_contents($get_product_csv_url);
