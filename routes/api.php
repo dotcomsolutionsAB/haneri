@@ -43,12 +43,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // User Routes
     Route::prefix('users')->group(function () {
-    Route::post('/register', [UserController::class, 'register']); // Register a new user
-    // Route::post('/login', [UserController::class, 'login']);       // Log in a user
-    Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
-    Route::post('/update', [UserController::class, 'update']);     // Update user details
-    // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
-
+        Route::post('/register', [UserController::class, 'register']); // Register a new user
+        // Route::post('/login', [UserController::class, 'login']);       // Log in a user
+        Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
+        Route::post('/update', [UserController::class, 'update']);     // Update user details
+        // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
+        });
     Route::middleware('role:admin')->group(function () {
         // Product Routes
         Route::prefix('products')->group(function () {
@@ -59,7 +59,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
         });
     });
-});
 
 
     // Category Routes
