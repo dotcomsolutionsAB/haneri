@@ -48,7 +48,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
     Route::post('/update', [UserController::class, 'update']);     // Update user details
     // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
-});
 
     Route::middleware('role:admin')->group(function () {
         // Product Routes
@@ -60,6 +59,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
         });
     });
+});
+
 
     // Category Routes
     Route::prefix('categories')->group(function () {
