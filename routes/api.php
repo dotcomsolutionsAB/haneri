@@ -21,15 +21,15 @@ Route::post('/login/{otp?}', [AuthController::class, 'login']);
 Route::post('/otp', [AuthController::class, 'generate_otp']);
 
 // Product Routes
-Route::prefix('products')->group(function () {
-    Route::get('/', [ProductController::class, 'index']);          // List all products
-    Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
-    Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
-    Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
-    Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
+// Route::prefix('products')->group(function () {
+//     Route::get('/', [ProductController::class, 'index']);          // List all products
+//     Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
+//     Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
+//     Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
+//     Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
 
-    Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
-});
+//     Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
+// });
 
 Route::prefix('cart')->group(function () {
     Route::get('/', [CartController::class, 'index']);             // Get all cart items for a user
