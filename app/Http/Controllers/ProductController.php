@@ -167,7 +167,7 @@ class ProductController extends Controller
             $query = ProductModel::with([
                 'brand:id,name',
                 'category:id,name',
-            ])->where('company_id', Auth::user()->company_id);
+            ]);
 
             // ✅ Apply search filter (search in `product name`, `brand name`, `category name`)
             if (!empty($search)) {
