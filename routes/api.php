@@ -52,7 +52,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::middleware('role:admin')->group(function () {
         // Product Routes
         Route::prefix('products')->group(function () {
-            Route::post('/get_products', [ProductController::class, 'index']);          // List all products
+            Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
             Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
             Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
