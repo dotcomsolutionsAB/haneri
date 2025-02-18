@@ -278,6 +278,12 @@ class ProductController extends Controller
             // URL of the CSV file from Google Sheets
             $get_product_csv_url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSCT6XqtlJtx8Wcktt3fUH_0GUyvIy1o_zaIahnW56-V-Pbc_ms5CPQcFu8ToL7n6PfNTa3CGZ-IhLC/pub?gid=0&single=true&output=csv';
 
+            // Clear old data before import
+            ProductModel::truncate();
+            BrandModel::truncate();
+            CategoryModel::truncate();
+            ProductFeatureModel::truncate();
+
             // Fetch the CSV content using file_get_contents
             $csvContent_product = file_get_contents($get_product_csv_url);
 

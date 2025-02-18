@@ -50,14 +50,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
 });
 
-    // // Product Routes
-    // Route::prefix('products')->group(function () {
-    //     Route::get('/', [ProductController::class, 'index']);          // List all products
-    //     Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
-    //     Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
-    //     Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
-    //     Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
-    // });
+    Route::middleware('role:admin')->group(function () {
+        // Product Routes
+        Route::prefix('products')->group(function () {
+            Route::get('/', [ProductController::class, 'index']);          // List all products
+            Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
+            Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
+            Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
+            Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
+        });
+    });
 
     // Category Routes
     Route::prefix('categories')->group(function () {
