@@ -141,7 +141,7 @@ class ProductController extends Controller
 
                 // ✅ Process images
                 $uploadIds = $product->image ? explode(',', $product->image) : [];
-                $uploads = UploadModel::whereIn('id', $uploadIds)->pluck('file_url', 'id');
+                $uploads = UploadModel::whereIn('id', $uploadIds)->pluck('file_path', 'id');
                 $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
                 // ✅ Response Data
@@ -201,7 +201,7 @@ class ProductController extends Controller
 
             // ✅ Process images (fetch all image IDs and get URLs)
             $allImageIds = $products->flatMap(fn($p) => explode(',', $p->image ?? ''))->unique()->filter();
-            $uploads = UploadModel::whereIn('id', $allImageIds)->pluck('file_url', 'id');
+            $uploads = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
 
             // ✅ Transform product data
             $products->transform(function ($prod) use ($uploads) {
