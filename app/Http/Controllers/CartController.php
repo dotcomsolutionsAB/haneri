@@ -141,19 +141,19 @@ class CartController extends Controller
         ->map(function ($cartItem) {
         // Make sure to hide the unwanted fields from the product and variant
         if ($cartItem->user) {
-            $cartItem->user->makeHidden(['id', 'created_at', 'updated_at']);
+            $cartItem->user->makeHidden(['created_at', 'updated_at']);
         }
 
         if ($cartItem->product) {
-            $cartItem->product->makeHidden(['id', 'created_at', 'updated_at']);
+            $cartItem->product->makeHidden(['created_at', 'updated_at']);
         }
 
         if ($cartItem->variant) {
-            $cartItem->variant->makeHidden(['id', 'created_at', 'updated_at']);
+            $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
 
         // Optionally hide fields on the cart item itself
-        $cartItem->makeHidden(['id', 'created_at', 'updated_at']);
+        $cartItem->makeHidden(['created_at', 'updated_at']);
 
         return $cartItem;
         });
