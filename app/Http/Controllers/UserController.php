@@ -109,6 +109,8 @@ class UserController extends Controller
         // Call the register function
         $registerResponse = $this->register($registrationData);
 
+        dd($registerResponse);
+
         // 🔴 Convert JSON response to an array
         $registerData = json_decode($registerResponse->getContent(), true);
 
