@@ -107,7 +107,7 @@ class CartController extends Controller
         }
 
         if ($user) {
-
+dd($request->toArray());
             if ($user->role == 'admin') {
                 $request->validate([
                     'user_id' => 'required|integer|exists:users,id',
