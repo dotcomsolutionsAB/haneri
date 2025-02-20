@@ -109,11 +109,11 @@ class UserController extends Controller
         // Call the register function
         $registerResponse = $this->register($registrationData);
 
-         // 🔴 Convert JSON response to an array
+        // 🔴 Convert JSON response to an array
         $registerData = json_decode($registerResponse->getContent(), true);
-dd($registerData);
+
         // 🔴 Check if registration failed
-        if (!isset($registerData['success']) || !$registerData['success']) {
+        if (!isset($registerData['data'])) {
             return response()->json([
                 'message' => 'User registration failed',
                 'errors' => $registerData['errors'] ?? []
