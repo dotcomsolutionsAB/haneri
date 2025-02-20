@@ -130,8 +130,8 @@ class ProductController extends Controller
                 $product = ProductModel::with([
                     'brand:id,name',
                     'category:id,name',
-                    'features:id, product_id, feature_name,feature_value,is_filterable',
-                    'variants:id, product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,hsn,regular_tax,selling_tax,video_url,product_pdf'
+                    'features:id,product_id,feature_name,feature_value,is_filterable',
+                    'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,hsn,regular_tax,selling_tax,video_url,product_pdf'
                 ])->find($id);
 
                 if (!$product) {
@@ -171,8 +171,8 @@ class ProductController extends Controller
             $query = ProductModel::with([
                 'brand:id,name',
                 'category:id,name',
-                'features:id, product_id,feature_name,feature_value,is_filterable',
-                'variants:id, product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,hsn,regular_tax,selling_tax,video_url,product_pdf'
+                'features:id,product_id,feature_name,feature_value,is_filterable',
+                'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,hsn,regular_tax,selling_tax,video_url,product_pdf'
             ]);
 
             // ✅ Apply search filter (search in `product name`, `brand name`, `category name`)
