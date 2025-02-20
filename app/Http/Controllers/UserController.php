@@ -109,9 +109,15 @@ class UserController extends Controller
         // Call the register function
         $registerResponse = $this->register($registrationData);
 
-        // If registration fails, return the error
-        if (!$registerResponse['success']) {
-            return response()->json($registerResponse, 400);
+         // 🔴 Convert JSON response to an array
+        $registerData = json_decode($registerResponse->getContent(), true);
+
+        // 🔴 Check if registration failed
+        if (!isset($registerData['success']) || !$registerData['success']) {
+            return response()->json([
+                'message' => 'User registration failed',
+                'errors' => $registerData['errors'] ?? []
+            ], 400);
         }
 
         // Retrieve the newly created user
