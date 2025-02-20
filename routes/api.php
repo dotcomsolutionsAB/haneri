@@ -34,7 +34,7 @@ Route::post('/otp', [AuthController::class, 'generate_otp']);
 Route::prefix('cart')->group(function () {
     Route::get('/', [CartController::class, 'index']);             // Get all cart items for a user
     Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
-    Route::put('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
+    Route::post('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
     Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
 });
 
