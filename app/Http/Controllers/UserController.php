@@ -6,6 +6,9 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use App\Mail\UserRegisteredMail;
+use Illuminate\Support\Facades\Mail;
+use App\Models\CartModel;
 
 class UserController extends Controller
 {
@@ -72,5 +75,64 @@ class UserController extends Controller
         unset($user['id'], $user['created_at'], $user['updated_at']);
 
         return response()->json(['message' => 'User updated successfully!', 'data' => $user], 200);
+    }
+
+    public function guest_register(Request $request)
+    {
+        // Retrieve the cart_id from cookies
+        $cartId = $request->cookie('cart_id');
+
+        if (!$cartId) {
+            return response()->json(['message' => 'Cart ID not found in cookies.'], 400);
+        }
+
+        // Validate name, email, and mobile
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
+        ]);
+
+        // Generate a random password
+        $randomPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 10);
+        $hashedPassword = Hash::make($randomPassword);
+
+        // Prepare request data for registration
+        $registrationData = new Request([
+            'name' => $request->name,
+            'email' => $request->email,
+            'password' => $randomPassword,
+            'mobile' => $request->mobile,
+            'role' => 'customer'
+        ]);
+
+        // Call the register function
+        $registerResponse = $this->register($registrationData);
+
+        // If registration fails, return the error
+        if (!$registerResponse['success']) {
+            return response()->json($registerResponse, 400);
+        }
+
+        // Retrieve the newly created user
+        $user = $registerResponse['user'];
+
+        // ✅ Update cart: Replace cart_id with the new user_id
+        CartModel::where('user_id', $cartId)->update(['user_id' => $user->id]);
+
+        // Send email using Mailable
+        Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
+
+        // Automatically log in the user
+        $token = $user->createToken('authToken')->plainTextToken;
+
+        // Remove the cart_id cookie after transferring the cart to the user
+        Cookie::queue(Cookie::forget('cart_id'));
+
+        return response()->json([
+            'message' => 'User registered successfully! Cart updated and login credentials sent to email.',
+            'token' => $token,
+            'user' => $user
+        ], 201);
     }
 }

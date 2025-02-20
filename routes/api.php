@@ -19,17 +19,7 @@ use App\Http\Controllers\AddressController;
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login/{otp?}', [AuthController::class, 'login']);
 Route::post('/otp', [AuthController::class, 'generate_otp']);
-
-// Product Routes
-// Route::prefix('products')->group(function () {
-//     Route::get('/', [ProductController::class, 'index']);          // List all products
-//     Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
-//     Route::post('/', [ProductController::class, 'store']);         // Add a new product (Admin only)
-//     Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
-//     Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
-
-//     Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
-// });
+Route::post('/make_user', [AuthController::class, 'guest_register']);
 
 Route::prefix('cart')->group(function () {
     Route::post('/fetch', [CartController::class, 'index']);             // Get all cart items for a user
@@ -49,7 +39,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/update', [UserController::class, 'update']);     // Update user details
         // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
         });
+
     Route::middleware('role:admin')->group(function () {
+        
         // Product Routes
         Route::prefix('products')->group(function () {
             Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
@@ -109,10 +101,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     // Address Routes
-    Route::prefix('addresses')->group(function () {
+    Route::prefix('address')->group(function () {
         Route::get('/', [AddressController::class, 'index']);          // List all addresses for a user
-        Route::post('/', [AddressController::class, 'store']);         // Add a new address
-        Route::put('/{id}', [AddressController::class, 'update']);     // Update an address
+        Route::post('/register', [AddressController::class, 'store']);         // Add a new address
+        Route::post('/update/{id}', [AddressController::class, 'update']);     // Update an address
         Route::delete('/{id}', [AddressController::class, 'destroy']); // Delete an address
     });
 });

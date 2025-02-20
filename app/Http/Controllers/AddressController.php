@@ -37,6 +37,8 @@ class AddressController extends Controller
     {
         // Validate the incoming data
         $request->validate([
+            'name' => 'required|string',
+            'contact_no' => 'required|string',
             'address_line1' => 'required|string',
             'address_line2' => 'nullable|string',
             'city' => 'required|string',
@@ -44,6 +46,7 @@ class AddressController extends Controller
             'postal_code' => 'required|string',
             'country' => 'required|string',
             'is_default' => 'nullable|boolean',
+            'gst_no' => 'required|string',
         ]);
 
         $user = Auth::user();
@@ -67,6 +70,8 @@ class AddressController extends Controller
         // Create the new address
         $address = AddressModel::create([
             'user_id' => $user->id,
+            'name' => $request->input('name'),
+            'contact_no' => $request->input('contact_no'),
             'address_line1' => $request->input('address_line1'),
             'address_line2' => $request->input('address_line2', null),
             'city' => $request->input('city'),
@@ -74,6 +79,7 @@ class AddressController extends Controller
             'postal_code' => $request->input('postal_code'),
             'country' => $request->input('country'),
             'is_default' => $request->input('is_default', false),
+            'gst_no' => $request->input('gst_no'),
         ]);
 
         unset($address['id'], $address['created_at'], $address['updated_at']);
@@ -89,6 +95,8 @@ class AddressController extends Controller
     {
         // Validate the incoming data
         $request->validate([
+            'name' => 'required|string',
+            'contact_no' => 'required|string',
             'address_line1' => 'required|string',
             'address_line2' => 'nullable|string',
             'city' => 'required|string',
@@ -112,6 +120,8 @@ class AddressController extends Controller
 
         // Update the address
         $address->update([
+            'name' => $request->input('name'),
+            'contact_no' => $request->input('contact_no'),
             'address_line1' => $request->input('address_line1'),
             'address_line2' => $request->input('address_line2', null),
             'city' => $request->input('city'),
@@ -119,6 +129,7 @@ class AddressController extends Controller
             'postal_code' => $request->input('postal_code'),
             'country' => $request->input('country'),
             'is_default' => $request->input('is_default', false),
+            'gst_no' => $request->input('gst_no'),
         ]);
 
         unset($address['id'], $address['created_at'], $address['updated_at']);
