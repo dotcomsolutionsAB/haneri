@@ -111,7 +111,7 @@ class UserController extends Controller
 
          // 🔴 Convert JSON response to an array
         $registerData = json_decode($registerResponse->getContent(), true);
-
+dd($registerData);
         // 🔴 Check if registration failed
         if (!isset($registerData['success']) || !$registerData['success']) {
             return response()->json([
