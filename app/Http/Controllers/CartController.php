@@ -126,7 +126,7 @@ class CartController extends Controller
 
             // Check if the cart_id exists in the cookies
             if (!$cartId) {
-                return response()->json(['message' => 'Cart ID not found.'], 404);
+                return response()->json(['message' => 'Cart Record not found.'], 404);
             }
 
             $user_id = $cartId;
