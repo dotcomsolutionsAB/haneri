@@ -19,7 +19,7 @@ use App\Http\Controllers\AddressController;
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login/{otp?}', [AuthController::class, 'login']);
 Route::post('/otp', [AuthController::class, 'generate_otp']);
-Route::post('/make_user', [AuthController::class, 'guest_register']);
+Route::post('/make_user', [UserController::class, 'guest_register']);
 
 Route::prefix('cart')->group(function () {
     Route::post('/fetch', [CartController::class, 'index']);             // Get all cart items for a user
