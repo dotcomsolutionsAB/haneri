@@ -120,22 +120,8 @@ class UserController extends Controller
             ], 400);
         }
 
-        // // Retrieve the user data correctly
-        // $user = $registerData['data']; // This is now an array
-
-         // ✅ Convert `$user` into an Eloquent Model
-        if ($registerData['data'] instanceof User) {
-            $user = $registerData['data']; // If already a model, use it
-        } else {
-            $user = User::find($registerData['data']['id']); // Convert array to model
-        }
-
-        // 🔴 Ensure `$user` exists before proceeding
-        if (!$user || !$user->id) {
-            return response()->json([
-                'message' => 'User registration failed: Unable to retrieve user data.',
-            ], 400);
-        }
+        // Retrieve the user data correctly
+        $user = $registerData['data']; // This is now an array
 
         // ✅ Extract user ID from `original`
         $userId = $user->getOriginal('id'); // Safe way to get the original ID
@@ -146,8 +132,11 @@ class UserController extends Controller
         // Send email using Mailable
         Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
 
+        // Retrieve the user
+        $get_user = User::where('mobile', $request->mobile)->first();
+
         // Automatically log in the user
-        $token = $user->createToken('authToken')->plainTextToken;
+        $token = $get_user->createToken('authToken')->plainTextToken;
 
         // Remove the cart_id cookie after transferring the cart to the user
         Cookie::queue(Cookie::forget('cart_id'));
