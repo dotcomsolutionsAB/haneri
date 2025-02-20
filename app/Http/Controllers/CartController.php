@@ -166,17 +166,41 @@ class CartController extends Controller
     // Update Cart Item
     public function update(Request $request, $id)
     {
-        $user = Auth::user(); 
+        // $user = Auth::user(); 
+        // Check for Bearer Token (Authenticated User)
+        $user = Auth::guard('sanctum')->user(); 
+        $user_id = null;
 
-        if ($user->role == 'admin') {
-            $request->validate([
-                'user_id' => 'required|integer|exists:users,id',
-            ]);  
-            $user_id =  $request->input('user_id');
-        }
+        // if ($user->role == 'admin') {
+        //     $request->validate([
+        //         'user_id' => 'required|integer|exists:users,id',
+        //     ]);  
+        //     $user_id =  $request->input('user_id');
+        // }
 
-        else {
-            $user_id =  $user->id;
+        // else {
+        //     $user_id =  $user->id;
+        // }
+
+        if ($user) {
+            // If admin, require 'user_id' in request
+            if ($user->role == 'admin') {
+                $request->validate([
+                    'user_id' => 'required|integer|exists:users,id',
+                ]);  
+                $user_id = $request->input('user_id');
+            } else {
+                $user_id = $user->id;
+            }
+        } else {
+            // If no Bearer Token, check for 'cart_id' cookie
+            $cartId = $request->cookie('cart_id');
+    
+            if (!$cartId) {
+                return response()->json(['message' => 'Your cart is empty.'], 400);
+            }
+    
+            $user_id = $cartId; // Use cart_id as user_id for guest users
         }
 
         $cartItem = CartModel::where('user_id', $user_id)->find($id);
