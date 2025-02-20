@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Mail\UserRegisteredMail;
 use Illuminate\Support\Facades\Mail;
 use App\Models\CartModel;
+use Illuminate\Support\Facades\Cookie;
 
 class UserController extends Controller
 {
