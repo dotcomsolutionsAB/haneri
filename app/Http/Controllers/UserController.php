@@ -121,7 +121,7 @@ class UserController extends Controller
         }
 
         // Retrieve the newly created user
-        $user = $registerResponse['user'];
+        $user = $registerData['data'];
 
         // ✅ Update cart: Replace cart_id with the new user_id
         CartModel::where('user_id', $cartId)->update(['user_id' => $user->id]);
