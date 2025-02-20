@@ -109,12 +109,10 @@ class UserController extends Controller
         // Call the register function
         $registerResponse = $this->register($registrationData);
 
-        dd($registerResponse);
+        // 🔴 Extract data properly from `original`
+        $registerData = $registerResponse->original ?? [];
 
-        // 🔴 Convert JSON response to an array
-        $registerData = json_decode($registerResponse->getContent(), true);
-
-        // 🔴 Check if registration failed
+       // 🔴 Ensure 'data' key exists in the response
         if (!isset($registerData['data'])) {
             return response()->json([
                 'message' => 'User registration failed',
@@ -122,11 +120,13 @@ class UserController extends Controller
             ], 400);
         }
 
-        // Retrieve the newly created user
-        $user = $registerData['data'];
+        // Retrieve the user data correctly
+        $user = $registerData['data']; // This is now an array
+
+        dd($user['id']);
 
         // ✅ Update cart: Replace cart_id with the new user_id
-        CartModel::where('user_id', $cartId)->update(['user_id' => $user->id]);
+        CartModel::where('user_id', $cartId)->update(['user_id' => $user['id']]);
 
         // Send email using Mailable
         Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
