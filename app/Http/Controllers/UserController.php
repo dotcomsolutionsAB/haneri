@@ -123,10 +123,11 @@ class UserController extends Controller
         // Retrieve the user data correctly
         $user = $registerData['data']; // This is now an array
 
-        dd($user);
+        // ✅ Extract user ID from `original`
+        $userId = $user->getOriginal('id'); // Safe way to get the original ID
 
         // ✅ Update cart: Replace cart_id with the new user_id
-        CartModel::where('user_id', $cartId)->update(['user_id' => $user['id']]);
+        CartModel::where('user_id', $cartId)->update(['user_id' => $userId]);
 
         // Send email using Mailable
         Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
