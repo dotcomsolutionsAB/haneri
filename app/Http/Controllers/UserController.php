@@ -126,6 +126,8 @@ class UserController extends Controller
         // ✅ Extract user ID from `original`
         $userId = $user->getOriginal('id'); // Safe way to get the original ID
 
+        dd($userId);
+
         // ✅ Update cart: Replace cart_id with the new user_id
         CartModel::where('user_id', $cartId)->update(['user_id' => $userId]);
 
