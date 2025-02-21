@@ -28,6 +28,11 @@ Route::prefix('cart')->group(function () {
     Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
 });
 
+Route::prefix('products')->group(function () {
+    Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
+    Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
+});
+
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
@@ -50,12 +55,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
         });
     });
-
-    Route::prefix('products')->group(function () {
-        Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
-        Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
-    });
-
 
     // Category Routes
     Route::prefix('categories')->group(function () {
