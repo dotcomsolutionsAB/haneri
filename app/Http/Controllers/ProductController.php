@@ -223,7 +223,7 @@ class ProductController extends Controller
             // **Apply variant filter by variant id**
             if (!empty($variantType)) {
                 $query->whereHas('variants', function ($q) use ($variantType) {
-                    $q->where('id', '=', $variantType);
+                    $q->where('variant_type', '=', $variantType);
                 });
             }
 
