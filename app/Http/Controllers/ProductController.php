@@ -226,7 +226,7 @@ class ProductController extends Controller
                     $q->where('variant_type', '=', $variantType);
                 });
             }
-
+dd($query);
             // ✅ Get total records before pagination
             $totalRecords = $query->count();
 
