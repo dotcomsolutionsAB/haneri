@@ -166,6 +166,8 @@ class ProductController extends Controller
             $isActive = $request->input('is_active'); // Active/Inactive filter
             $limit    = $request->input('limit', 10); // Default limit to 10
             $offset   = $request->input('offset', 0); // Default offset to 0
+            $priceRange  = $request->input('price_range'); // e.g., below_10k, 10k_25k, etc.
+            $variantType = $request->input('variant_type');  // New filter for variant_type
 
             // ✅ Query with filters
             $query = ProductModel::with([
@@ -187,6 +189,42 @@ class ProductController extends Controller
             // ✅ Apply `is_active` filter if provided
             if (!is_null($isActive)) {
                 $query->where('is_active', $isActive);
+            }
+
+            // add price-range
+            // Apply price range filter on variants' selling_price
+            if (!empty($priceRange)) {
+                switch ($priceRange) {
+                    case 'below_10k':
+                        $query->whereHas('variants', function ($q) {
+                            $q->where('selling_price', '<', 10000);
+                        });
+                        break;
+                    case '10k_25k':
+                        $query->whereHas('variants', function ($q) {
+                            $q->whereBetween('selling_price', [10000, 25000]);
+                        });
+                        break;
+                    case '25k_50k':
+                        $query->whereHas('variants', function ($q) {
+                            $q->whereBetween('selling_price', [25000, 50000]);
+                        });
+                        break;
+                    case 'above_50k':
+                        $query->whereHas('variants', function ($q) {
+                            $q->where('selling_price', '>=', 50000);
+                        });
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            // **Apply variant_type filter**
+            if (!empty($variantType)) {
+                $query->whereHas('variants', function ($q) use ($variantType) {
+                    $q->where('variant_type', '=', $variantType);
+                });
             }
 
             // ✅ Get total records before pagination
