@@ -44,13 +44,16 @@ Route::middleware(['auth:sanctum'])->group(function () {
         
         // Product Routes
         Route::prefix('products')->group(function () {
-            Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
-            Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
             Route::post('/register', [ProductController::class, 'store']);         // Add a new product (Admin only)
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
         });
+    });
+
+    Route::prefix('products')->group(function () {
+        Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
+        Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
     });
 
 

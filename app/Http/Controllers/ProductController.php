@@ -220,7 +220,7 @@ class ProductController extends Controller
                 $prod->features = $prod->features;
                 $prod->variants = $prod->variants;
 
-                return $prod->makeHidden(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']);
+                return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
             });
 
             // ✅ Return response
