@@ -10,7 +10,7 @@ class AddressModel extends Model
     protected $table = 't_addresses';
 
     protected $fillable = [
-        'user_id', 'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country', 'is_default'
+        'user_id', 'name', 'contact_no', 'address_line1', 'address_line2', 'city', 'state', 'postal_code', 'country', 'is_default', 'gst_no'
     ];
 
     /**
