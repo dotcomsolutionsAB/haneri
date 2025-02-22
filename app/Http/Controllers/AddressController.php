@@ -46,7 +46,7 @@ class AddressController extends Controller
             'postal_code' => 'required|string',
             'country' => 'required|string',
             'is_default' => 'nullable|boolean',
-            'gst_no' => 'required|string',
+            'gst_no' => 'nullable|string',
         ]);
 
         $user = Auth::user();
@@ -104,6 +104,7 @@ class AddressController extends Controller
             'postal_code' => 'required|string',
             'country' => 'required|string',
             'is_default' => 'nullable|boolean',
+            'gst_no' => 'nullable|string',
         ]);
 
         $address = AddressModel::find($id);
