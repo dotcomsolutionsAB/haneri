@@ -126,7 +126,7 @@ class RazorpayController extends Controller
             // ✅ Log the raw response for debugging
             \Log::info('Fetched Order Details: ', $orderArray);
 
-            return response()->json($orderDetails);
+            return response()->json($orderArray);
         } catch (\Exception $e) {
 
             \Log::error('Error fetching order status: ' . $e->getMessage());
