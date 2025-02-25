@@ -13,14 +13,12 @@ return new class extends Migration
     {
         Schema::create('t_products', function (Blueprint $table) {
             $table->id();
+            $table->string('slug')->unique(); // SEO-friendly URL
             $table->string('name');
-            // $table->foreignId('brand_id')->constrained('t_brands');
-            // $table->foreignId('category_id')->constrained('t_categories');
-            // $table->foreignId('photo_id')->nullable()->constrained('t_uploads'); // References the uploads table
             $table->integer('brand_id');
             $table->integer('category_id');
-            $table->string('slug')->unique(); // SEO-friendly URL
             $table->text('description');
+            $table->enum('type', ['simple', 'variable'])->default('simple'); // Order status
             $table->boolean('is_active')->default(true); // Active or inactive status
             $table->timestamps();
         });
