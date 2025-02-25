@@ -14,6 +14,13 @@ class RazorpayController extends Controller
 
     public function __construct()
     {
+        $apiKey = env('RAZORPAY_KEY');
+        $apiSecret = env('RAZORPAY_SECRET');
+
+        if (!$apiKey || !$apiSecret) {
+            throw new \Exception('Razorpay API credentials are missing.');
+        }
+        
         $this->razorpay = new Api(config('services.razorpay.key'), config('services.razorpay.secret'));
     }
 
