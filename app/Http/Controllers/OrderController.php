@@ -7,6 +7,7 @@ use App\Models\OrderModel;
 use App\Models\OrderItemModel;
 use App\Models\CartModel;
 use DB;
+use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 
 class OrderController extends Controller
@@ -53,6 +54,22 @@ class OrderController extends Controller
             foreach($cartItems as $cartItem)
             {
                 $totalAmount += $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) *$cartItem->quantity;
+            }
+
+
+            // Call Razorpay Order API Before Saving Order in DB**
+            $razorpayController = new RazorpayController(); 
+            $razorpayRequest = new Request([
+                'amount' => $totalAmount,
+                'currency' => 'INR'
+            ]);
+            $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
+
+            // Decode Razorpay response
+            $razorpayData = json_decode($razorpayResponse->getContent(), true);
+            if (!$razorpayData['success']) {
+                DB::rollBack();
+                return response()->json(['message' => 'Failed to create Razorpay order.'], 500);
             }
 
             // Create the order record
