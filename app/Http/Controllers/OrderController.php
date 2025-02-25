@@ -122,7 +122,7 @@ class OrderController extends Controller
                     'payment_status' => $order->payment_status,
                     'shipping_address' => $order->shipping_address,
                     'razorpay_order_id' => $order->razorpay_order_id,
-                    'user_name' => $user_name,
+                    'name' => $user_name,
                     'email' => $user_email, 
                     'phone' => $user_phone, 
                 ]
