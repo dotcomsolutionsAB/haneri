@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
 use App\Models\CartModel;
+use App\Models\User;
 use DB;
 use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +36,15 @@ class OrderController extends Controller
         else {
             $user_id =  $user->id;
         }
+
+        // Fetch user details from User model
+        $orderUser = User::find($user_id);
+        if (!$orderUser) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        $user_email = $orderUser->email;  // Fetch email
+        $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
 
         // Start a transaction to ensure all operations are atomic
         DB::beginTransaction();
@@ -101,8 +111,21 @@ class OrderController extends Controller
             // Commit the transaction
             DB::commit();
 
-            // Exclude unwanted fields from the response
-            unset($order['id'], $order['created_at'], $order['updated_at']);
+            // Prepare response
+            $response = [
+                'message' => 'Order created successfully!',
+                'data' => [
+                    'order_id' => $order->id,
+                    'total_amount' => $order->total_amount,
+                    'status' => $order->status,
+                    'payment_status' => $order->payment_status,
+                    'shipping_address' => $order->shipping_address,
+                    'razorpay_order_id' => $order->razorpay_order_id,
+                    'user_id' => $user_id,
+                    'email' => $user_email, 
+                    'phone' => $user_phone, 
+                ]
+            ];
 
             // Return success response
             return response()->json(['message' => 'Order created successfully!', 'data' => $order], 201);
