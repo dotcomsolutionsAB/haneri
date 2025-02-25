@@ -113,7 +113,9 @@ class OrderController extends Controller
         if ($variant_id) {
             // Assuming you have a method for variant price, like `getVariantPrice()`
             $variant = \App\Models\ProductVariantModel::find($variant_id);
-            return $variant ? $variant->price : $product->price;  // Fallback to product price if variant not found
+            // return $variant ? $variant->price : $product->price;  // Fallback to product price if variant not found
+
+            return $variant ? $variant->selling_price : 0;  // Fallback to product price if variant not found
         }
 
         return $product->price;  // Return product price if no variant
