@@ -128,7 +128,7 @@ class OrderController extends Controller
             ];
 
             // Return success response
-            return response()->json(['message' => 'Order created successfully!', 'data' => $order], 201);
+            return response()->json(['message' => 'Order created successfully!', 'data' => $response], 201);
         }
 
         catch(\Exception $e)
