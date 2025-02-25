@@ -102,4 +102,32 @@ class RazorpayController extends Controller
             ], 400);
         }
     }
+
+    public function fetchPaymentStatus($paymentId)
+    {
+        try {
+            $paymentDetails = $this->razorpay->fetchPaymentDetails($paymentId);
+
+            return response()->json($paymentDetails);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function fetchOrderStatus($orderId)
+    {
+        try {
+            $orderDetails = $this->razorpay->fetchOrderDetails($orderId);
+
+             // Log the raw response for debugging
+        \Log::info('Fetched Order Details: ', (array) $orderDetails);
+
+            return response()->json($orderDetails);
+        } catch (\Exception $e) {
+
+            \Log::error('Error fetching order status: ' . $e->getMessage());
+
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
 }

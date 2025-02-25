@@ -116,7 +116,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('razorpay')->group(function () {
         // Route::get('/', [AddressController::class, 'index']);          // List all addresses for a user
         Route::post('/register', [RazorpayController::class, 'createOrder']);         // Add a new address
-        // Route::post('/update/{id}', [AddressController::class, 'update']);     // Update an address
-        // Route::delete('/{id}', [AddressController::class, 'destroy']); // Delete an address
+        Route::get('/payment-status/{paymentId}', [RazorpayController::class, 'fetchPaymentStatus']);
+        Route::get('/order-status/{orderId}', [RazorpayController::class, 'fetchOrderStatus']);
     });
 });
