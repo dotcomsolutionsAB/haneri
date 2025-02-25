@@ -79,6 +79,7 @@ class OrderController extends Controller
                 'status' => $request->input('status', 'pending'),
                 'payment_status' => $request->input('payment_status', 'pending'),
                 'shipping_address' => $request->input('shipping_address'),
+                'razorpay_order_id' => $razorpayData['order']['id'],
             ]);
 
             // Iterate through each cart item to add it to the order items table
