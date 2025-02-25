@@ -43,17 +43,27 @@ class RazorpayController extends Controller
                 'payment_capture' => 1, // Auto capture payment
             ];
 
+            // ✅ Create Order in Razorpay
             $order = $this->razorpay->order->create($orderData);
 
-            // ✅ Debugging: Log response
-            \Log::info('Razorpay Order Created:', ['order' => $order]);
+            // ✅ Extract Order ID
+            $orderId = $order['id'];
+
+            // ✅ Convert Razorpay Order Object to Array Properly
+            $orderArray = $order->toArray();
+
+            // ✅ Log Response
+            \Log::info('Razorpay Order Created:', ['order' => $orderArray]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Razorpay order created successfully.',
-                'order' => $order,
+                'order_id' => $orderId, // Return Order ID separately
+                'order' => $orderArray,
             ], 201);
         } catch (Exception $e) {
+            \Log::error('Razorpay Order Error:', ['error' => $e->getMessage()]);
+    
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating Razorpay order: ' . $e->getMessage(),
