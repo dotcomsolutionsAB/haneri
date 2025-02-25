@@ -120,7 +120,8 @@ class RazorpayController extends Controller
             $orderDetails = $this->razorpay->order->fetch($orderId);
 
             // ✅ Convert to an array for logging
-            $orderArray = json_decode(json_encode($orderDetails), true);
+            // $orderArray = json_decode(json_encode($orderDetails), true);
+            $orderArray = $orderDetails->toArray();
 
             // ✅ Log the raw response for debugging
             \Log::info('Fetched Order Details: ', $orderArray);
