@@ -43,6 +43,7 @@ class OrderController extends Controller
             return response()->json(['message' => 'User not found.'], 404);
         }
 
+        $user_name = $orderUser->name;  // Fetch name
         $user_email = $orderUser->email;  // Fetch email
         $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
 
@@ -121,7 +122,7 @@ class OrderController extends Controller
                     'payment_status' => $order->payment_status,
                     'shipping_address' => $order->shipping_address,
                     'razorpay_order_id' => $order->razorpay_order_id,
-                    'user_id' => $user_id,
+                    'user_name' => $user_name,
                     'email' => $user_email, 
                     'phone' => $user_phone, 
                 ]
