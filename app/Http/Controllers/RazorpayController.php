@@ -14,12 +14,12 @@ class RazorpayController extends Controller
 
     public function __construct()
     {
-        $apiKey = env('RAZORPAY_KEY');
-        $apiSecret = env('RAZORPAY_SECRET');
+        // $apiKey = env('RAZORPAY_KEY');
+        // $apiSecret = env('RAZORPAY_SECRET');
 
-        if (!$apiKey || !$apiSecret) {
-            throw new \Exception('Razorpay API credentials are missing.');
-        }
+        // if (!$apiKey || !$apiSecret) {
+        //     throw new \Exception('Razorpay API credentials are missing.');
+        // }
         
         $this->razorpay = new Api(config('services.razorpay.key'), config('services.razorpay.secret'));
     }
@@ -44,6 +44,9 @@ class RazorpayController extends Controller
             ];
 
             $order = $this->razorpay->order->create($orderData);
+
+            // ✅ Debugging: Log response
+            \Log::info('Razorpay Order Created:', ['order' => $order]);
 
             return response()->json([
                 'success' => true,
