@@ -117,7 +117,7 @@ class RazorpayController extends Controller
     public function fetchOrderStatus($orderId)
     {
         try {
-            $orderDetails = $this->razorpay->fetchOrderDetails($orderId);
+            $orderDetails = $this->razorpay->fetch($orderId);
 
              // Log the raw response for debugging
         \Log::info('Fetched Order Details: ', (array) $orderDetails);
