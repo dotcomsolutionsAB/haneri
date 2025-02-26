@@ -107,9 +107,11 @@ class RazorpayController extends Controller
     {
         try {
             // $paymentDetails = $this->razorpay->fetchPaymentDetails($paymentId);
-            $paymentDetails = $this->razorpay->payment->fetch($paymentId);            ;
+            $paymentDetails = $this->razorpay->payment->fetch($paymentId);
+            
+            $paymentArray = $paymentDetails->toArray();
 
-            return response()->json($paymentDetails);
+            return response()->json($paymentArray);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
