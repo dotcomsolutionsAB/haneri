@@ -62,7 +62,7 @@ class PaymentController extends Controller
 
         return response()->json([
             'message' => 'Payment created successfully!',
-            'data' => $payment,
+            'data' => $responseData,
             'product_stats' => $productStats,
         ], 201);
     }
