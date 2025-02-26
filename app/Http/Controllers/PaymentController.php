@@ -23,9 +23,9 @@ class PaymentController extends Controller
             'user_id' => 'nullable|integer|exists:users,id',
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['errors' => $validator->errors()], 400);
-        }
+        // if ($validator->fails()) {
+        //     return response()->json(['errors' => $validator->errors()], 400);
+        // }
 
         // ✅ Get authenticated user
         $user = Auth::user();
@@ -54,6 +54,11 @@ class PaymentController extends Controller
                 'total_quantity' => $items->sum('quantity'),
             ];
         })->values();
+
+        // Append the shipping address from the order to the response without storing it in the PaymentModel.
+        $responseData = $payment->toArray();
+        unset($responseData['id'], $responseData['created_at'], $responseData['updated_at']);
+        $responseData['shipping_address'] = $order->shipping_address;
 
         return response()->json([
             'message' => 'Payment created successfully!',
