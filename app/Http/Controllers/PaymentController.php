@@ -31,15 +31,15 @@ class PaymentController extends Controller
         $user = Auth::user();
 
         // ✅ Store payment in the database
-        // $payment = PaymentModel::create([
-        //     'method' => $request->input('method'),
-        //     'razorpay_payment_id' => $request->input('razorpay_payment_id'),
-        //     'amount' => $request->input('amount'),
-        //     'status' => $request->input('status'),
-        //     'order_id' => $request->input('order_id'),
-        //     'razorpay_order_id' => $request->input('razorpay_order_id'),
-        //     'user' => $user->id ?? $request->input('user_id'), // Use Auth user or fallback to request
-        // ]);
+        $payment = PaymentModel::create([
+            'method' => $request->input('method'),
+            'razorpay_payment_id' => $request->input('razorpay_payment_id'),
+            'amount' => $request->input('amount'),
+            'status' => $request->input('status'),
+            'order_id' => $request->input('order_id'),
+            'razorpay_order_id' => $request->input('razorpay_order_id'),
+            'user' => $user->id ?? $request->input('user_id'), // Use Auth user or fallback to request
+        ]);
 
         // Fetch the order along with its order items and the related products
         $order = OrderModel::with('items.product')->find($request->input('order_id'));
@@ -48,7 +48,7 @@ class PaymentController extends Controller
         }
 
         // Group order items by product_id and calculate total quantity per product
-        $productStats = $order->orderItems->groupBy('product_id')->map(function ($items) {
+        $productStats = $order->items->groupBy('product_id')->map(function ($items) {
             return [
                 'product_name' => $items->first()->product->name,
                 'total_quantity' => $items->sum('quantity'),
