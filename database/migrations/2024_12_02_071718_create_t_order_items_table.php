@@ -13,9 +13,6 @@ return new class extends Migration
     {
         Schema::create('t_order_items', function (Blueprint $table) {
             $table->id();
-            // $table->foreignId('order_id')->constrained('t_orders'); // Link to orders
-            // $table->foreignId('product_id')->constrained('t_products'); // Link to products
-            // $table->foreignId('variant_id')->nullable()->constrained('t_product_variants'); // Optional variant
             $table->integer('order_id'); // Link to orders
             $table->integer('product_id'); // Link to products
             $table->integer('variant_id')->nullable(); // Optional variant

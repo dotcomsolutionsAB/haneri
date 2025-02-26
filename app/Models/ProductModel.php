@@ -67,4 +67,9 @@ class ProductModel extends Model
     {
         return $this->belongsTo(CategoryModel::class, 'photo_id', 'id'); // photo_id references id in Category table
     }
+
+    public function orderItems()
+    {
+        return $this->hasMany(OrderItemModel::class, 'product_id', 'id');
+    }
 }

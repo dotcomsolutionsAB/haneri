@@ -13,6 +13,7 @@ use App\Http\Controllers\SettingController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\RazorpayController;
+use App\Http\Controllers\PaymentController;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
@@ -119,4 +120,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/payment-status/{paymentId}', [RazorpayController::class, 'fetchPaymentStatus']);
         Route::get('/order-status/{orderId}', [RazorpayController::class, 'fetchOrderStatus']);
     });
+
+    Route::post('/payments', [PaymentController::class, 'store']);
 });

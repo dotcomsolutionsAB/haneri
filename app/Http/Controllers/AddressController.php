@@ -27,7 +27,7 @@ class AddressController extends Controller
         $addresses = AddressModel::where('user_id', $user_id)->get();
 
         return $addresses->isNotEmpty()
-        ? response()->json(['message' => 'Addresses retrieved successfully!', 'data' => $addresses->makeHidden(['id', 'created_at', 'updated_at']), 'count' => count($addresses)], 200)
+        ? response()->json(['message' => 'Addresses retrieved successfully!', 'data' => $addresses->makeHidden(['created_at', 'updated_at']), 'count' => count($addresses)], 200)
         : response()->json(['message' => 'No address found.'], 400);
 
     }
