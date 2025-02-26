@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Models\PaymentModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Auth;
@@ -30,7 +30,7 @@ class PaymentController extends Controller
         $user = Auth::user();
 
         // ✅ Store payment in the database
-        $payment = Payment::create([
+        $payment = PaymentModel::create([
             'method' => $request->input('method'),
             'razorpay_payment_id' => $request->input('razorpay_payment_id'),
             'amount' => $request->input('amount'),
