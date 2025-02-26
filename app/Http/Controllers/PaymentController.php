@@ -42,7 +42,7 @@ class PaymentController extends Controller
         ]);
 
         // Fetch the order along with its order items and the related products
-        $order = OrderModel::with('orderItems.product')->find($request->input('order_id'));
+        $order = OrderModel::with('items.product')->find($request->input('order_id'));
         if (!$order) {
             return response()->json(['error' => 'Order not found.'], 404);
         }
