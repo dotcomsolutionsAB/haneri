@@ -559,4 +559,23 @@ class ProductController extends Controller
         }
     }
 
+    // unique variant type
+    public function unique_type()
+    {
+        try {
+            // Fetch unique variant types using distinct() and pluck() for a clean array.
+            $uniqueTypes = ProductVariantModel::distinct()->pluck('variant_type');
+            
+            return response()->json([
+                'success' => true,
+                'data' => $uniqueTypes,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }
