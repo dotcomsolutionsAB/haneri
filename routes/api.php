@@ -32,7 +32,7 @@ Route::prefix('cart')->group(function () {
 
 Route::prefix('products')->group(function () {
     Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
-    Route::get('/{slug}', [ProductController::class, 'show']);     // Get details of a single product
+    Route::get('/product_slug/{slug}', [ProductController::class, 'show']);     // Get details of a single product
     Route::get('/unique_variant', [ProductController::class, 'unique_type']);     // Get details of a single product
 });
 
