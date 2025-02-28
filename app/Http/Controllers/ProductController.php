@@ -171,7 +171,8 @@ class ProductController extends Controller
             $priceRange  = $request->input('price_range'); // e.g., below_10k, 10k_25k, etc.
             $variantType = $request->input('variant_type');  // New filter for variant_type
             $orderPrice     = strtolower($request->input('order_price'));  // Ascending or descending order by price
-            $priceFilter    = $request->input('price_filter');     // Exact selling_price filter
+            $minPriceFilter  = $request->input('min_priceFilter');  // Minimum selling price
+            $maxPriceFilter  = $request->input('max_priceFilter');  // Maximum selling price
 
             // ✅ Query with filters
             $query = ProductModel::with([
@@ -227,10 +228,10 @@ class ProductController extends Controller
                 $query->orderByRaw('(SELECT MAX(selling_price) FROM t_product_variants WHERE t_product_variants.product_id = t_products.id) DESC');
             }
 
-            // Apply price_filter (Exact price match on variants' selling_price)
-            if (!empty($priceFilter)) {
-                $query->whereHas('variants', function ($q) use ($priceFilter) {
-                    $q->where('selling_price', '=', $priceFilter);
+            // Apply min_priceFilter and max_priceFilter (Filter products by selling_price range)
+            if (!empty($minPriceFilter) && !empty($maxPriceFilter)) {
+                $query->whereHas('variants', function ($q) use ($minPriceFilter, $maxPriceFilter) {
+                    $q->whereBetween('selling_price', [$minPriceFilter, $maxPriceFilter]);
                 });
             }
 
