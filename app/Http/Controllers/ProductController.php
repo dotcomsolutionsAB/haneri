@@ -162,12 +162,16 @@ class ProductController extends Controller
             }
 
             // ✅ Fetch multiple products with filters
-            $search   = $request->input('search'); // Search filter for name, brand, category
+            $searchProduct  = $request->input('search_product');   // Product name filter (comma-separated)
+            $searchBrand    = $request->input('search_brand');     // Brand name filter (comma-separated)
+            $searchCategory = $request->input('search_category');  // Category name filter (comma-separated)
             $isActive = $request->input('is_active'); // Active/Inactive filter
             $limit    = $request->input('limit', 10); // Default limit to 10
             $offset   = $request->input('offset', 0); // Default offset to 0
             $priceRange  = $request->input('price_range'); // e.g., below_10k, 10k_25k, etc.
             $variantType = $request->input('variant_type');  // New filter for variant_type
+            $orderPrice     = strtolower($request->input('order_price'));  // Ascending or descending order by price
+            $priceFilter    = $request->input('price_filter');     // Exact selling_price filter
 
             // ✅ Query with filters
             $query = ProductModel::with([
@@ -177,18 +181,57 @@ class ProductController extends Controller
                 'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,hsn,regular_tax,selling_tax,video_url,product_pdf'
             ]);
 
-            // ✅ Apply search filter (search in `product name`, `brand name`, `category name`)
-            if (!empty($search)) {
-                $query->where(function ($q) use ($search) {
-                    $q->where('name', 'LIKE', "%$search%")
-                    ->orWhereHas('brand', fn($q2) => $q2->where('name', 'LIKE', "%$search%"))
-                    ->orWhereHas('category', fn($q2) => $q2->where('name', 'LIKE', "%$search%"));
+            // Apply search_product filter (comma-separated product names)
+            if (!empty($searchProduct)) {
+                $productNames = explode(',', $searchProduct);
+                $query->where(function ($q) use ($productNames) {
+                    foreach ($productNames as $name) {
+                        $q->orWhere('name', 'LIKE', '%' . trim($name) . '%');
+                    }
                 });
             }
 
-            // ✅ Apply `is_active` filter if provided
+            // Apply search_brand filter (comma-separated brand names)
+            if (!empty($searchBrand)) {
+                $brandNames = explode(',', $searchBrand);
+                $query->whereHas('brand', function ($q) use ($brandNames) {
+                    $q->where(function ($q2) use ($brandNames) {
+                        foreach ($brandNames as $brand) {
+                            $q2->orWhere('name', 'LIKE', '%' . trim($brand) . '%');
+                        }
+                    });
+                });
+            }
+
+            // Apply search_category filter (comma-separated category names)
+            if (!empty($searchCategory)) {
+                $categoryNames = explode(',', $searchCategory);
+                $query->whereHas('category', function ($q) use ($categoryNames) {
+                    $q->where(function ($q2) use ($categoryNames) {
+                        foreach ($categoryNames as $category) {
+                            $q2->orWhere('name', 'LIKE', '%' . trim($category) . '%');
+                        }
+                    });
+                });
+            }
+
+            // Apply `is_active` filter if provided
             if (!is_null($isActive)) {
                 $query->where('is_active', $isActive);
+            }
+
+            // Apply order_price filter (sorting by selling_price)
+            if ($orderPrice === 'ascending') {
+                $query->orderByRaw('(SELECT MIN(selling_price) FROM t_product_variants WHERE t_product_variants.product_id = t_products.id) ASC');
+            } elseif ($orderPrice === 'descending') {
+                $query->orderByRaw('(SELECT MAX(selling_price) FROM t_product_variants WHERE t_product_variants.product_id = t_products.id) DESC');
+            }
+
+            // Apply price_filter (Exact price match on variants' selling_price)
+            if (!empty($priceFilter)) {
+                $query->whereHas('variants', function ($q) use ($priceFilter) {
+                    $q->where('selling_price', '=', $priceFilter);
+                });
             }
 
             // add price-range
