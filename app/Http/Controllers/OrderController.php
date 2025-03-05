@@ -230,4 +230,47 @@ class OrderController extends Controller
 
         return response()->json(['message' => 'Order details fetched successfully!', 'data' => $get_order], 200);
     }
+
+    // delete an order
+    public function delete($orderId)
+    {
+        try {
+            // Start transaction
+            DB::beginTransaction();
+
+            // Fetch the order
+            $order = OrderModel::find($orderId);
+
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order not found!',
+                ], 404);
+            }
+
+            // Delete related order items
+            OrderItemModel::where('order_id', $orderId)->delete();
+
+            // Delete the order
+            $order->delete();
+
+            // Commit transaction
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Order and corresponding items deleted successfully!',
+            ], 200);
+        } catch (\Exception $e) {
+            // Rollback transaction in case of failure
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete order.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }

@@ -220,4 +220,46 @@ class QuotationController extends Controller
 
         return response()->json(['message' => 'Quotation details fetched successfully!', 'data' => $get_quotation], 200);
     }
+
+    // delete an quotation
+    public function delete($quotationId)
+    {
+        try {
+            // Start transaction
+            DB::beginTransaction();
+
+            // Fetch the order
+            $quotationId = QuotationModel::find($quotationId);
+
+            if (!$order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Quotation not found!',
+                ], 404);
+            }
+
+            // Delete related order items
+            QuotationItemModel::where('quotation_id', $quotationId)->delete();
+
+            // Delete the order
+            $quotationId->delete();
+
+            // Commit transaction
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Quotation and corresponding items deleted successfully!',
+            ], 200);
+        } catch (\Exception $e) {
+            // Rollback transaction in case of failure
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to delete quotation.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
