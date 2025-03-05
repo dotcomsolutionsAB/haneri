@@ -242,7 +242,7 @@ class QuotationController extends Controller
             QuotationItemModel::where('quotation_id', $quotationId)->delete();
 
             // Delete the order
-            $quotationId->delete();
+            $quotation->delete();
 
             // Commit transaction
             DB::commit();
