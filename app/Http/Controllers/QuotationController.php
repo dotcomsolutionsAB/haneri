@@ -3,18 +3,18 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\OrderModel;
-use App\Models\OrderItemModel;
+use App\Models\QuotationModel;
+use App\Models\QuotationItemModel;
 use App\Models\CartModel;
 use App\Models\User;
 use DB;
 use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 
-class OrderController extends Controller
+class QuotationController extends Controller
 {
     //
-    // Store a new order
+    // Store a new quotation
     public function store(Request $request)
     {
         // Validate request data
@@ -26,26 +26,15 @@ class OrderController extends Controller
 
         $user = Auth::user(); 
 
-        if ($user->role == 'admin') {
-            $request->validate([
-                'user_id' => 'required|integer|exists:users,id',
-            ]);  
-            $user_id =  $request->input('user_id');
-        }
-
-        else {
-            $user_id =  $user->id;
-        }
-
         // Fetch user details from User model
-        $orderUser = User::find($user_id);
-        if (!$orderUser) {
+        $quotationUser = User::find($user_id);
+        if (!$quotationUser) {
             return response()->json(['message' => 'User not found.'], 404);
         }
 
-        $user_name = $orderUser->name;  // Fetch name
-        $user_email = $orderUser->email;  // Fetch email
-        $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
+        $user_name = $quotationUser->name;  // Fetch name
+        $user_email = $quotationUser->email;  // Fetch email
+        $user_phone = $quotationUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
 
         // Start a transaction to ensure all operations are atomic
         DB::beginTransaction();
@@ -68,7 +57,7 @@ class OrderController extends Controller
             }
 
 
-            // Call Razorpay Order API Before Saving Order in DB**
+            // Call Razorpay quotation API Before Saving quotation in DB**
             $razorpayController = new RazorpayController(); 
             $razorpayRequest = new Request([
                 'amount' => $totalAmount,
@@ -80,11 +69,11 @@ class OrderController extends Controller
             $razorpayData = json_decode($razorpayResponse->getContent(), true);
             if (!$razorpayData['success']) {
                 DB::rollBack();
-                return response()->json(['message' => 'Failed to create Razorpay order.'], 500);
+                return response()->json(['message' => 'Failed to create Razorpay quotation.'], 500);
             }
 
-            // Create the order record
-            $order = OrderModel::create([
+            // Create the quotation record
+            $quotation = QuotationModel::create([
                 'user_id' => $user_id,
                 'total_amount' => $totalAmount,
                 'status' => $request->input('status', 'pending'),
@@ -97,8 +86,8 @@ class OrderController extends Controller
             foreach($cartItems as $cartItem)
             {
                 // Create the order item record
-                OrderItemModel::create([
-                    'order_id' => $order->id, // Link to the created order
+                QuotationItemModel::create([
+                    'quotation_id' => $quotation->id, // Link to the created order
                     'product_id' => $cartItem->product_id,
                     'variant_id' => $cartItem->variant_id,
                     'quantity' => $cartItem->quantity,
@@ -114,14 +103,14 @@ class OrderController extends Controller
 
             // Prepare response
             $response = [
-                'message' => 'Order created successfully!',
+                'message' => 'Quotation created successfully!',
                 'data' => [
-                    'order_id' => $order->id,
-                    'total_amount' => $order->total_amount,
-                    'status' => $order->status,
-                    'payment_status' => $order->payment_status,
-                    'shipping_address' => $order->shipping_address,
-                    'razorpay_order_id' => $order->razorpay_order_id,
+                    'quotation' => $quotation->id,
+                    'total_amount' => $quotation->total_amount,
+                    'status' => $quotation->status,
+                    'payment_status' => $quotation->payment_status,
+                    'shipping_address' => $quotation->shipping_address,
+                    'razorpay_order_id' => $quotation->razorpay_quotation_id,
                     'name' => $user_name,
                     'email' => $user_email, 
                     'phone' => $user_phone, 
@@ -129,19 +118,19 @@ class OrderController extends Controller
             ];
 
             // Return success response
-            return response()->json(['message' => 'Order created successfully!', 'data' => $response], 201);
+            return response()->json(['message' => 'Quotation created successfully!', 'data' => $response], 201);
         }
 
         catch(\Exception $e)
         {
             // Log the exception for debugging
-            \Log::error('Failed to create order: ' . $e->getMessage());
+            \Log::error('Failed to create quotation: ' . $e->getMessage());
 
             // In case of any failure, roll back the transaction
             DB::rollBack();
 
             // Return error response
-            return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
+            return response()->json(['message' => 'Failed to create quotation. Please try again.', 'error' => $e->getMessage()], 500);
         }
     }
 
@@ -162,7 +151,7 @@ class OrderController extends Controller
         return $product->price;  // Return product price if no variant
     }
 
-    // View all orders for a user
+    // View all quotations for a user
     public function index(Request $request)
     {
         $user = Auth::user(); 
@@ -177,57 +166,57 @@ class OrderController extends Controller
             $user_id =  $user->id;
         }
 
-        // Fetch all orders for the user
-        $orders = OrderModel::with(['items', 'user'])
+        // Fetch all quotations for the user
+        $quotations = QuotationModel::with(['items', 'user'])
                             -> where('user_id', $user_id)
                             ->get()
-                            ->map(function ($order) {
+                            ->map(function ($quotation) {
                             // Make sure to hide the unwanted fields from the user and items
-                            if ($order->items) {
-                                $order->items->makeHidden(['id', 'created_at', 'updated_at']);
+                            if ($quotation->items) {
+                                $quotation->items->makeHidden(['id', 'created_at', 'updated_at']);
                             }
-                            if ($order->user) {
-                                $order->user->makeHidden(['id', 'created_at', 'updated_at']);
+                            if ($quotation->user) {
+                                $quotation->user->makeHidden(['id', 'created_at', 'updated_at']);
                             }
-                            // Optionally hide fields from the order
-                            $order->makeHidden(['id', 'created_at', 'updated_at']);
-                            return $order;
+                            // Optionally hide fields from the quotation
+                            $quotation->makeHidden(['id', 'created_at', 'updated_at']);
+                            return $quotation;
                         });
 
-        return $orders->isNotEmpty()
-            ? response()->json(['message' => 'Orders fetched successfully!', 'data' => $orders, 'count' => count($orders)], 200)
-            : response()->json(['message' => 'No orders found.'], 400);
+        return $quotations->isNotEmpty()
+            ? response()->json(['message' => 'Quotations fetched successfully!', 'data' => $quotations, 'count' => count($quotations)], 200)
+            : response()->json(['message' => 'No quotations found.'], 400);
     }
 
-    // View details of a single order
+    // View details of a single quotation
     public function show($id)
     {
         $user = Auth::user();
 
-        // Fetch the order by ID for the user
-        $get_order = OrderModel::with(['items', 'user'])
+        // Fetch the quotation by ID for the user
+        $get_quotation = QuotationModel::with(['items', 'user'])
                             ->where('user_id', $user->id)
                             ->get()
-                            ->map(function ($order) {
+                            ->map(function ($quotation) {
                                 // Make sure to hide the unwanted fields from the user and items
-                                if ($order->items) {
-                                    $order->items->makeHidden(['id', 'created_at', 'updated_at']);
+                                if ($quotation->items) {
+                                    $quotation->items->makeHidden(['id', 'created_at', 'updated_at']);
                                 }
-                                if ($order->user) {
-                                    $order->user->makeHidden(['id', 'created_at', 'updated_at']);
+                                if ($quotation->user) {
+                                    $quotation->user->makeHidden(['id', 'created_at', 'updated_at']);
                                 }
-                                // Optionally hide fields from the order
-                                $order->makeHidden(['id', 'created_at', 'updated_at']);
-                                return $order;
+                                // Optionally hide fields from the quotation
+                                $quotation->makeHidden(['id', 'created_at', 'updated_at']);
+                                return $quotation;
                             });
 
-        if (!$get_order) {
-            return response()->json(['message' => 'Order not found.'], 404);
+        if (!$get_quotation) {
+            return response()->json(['message' => 'Quotation not found.'], 404);
         }
 
         // Hide unnecessary fields
-        $get_order->makeHidden(['id', 'created_at', 'updated_at']);
+        $get_quotation->makeHidden(['id', 'created_at', 'updated_at']);
 
-        return response()->json(['message' => 'Order details fetched successfully!', 'data' => $get_order], 200);
+        return response()->json(['message' => 'Quotation details fetched successfully!', 'data' => $get_quotation], 200);
     }
 }

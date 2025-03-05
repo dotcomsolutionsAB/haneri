@@ -9,6 +9,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\BrandController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\SettingController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\AddressController;
@@ -59,6 +60,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/update', [UserController::class, 'update']);     // Update user details
         // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
         });
+    
+    // for vendors
+    Route::middleware('role:vendor')->group(function () {
+        
+        // Quotation Routes
+        Route::prefix('quotation')->group(function () {
+            Route::get('/', [QuotationController::class, 'index']);            // List all orders for a user
+            Route::get('/{id}', [QuotationController::class, 'show']);         // Get details of a single order
+            Route::post('/', [QuotationController::class, 'store']);           // Create a new order
+        });
+    });
 
     Route::middleware('role:admin')->group(function () {
         
