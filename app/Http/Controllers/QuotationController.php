@@ -24,7 +24,8 @@ class QuotationController extends Controller
             'shipping_address' => 'required|string',
         ]);
 
-        $user_id = Auth::user(); 
+        $user = Auth::user(); // Get the user object
+        $user_id = $user->id; // Extract the user ID
 
         // Fetch user details from User model
         $quotationUser = User::find($user_id);
