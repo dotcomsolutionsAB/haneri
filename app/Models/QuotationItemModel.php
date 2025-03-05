@@ -9,5 +9,5 @@ class QuotationItemModel extends Model
     //
     protected $table = 't_quotation_items';
 
-    protected $fillable = ['order_id', 'product_id', 'variant_id', 'quantity', 'price'];
+    protected $fillable = ['quotation_id', 'product_id', 'variant_id', 'quantity', 'price'];
 }
