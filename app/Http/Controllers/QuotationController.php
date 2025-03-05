@@ -229,9 +229,9 @@ class QuotationController extends Controller
             DB::beginTransaction();
 
             // Fetch the order
-            $quotationId = QuotationModel::find($quotationId);
+            $quotation = QuotationModel::find($quotationId);
 
-            if (!$order) {
+            if (!$quotation) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Quotation not found!',
