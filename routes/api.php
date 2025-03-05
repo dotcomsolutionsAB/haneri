@@ -115,7 +115,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/', [OrderController::class, 'index']);            // List all orders for a user
         Route::get('/{id}', [OrderController::class, 'show']);         // Get details of a single order
         Route::post('/', [OrderController::class, 'store']);           // Create a new order
-        Route::delete('/{id}', [QuotationController::class, 'delete']);           // Create a new order
+        Route::delete('/{id}', [OrderController::class, 'delete']);           // Create a new order
     });
 
     // Setting Routes
