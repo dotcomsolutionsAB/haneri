@@ -18,16 +18,12 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Bootstrap any application services.
      */
-    // public function boot(): void
-    // {
-    //     //
-    //     $this->app['router']->aliasMiddleware('role', \App\Http\Middleware\RoleMiddleware::class);
-    // }
-    public function boot()
+    public function boot(): void
     {
-        // Force HTTPS for URL generation in non-local environments
-        if (env('APP_ENV') !== 'local') {
-            URL::forceScheme('https');
-        }
+        //
+        $this->app['router']->aliasMiddleware('role', \App\Http\Middleware\RoleMiddleware::class);
+
+        // Register CorsMiddleware
+        $this->app['router']->aliasMiddleware('cors', \App\Http\Middleware\CorsMiddleware::class);
     }
 }
