@@ -143,7 +143,8 @@ return [
     |
     */
 
-    'path' => env('SESSION_PATH', '/'),
+    // 'path' => env('SESSION_PATH', '/'),
+    'path' => '/',
 
     /*
     |--------------------------------------------------------------------------
@@ -171,7 +172,8 @@ return [
     */
 
     // 'secure' => env('SESSION_SECURE_COOKIE'),
-    'secure' => env('SESSION_SECURE_COOKIE', true), // Required for HTTPS
+    // 'secure' => env('SESSION_SECURE_COOKIE', true), // Required for HTTPS
+    'secure' => true,  // Force HTTPS cookies
 
     /*
     |--------------------------------------------------------------------------
@@ -184,7 +186,8 @@ return [
     |
     */
 
-    'http_only' => env('SESSION_HTTP_ONLY', true),
+    // 'http_only' => env('SESSION_HTTP_ONLY', true),
+    'http_only' => true, // Prevents JavaScript access
 
     /*
     |--------------------------------------------------------------------------
@@ -202,7 +205,8 @@ return [
     */
 
     // 'same_site' => env('SESSION_SAME_SITE', 'lax'),
-    'same_site' => env('SESSION_SAME_SITE', 'none'),
+    // 'same_site' => env('SESSION_SAME_SITE', 'none'),
+    'same_site' => 'none', // Required for cross-origin requests
 
     /*
     |--------------------------------------------------------------------------
@@ -215,6 +219,7 @@ return [
     |
     */
 
-    'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
+    // 'partitioned' => env('SESSION_PARTITIONED_COOKIE', false),
+    'partitioned' => false,
 
 ];
