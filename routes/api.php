@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Cookie;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\ProductController;
@@ -19,6 +20,22 @@ use App\Http\Controllers\PaymentController;
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
 // })->middleware('auth:sanctum');
+
+Route::post('/cart/set-cookie', function (Request $request) {
+    $cartId = $request->input('cart_id');
+
+    if (!$cartId) {
+        return response()->json(['error' => 'Cart ID is required'], 400);
+    }
+
+    $cookie = cookie('cart_id', $cartId, 60 * 24 * 365) // Expire in 1 year
+        ->withHttpOnly(true)  // Prevent access from JavaScript
+        ->withSecure(true)    // Only send over HTTPS
+        ->withSameSite('None'); // Required for cross-domain cookies
+
+    return response()->json(['success' => true])->cookie($cookie);
+});
+
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login/{otp?}', [AuthController::class, 'login']);
 Route::post('/otp', [AuthController::class, 'generate_otp']);
