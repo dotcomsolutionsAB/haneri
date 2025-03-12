@@ -35,22 +35,49 @@ class CorsMiddleware
     //     return $response;
     // }
 
+    // public function handle(Request $request, Closure $next): Response
+    // {
+    //     $allowedOrigins = ['https://haneri.ongoingsites.xyz']; // Add frontend domain
+
+    //     $origin = $request->headers->get('Origin');
+
+    //     if (in_array($origin, $allowedOrigins)) {
+    //         $response = $next($request);
+    //         $response->headers->set('Access-Control-Allow-Origin', $origin);
+    //         $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    //         $response->headers->set('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Requested-With');
+    //         $response->headers->set('Access-Control-Allow-Credentials', 'true');
+    //     } else {
+    //         $response = $next($request);
+    //     }
+
+    //     return $response;
+    // }
+
     public function handle(Request $request, Closure $next): Response
     {
-        $allowedOrigins = ['https://haneri.ongoingsites.xyz']; // Add frontend domain
-
+        $allowedOrigins = ['https://haneri.ongoingsites.xyz']; // Your frontend domain
         $origin = $request->headers->get('Origin');
 
-        if (in_array($origin, $allowedOrigins)) {
-            $response = $next($request);
-            $response->headers->set('Access-Control-Allow-Origin', $origin);
-            $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            $response->headers->set('Access-Control-Allow-Headers', 'Origin, Content-Type, Accept, Authorization, X-Requested-With');
-            $response->headers->set('Access-Control-Allow-Credentials', 'true');
-        } else {
-            $response = $next($request);
+        $headers = [
+            'Access-Control-Allow-Origin' => in_array($origin, $allowedOrigins) ? $origin : 'https://haneri.ongoingsites.xyz',
+            'Access-Control-Allow-Methods' => 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers' => 'Origin, Content-Type, Accept, Authorization, X-Requested-With, X-CSRF-TOKEN',
+            'Access-Control-Allow-Credentials' => 'true',
+        ];
+
+        // Handle preflight requests
+        if ($request->isMethod('OPTIONS')) {
+            return response()->json('Preflight OK', 200, $headers);
+        }
+
+        $response = $next($request);
+
+        foreach ($headers as $key => $value) {
+            $response->headers->set($key, $value);
         }
 
         return $response;
     }
+
 }

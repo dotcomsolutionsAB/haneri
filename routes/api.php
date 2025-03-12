@@ -21,19 +21,21 @@ use App\Http\Controllers\PaymentController;
 //     return $request->user();
 // })->middleware('auth:sanctum');
 
-Route::post('/cart/set-cookie', function (Request $request) {
-    $cartId = $request->input('cart_id');
+Route::group(['middleware' => ['cors']], function () {
+    Route::post('/cart/set-cookie', function (Request $request) {
+        $cartId = $request->input('cart_id');
 
-    if (!$cartId) {
-        return response()->json(['error' => 'Cart ID is required'], 400);
-    }
+        if (!$cartId) {
+            return response()->json(['error' => 'Cart ID is required'], 400);
+        }
 
-    $cookie = cookie('cart_id', $cartId, 60 * 24 * 365) // Expire in 1 year
-        ->withHttpOnly(true)  // Prevent access from JavaScript
-        ->withSecure(true)    // Only send over HTTPS
-        ->withSameSite('None'); // Required for cross-domain cookies
+        $cookie = cookie('cart_id', $cartId, 60 * 24 * 365) // Expire in 1 year
+            ->withHttpOnly(true)  // Prevent access from JavaScript
+            ->withSecure(true)    // Only send over HTTPS
+            ->withSameSite('None'); // Required for cross-domain cookies
 
-    return response()->json(['success' => true])->cookie($cookie);
+        return response()->json(['success' => true])->cookie($cookie);
+    });
 });
 
 Route::post('/register', [UserController::class, 'register']);
