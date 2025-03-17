@@ -148,4 +148,48 @@ class UserController extends Controller
             'user' => $user
         ], 201);
     }
+
+    /**
+     * Fetch All Users with Search & Role Filter (Admin Only)
+     */
+    public function fetchUsers(Request $request)
+    {
+        try {
+            // ✅ Ensure the user is an admin
+            $admin = Auth::user();
+            if ($admin->role !== 'admin') {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            // ✅ Query Users
+            $query = User::query();
+
+            // 🔹 Search by User Name
+            if ($request->has('user_name')) {
+                $query->where('name', 'like', '%' . $request->user_name . '%');
+            }
+
+            // 🔹 Filter by Role
+            if ($request->has('role')) {
+                $query->where('role', $request->role);
+            }
+
+            // ✅ Get Filtered Users
+            $users = $query->get();
+
+            // ✅ Return Response
+            return response()->json([
+                'success' => true,
+                'message' => 'Users fetched successfully!',
+                'data' => $users,
+            ], 200);
+
+        } catch (\Exception $e) {
+            // ✅ Handle Errors
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching users: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

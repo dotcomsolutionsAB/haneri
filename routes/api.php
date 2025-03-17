@@ -106,6 +106,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // for all orders
         Route::post('/fetch_all', [OrderController::class, 'fetchOrders']); // List all orders for admin
+
+        // for all users
+        Route::post('/all_users', [UserController::class, 'fetchUsers']); // List all users for admin
     });
 
     // Category Routes
