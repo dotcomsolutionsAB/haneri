@@ -30,4 +30,10 @@ class OrderModel extends Model
     {
         return $this->hasMany(OrderItemModel::class, 'order_id', 'id'); // order_id references id in Order table
     }
+
+    // Relationship: Each order has many payments
+    public function payments()
+    {
+        return $this->hasMany(PaymentModel::class, 'order_id');
+    }
 }

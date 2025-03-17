@@ -273,4 +273,61 @@ class OrderController extends Controller
         }
     }
 
+    // for all orders
+    /**
+     * Fetch Orders for Admin with Filters
+     */
+    public function fetchOrders(Request $request)
+    {
+        try {
+            // ✅ Ensure the user is an admin
+            $user = Auth::user();
+            if ($user->role !== 'admin') {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            // ✅ Query Orders with Filters
+            $query = OrderModel::with(['user', 'payments']);
+
+            // 🔹 Filter by Order ID
+            if ($request->has('order_id')) {
+                $query->where('id', $request->order_id);
+            }
+
+            // 🔹 Filter by Date
+            if ($request->has('date')) {
+                $query->whereDate('created_at', $request->date);
+            }
+
+            // 🔹 Filter by User Name
+            if ($request->has('user_name')) {
+                $query->whereHas('user', function ($q) use ($request) {
+                    $q->where('name', 'like', '%' . $request->user_name . '%');
+                });
+            }
+
+            // 🔹 Filter by Status
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // ✅ Get Filtered Orders
+            $orders = $query->get();
+
+            // ✅ Return Response
+            return response()->json([
+                'success' => true,
+                'message' => 'Orders fetched successfully!',
+                'data' => $orders,
+            ], 200);
+
+        } catch (\Exception $e) {
+            // ✅ Handle Errors
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching orders: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
 }
