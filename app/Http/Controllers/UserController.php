@@ -181,7 +181,7 @@ class UserController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Users fetched successfully!',
-                'data' => $users,
+                'data' => $users->makeHidden(['email_verified_at', 'otp', 'expires_at', 'created_at', 'updated_at']),
             ], 200);
 
         } catch (\Exception $e) {
