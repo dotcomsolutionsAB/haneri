@@ -189,8 +189,6 @@ class UserController extends Controller
                 'success' => true,
                 'message' => 'Users fetched successfully!',
                 'total_users' => $totalUsers,
-                'limit' => (int) $limit,
-                'offset' => (int) $offset,
                 'data' => $users->makeHidden(['email_verified_at', 'otp', 'expires_at', 'created_at', 'updated_at']),
             ], 200);
 

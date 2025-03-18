@@ -325,6 +325,7 @@ class OrderController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Orders fetched successfully!',
+                'total_orders' => $totalOrders,
                 'data' => $orders,
             ], 200);
 
