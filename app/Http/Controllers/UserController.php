@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Mail\UserRegisteredMail;
 use Illuminate\Support\Facades\Mail;
 use App\Models\CartModel;
-use Illuminate\Support\Facades\Cookie;
+//use Illuminate\Support\Facades\Cookie;
 
 class UserController extends Controller
 {
@@ -81,7 +81,10 @@ class UserController extends Controller
     public function guest_register(Request $request)
     {
         // Retrieve the cart_id from cookies
-        $cartId = $request->cookie('cart_id');
+        //$cartId = $request->cookie('cart_id');
+
+        // Replace with Normal Request Input
+        $cartId = $request->input('cart_id');
 
         if (!$cartId) {
             return response()->json(['message' => 'Cart ID not found in cookies.'], 400);
@@ -140,7 +143,7 @@ class UserController extends Controller
         $token = $get_user->createToken('authToken')->plainTextToken;
 
         // Remove the cart_id cookie after transferring the cart to the user
-        Cookie::queue(Cookie::forget('cart_id'));
+        //Cookie::queue(Cookie::forget('cart_id'));
 
         return response()->json([
             'message' => 'User registered successfully! Cart updated and login credentials sent to email.',
