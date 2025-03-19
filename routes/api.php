@@ -21,36 +21,36 @@ use App\Http\Controllers\PaymentController;
 //     return $request->user();
 // })->middleware('auth:sanctum');
 
-Route::group(['middleware' => ['cors']], function () {
-    Route::post('/cart/set-cookie', function (Request $request) {
-        $cartId = $request->input('cart_id');
+// Route::group(['middleware' => ['cors']], function () {
+//     Route::post('/cart/set-cookie', function (Request $request) {
+//         $cartId = $request->input('cart_id');
 
-        if (!$cartId) {
-            return response()->json(['error' => 'Cart ID is required'], 400);
-        }
+//         if (!$cartId) {
+//             return response()->json(['error' => 'Cart ID is required'], 400);
+//         }
 
-        $cookie = cookie('cart_id', $cartId, 60 * 24 * 365) // Expire in 1 year
-            ->withHttpOnly(true)  // Prevent access from JavaScript
-            ->withSecure(true)    // Only send over HTTPS
-            ->withSameSite('None'); // Required for cross-domain cookies
+//         $cookie = cookie('cart_id', $cartId, 60 * 24 * 365) // Expire in 1 year
+//             ->withHttpOnly(true)  // Prevent access from JavaScript
+//             ->withSecure(true)    // Only send over HTTPS
+//             ->withSameSite('None'); // Required for cross-domain cookies
 
-        return response()->json(['success' => true])->cookie($cookie);
-    });
-});
+//         return response()->json(['success' => true])->cookie($cookie);
+//     });
+// });
 
 Route::post('/register', [UserController::class, 'register']);
 Route::post('/login/{otp?}', [AuthController::class, 'login']);
 Route::post('/otp', [AuthController::class, 'generate_otp']);
 Route::post('/make_user', [UserController::class, 'guest_register']);
 
-Route::middleware(['cors'])->group(function () {
+// Route::middleware(['cors'])->group(function () {
     Route::prefix('cart')->group(function () {
         Route::post('/fetch', [CartController::class, 'index']);             // Get all cart items for a user
         Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
         Route::post('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
         Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
     });
-});
+// });
 
 Route::prefix('products')->group(function () {
     Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products

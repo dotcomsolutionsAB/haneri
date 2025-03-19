@@ -35,10 +35,16 @@ class CartController extends Controller
             $userId = $user->id;
         } else {
             // If user is not logged in, use cart ID from cookies
-            $cartData = $request->cookie('cart_id');
+            //$cartData = $request->cookie('cart_id');
+
+            $cartId = null;
+
+            // Replace with Normal Request Input
+            $cartId = $request->input('cart_id');
             
             // If no cart ID exists in the cookie, generate a new one
-            if (!$cartData) {
+            // if (!$cartData) {
+            if (($cartId == null)) {
                 // $cartId = Str::random(32);
                 // $cartId = Str::uuid();
 
@@ -51,7 +57,7 @@ class CartController extends Controller
                 $hashedCartId = Hash::make($cartId); // Hash the cart ID to ensure it is secure
 
                 // Store the generated cart ID in the user's cookies (expires in 24 hours)
-                Cookie::queue('cart_id', $cartId, 1440); // 1440 minutes = 24 hours
+                //Cookie::queue('cart_id', $cartId, 1440); // 1440 minutes = 24 hours
                 // Cookie::queue('cart_id', $cartId, 5); // 1440 minutes = 24 hours
 
                 // Store the current timestamp for expiration (24 hours)
@@ -75,11 +81,14 @@ class CartController extends Controller
                 // $cartId = $cartData['cart_id'];
 
                 // If cart ID exists, use the existing cart ID (no need to hash it here)
-                $cartId = $request->cookie('cart_id');
+                //$cartId = $request->cookie('cart_id');
+
+                // Replace with Normal Request Input
+                $cartId = $request->input('cart_id');
                 $hashedCartId = $cartId; // Set the hashed cart ID to the original cart ID for guest users
             }
 
-            $userId = $cartId; // For guest users, set user ID as cart ID
+            $userId = $hashedCartId; // For guest users, set user ID as cart ID
         }
 
         $cart = CartModel::create([
@@ -122,7 +131,10 @@ class CartController extends Controller
             $userId = $user->id;
         } else {
             // Retrieve the cart_id from cookies
-            $cartId = $request->cookie('cart_id');
+            //$cartId = $request->cookie('cart_id');
+
+            // Replace with Normal Request Input
+            $cartId = $request->input('cart_id');
 
             // Check if the cart_id exists in the cookies
             if (!$cartId) {
