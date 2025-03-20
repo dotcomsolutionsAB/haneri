@@ -33,9 +33,8 @@ class BrandController extends Controller
     // View All
     public function index()
     {
-        $brands = BrandModel::select('name', 'logo', 'custom_sort', 'description')
-            ->get()
-            ->makeHidden(['created_at', 'updated_at']);
+        $brands = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description')
+            ->get();
 
         return $brands->isNotEmpty()
             ? response()->json(['message' => 'Brands fetched successfully!', 'data' => $brands, 'count' => count($brands)], 200)
