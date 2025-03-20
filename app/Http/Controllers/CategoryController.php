@@ -37,7 +37,7 @@ class CategoryController extends Controller
     {
         $categories = CategoryModel::select('name', 'parent_id', 'photo', 'custom_sort', 'description')
             ->get()
-            ->makeHidden(['id', 'created_at', 'updated_at']);
+            ->makeHidden(['created_at', 'updated_at']);
 
         return $categories->isNotEmpty()
             ? response()->json(['message' => 'Categories fetched successfully!', 'data' => $categories, 'count' => count($categories)], 200)

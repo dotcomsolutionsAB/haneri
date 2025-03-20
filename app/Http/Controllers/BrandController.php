@@ -35,7 +35,7 @@ class BrandController extends Controller
     {
         $brands = BrandModel::select('name', 'logo', 'custom_sort', 'description')
             ->get()
-            ->makeHidden(['id', 'created_at', 'updated_at']);
+            ->makeHidden(['created_at', 'updated_at']);
 
         return $brands->isNotEmpty()
             ? response()->json(['message' => 'Brands fetched successfully!', 'data' => $brands, 'count' => count($brands)], 200)
