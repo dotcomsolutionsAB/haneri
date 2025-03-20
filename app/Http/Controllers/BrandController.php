@@ -33,8 +33,7 @@ class BrandController extends Controller
     // View All
     public function index()
     {
-        $query = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description')
-            ->get();
+        $query = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description');
 
         if ($request->has('name')) {
             $query->where('name', 'LIKE', '%' . $request->input('name') . '%');

@@ -35,8 +35,7 @@ class CategoryController extends Controller
     // View All
     public function index(Request $request)
     {
-        $query = CategoryModel::select('id', 'name', 'parent_id', 'photo', 'custom_sort', 'description')
-            ->get();
+        $query = CategoryModel::select('id', 'name', 'parent_id', 'photo', 'custom_sort', 'description');
 
         if ($request->has('name')) {
             $query->where('name', 'LIKE', '%' . $request->input('name') . '%');
