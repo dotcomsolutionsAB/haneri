@@ -31,7 +31,7 @@ class BrandController extends Controller
     }
 
     // View All
-    public function index()
+    public function index(Request $request)
     {
         $query = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description');
 
