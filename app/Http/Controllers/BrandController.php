@@ -33,8 +33,14 @@ class BrandController extends Controller
     // View All
     public function index()
     {
-        $brands = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description')
+        $query = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description')
             ->get();
+
+        if ($request->has('name')) {
+            $query->where('name', 'LIKE', '%' . $request->input('name') . '%');
+        }
+
+        $brands = $query->get();
 
         return $brands->isNotEmpty()
             ? response()->json(['message' => 'Brands fetched successfully!', 'data' => $brands, 'count' => count($brands)], 200)

@@ -60,14 +60,14 @@ Route::prefix('products')->group(function () {
 
 // Category Routes
 Route::prefix('categories')->group(function () {
-    Route::get('/', [CategoryController::class, 'index']);         // List all categories
-    Route::get('/{id}', [CategoryController::class, 'show']);      // Get details of a single category
+    Route::post('/fetch', [CategoryController::class, 'index']);         // List all categories
+    Route::post('/fetch/{id}', [CategoryController::class, 'show']);      // Get details of a single category
 });
 
 // Brand Routes
 Route::prefix('brands')->group(function () {
-    Route::get('/', [BrandController::class, 'index']);            // List all brands
-    Route::get('/{id}', [BrandController::class, 'show']);         // Get details of a single brand
+    Route::post('/fetch', [BrandController::class, 'index']);            // List all brands
+    Route::post('/fetch/{id}', [BrandController::class, 'show']);         // Get details of a single brand
 });
 
 Route::middleware(['auth:sanctum'])->group(function () {

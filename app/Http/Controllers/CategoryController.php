@@ -33,10 +33,16 @@ class CategoryController extends Controller
     }
 
     // View All
-    public function index()
+    public function index(Request $request)
     {
-        $categories = CategoryModel::select('id', 'name', 'parent_id', 'photo', 'custom_sort', 'description')
+        $query = CategoryModel::select('id', 'name', 'parent_id', 'photo', 'custom_sort', 'description')
             ->get();
+
+        if ($request->has('name')) {
+            $query->where('name', 'LIKE', '%' . $request->input('name') . '%');
+        }
+
+        $categories = $query->get();
 
         return $categories->isNotEmpty()
             ? response()->json(['message' => 'Categories fetched successfully!', 'data' => $categories, 'count' => count($categories)], 200)
