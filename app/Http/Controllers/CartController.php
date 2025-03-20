@@ -20,6 +20,8 @@ class CartController extends Controller
             'product_id' => 'required|integer|exists:t_products,id',
             'variant_id' => 'nullable|integer|exists:t_product_variants,id',
             'quantity' => 'required|integer|min:1',
+            // Note: cart_id is optional for guest users
+            'cart_id' => 'nullable|string'
         ]);
 
         // Manually check for Bearer Token (optional)
@@ -34,61 +36,17 @@ class CartController extends Controller
             // If user is logged in, use their ID
             $userId = $user->id;
         } else {
-            // If user is not logged in, use cart ID from cookies
-            //$cartData = $request->cookie('cart_id');
-
-            $cartId = null;
-
-            // Replace with Normal Request Input
+            // For guest users, get cart_id from request input
             $cartId = $request->input('cart_id');
-            
-            // If no cart ID exists in the cookie, generate a new one
-            // if (!$cartData) {
-            if (($cartId == null)) {
-                // $cartId = Str::random(32);
-                // $cartId = Str::uuid();
 
-                // Generate a UUID (random string) for the cart ID
+            // If no cart_id is provided, generate a new one
+            if (!$cartId) {
                 do {
-                    $cartId = Str::uuid(); // or you can use Str::random(32)
-                } while (CartModel::where('user_id', $cartId)->exists()); // Check if the cart ID already exists in the database
-            
-                // Optional: Hash the cartId before storing for added security
-                $hashedCartId = Hash::make($cartId); // Hash the cart ID to ensure it is secure
-
-                // Store the generated cart ID in the user's cookies (expires in 24 hours)
-                //Cookie::queue('cart_id', $cartId, 1440); // 1440 minutes = 24 hours
-                // Cookie::queue('cart_id', $cartId, 5); // 1440 minutes = 24 hours
-
-                // Store the current timestamp for expiration (24 hours)
-                // $timestamp = now()->timestamp;
-
-                // // Store cart data with timestamp in the cookie (expires in 24 hours)
-                // Cookie::queue('cart_data', json_encode(['cart_id' => $cartId, 'timestamp' => $timestamp]), 2); // 1440 minutes = 24 hours
+                    $cartId = (string) Str::uuid();
+                } while (CartModel::where('user_id', $cartId)->exists());
             }
-            else {
-                // Decode the cart data from cookie (cart_id and timestamp)
-                // $cartData = json_decode($cartData, true);
-
-                // if (json_last_error() !== JSON_ERROR_NONE) {
-                //     dd(json_last_error_msg()); // Shows the error message
-                // } else {
-                //     dd($cartData); // If no error, the decoded array will be shown
-                // }
-                // dd($cartData);
-
-                // // Use existing cart_id if it's not expired
-                // $cartId = $cartData['cart_id'];
-
-                // If cart ID exists, use the existing cart ID (no need to hash it here)
-                //$cartId = $request->cookie('cart_id');
-
-                // Replace with Normal Request Input
-                $cartId = $request->input('cart_id');
-                $hashedCartId = $cartId; // Set the hashed cart ID to the original cart ID for guest users
-            }
-
-            $userId = $hashedCartId; // For guest users, set user ID as cart ID
+            // Use the cart_id as the user_id for guest users
+            $userId = $cartId;        
         }
 
         $cart = CartModel::create([
