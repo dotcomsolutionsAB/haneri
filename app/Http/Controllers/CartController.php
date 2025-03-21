@@ -197,7 +197,7 @@ class CartController extends Controller
     }
 
     // Delete Cart Item
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         // Check for Bearer Token (Authenticated User)
         $user = Auth::guard('sanctum')->user(); 
@@ -228,7 +228,7 @@ class CartController extends Controller
 
 
         $cartItem = CartModel::where('user_id', $user_id)->find($id);
-        
+
         if (!$cartItem) {
             return response()->json(['message' => 'Cart item not found.'], 404);
         }
