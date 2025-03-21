@@ -164,7 +164,12 @@ class CartController extends Controller
             }
         } else {
             // If no Bearer Token, check for 'cart_id' cookie
-            $cartId = $request->cookie('cart_id');
+            // $cartId = $request->cookie('cart_id');
+
+            // initialize
+            $cartId = null;
+            // For guest users, get cart_id from request input
+            $cartId = $request->input('cart_id');
     
             if (!$cartId) {
                 return response()->json(['message' => 'Your cart is empty.'], 400);
@@ -194,7 +199,36 @@ class CartController extends Controller
     // Delete Cart Item
     public function destroy($id)
     {
-        $cartItem = CartModel::find($id);
+        // Check for Bearer Token (Authenticated User)
+        $user = Auth::guard('sanctum')->user(); 
+        $user_id = null;
+
+        if ($user) {
+            // If admin, require 'user_id' in request
+            if ($user->role == 'admin') {
+                $request->validate([
+                    'user_id' => 'required|integer|exists:users,id',
+                ]);  
+                $user_id = $request->input('user_id');
+            } else {
+                $user_id = $user->id;
+            }
+        } else {
+            // initialize
+            $cartId = null;
+            // For guest users, get cart_id from request input
+            $cartId = $request->input('cart_id');
+    
+            if (!$cartId) {
+                return response()->json(['message' => 'Your cart is empty.'], 400);
+            }
+    
+            $user_id = $cartId; // Use cart_id as user_id for guest users
+        }
+
+
+        $cartItem = CartModel::where('user_id', $user_id)->find($id);
+        
         if (!$cartItem) {
             return response()->json(['message' => 'Cart item not found.'], 404);
         }
