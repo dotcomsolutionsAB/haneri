@@ -80,6 +80,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
         Route::post('/update', [UserController::class, 'update']);     // Update user details
         // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
+        Route::get('/dashboard', [UserController::class, 'record_count']); //get product count
         });
     
     // for vendors

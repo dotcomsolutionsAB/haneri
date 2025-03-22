@@ -33,16 +33,23 @@ class BrandController extends Controller
     // View All
     public function index(Request $request)
     {
+        $limit = $request->input('limit', 10);
+        $offset = $request->input('offset', 0);
+
         $query = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description');
 
         if ($request->has('name')) {
             $query->where('name', 'LIKE', '%' . $request->input('name') . '%');
         }
 
-        $brands = $query->get();
+       // Get total record count before applying limit
+        $totalRecords = $query->count();
+        
+        // Apply pagination
+        $brands = $query->offset($offset)->limit($limit)->get();
 
         return $brands->isNotEmpty()
-            ? response()->json(['message' => 'Brands fetched successfully!', 'data' => $brands, 'count' => count($brands)], 200)
+            ? response()->json(['message' => 'Brands fetched successfully!', 'data' => $brands, 'count' => count($brands), 'records' => $totalRecords], 200)
             : response()->json(['message' => 'No brands available.'], 400);
     }
 

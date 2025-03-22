@@ -9,6 +9,10 @@ use Illuminate\Support\Facades\Auth;
 use App\Mail\UserRegisteredMail;
 use Illuminate\Support\Facades\Mail;
 use App\Models\CartModel;
+use App\Models\OrderModel;
+use App\Models\BrandModel;
+use App\Models\CategoryModel;
+use App\Models\ProductModel;
 //use Illuminate\Support\Facades\Cookie;
 
 class UserController extends Controller
@@ -200,6 +204,37 @@ class UserController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching users: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Fetch total no of orders, brand, category and products
+     */
+    public function record_count()
+    {
+        try {
+            $total_order    = OrderModel::count();
+            $total_brand    = BrandModel::count();
+            $total_category = CategoryModel::count();
+            $total_product  = ProductModel::count();
+    
+            return response()->json([
+                'success' => true,
+                'message' => 'Record counts fetched successfully!',
+                'data' => [
+                    'total_orders'   => $total_order,
+                    'total_brands'   => $total_brand,
+                    'total_categories' => $total_category,
+                    'total_products' => $total_product,
+                ]
+            ], 200);
+    
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching record counts.',
+                'error' => $e->getMessage()
             ], 500);
         }
     }

@@ -35,16 +35,23 @@ class CategoryController extends Controller
     // View All
     public function index(Request $request)
     {
+        $limit = $request->input('limit', 10);
+        $offset = $request->input('offset', 0);
+
         $query = CategoryModel::select('id', 'name', 'parent_id', 'photo', 'custom_sort', 'description');
 
         if ($request->has('name')) {
             $query->where('name', 'LIKE', '%' . $request->input('name') . '%');
         }
 
-        $categories = $query->get();
+        // Get total record count before applying limit
+        $totalRecords = $query->count();
+
+        // Apply pagination
+        $categories = $query->offset($offset)->limit($limit)->get();
 
         return $categories->isNotEmpty()
-            ? response()->json(['message' => 'Categories fetched successfully!', 'data' => $categories, 'count' => count($categories)], 200)
+            ? response()->json(['message' => 'Categories fetched successfully!', 'data' => $categories, 'count' => count($categories), 'records' => $totalRecords], 200)
             : response()->json(['message' => 'No categories available.'], 400);
     }
 

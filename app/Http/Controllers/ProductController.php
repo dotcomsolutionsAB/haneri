@@ -283,7 +283,7 @@ class ProductController extends Controller
                     'success' => false,
                     'message' => 'No products found!',
                     'data'    => [],
-                    'total_records' => 0,
+                    'total_records' => $totalRecords,
                 ], 404);
             }
 
