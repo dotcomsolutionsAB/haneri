@@ -80,8 +80,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
         Route::post('/update', [UserController::class, 'update']);     // Update user details
         // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
-        Route::get('/dashboard', [UserController::class, 'record_count']); //get product count
-        });
+    });
     
     // for vendors
     Route::middleware('role:vendor')->group(function () {
@@ -110,6 +109,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // for all users
         Route::post('/all_users', [UserController::class, 'fetchUsers']); // List all users for admin
+
+        Route::prefix('users')->group(function () {
+            Route::get('/admin_dashboard', [UserController::class, 'record_count']); //get product count
+        });
     });
 
     // Category Routes

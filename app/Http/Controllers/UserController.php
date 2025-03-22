@@ -218,6 +218,45 @@ class UserController extends Controller
             $total_brand    = BrandModel::count();
             $total_category = CategoryModel::count();
             $total_product  = ProductModel::count();
+
+            // Sales by order status
+            $statusCounts = OrderModel::select('status', DB::raw('count(*) as count'))
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+            // Total sales amount where status is completed
+            $total_sales = OrderModel::where('status', 'completed')->sum('total_amount');
+
+            // Last 5 orders with user name
+            $last_5_orders = OrderModel::with('user:id,name')
+                    ->select('user_id', 'total_amount', 'status')
+                    ->latest()
+                    ->limit(5)
+                    ->get()
+                    ->map(function ($order) {
+                        return [
+                            'user_name' => optional($order->user)->name,
+                            'amount'    => $order->total_amount,
+                            'status'    => $order->status,
+                        ];
+                    });
+
+            // Monthly sales for current year
+            $currentYear = Carbon::now()->year;
+
+            $monthly_sales = OrderModel::selectRaw('MONTH(created_at) as month, SUM(total_amount) as total')
+                    ->whereYear('created_at', $currentYear)
+                    ->where('status', 'completed')
+                    ->groupBy(DB::raw('MONTH(created_at)'))
+                    ->pluck('total', 'month')
+                    ->toArray();
+
+            // Convert month numbers to names
+            $monthNames = [];
+            foreach (range(1, 12) as $m) {
+            $monthName = Carbon::create()->month($m)->format('F');
+            $monthNames[$monthName] = array_key_exists($m, $monthly_sales) ? round($monthly_sales[$m], 2) : 0.00;
+            }
     
             return response()->json([
                 'success' => true,
@@ -227,7 +266,16 @@ class UserController extends Controller
                     'total_brands'   => $total_brand,
                     'total_categories' => $total_category,
                     'total_products' => $total_product,
-                ]
+                ],
+                'order_status_counts' => [
+                    'pending'   => $statusCounts['pending'] ?? 0,
+                    'completed' => $statusCounts['completed'] ?? 0,
+                    'cancelled' => $statusCounts['cancelled'] ?? 0,
+                    'refunded'  => $statusCounts['refunded'] ?? 0,
+                ],
+                'total_sales'     => round($total_sales, 2),
+                'recent_orders'   => $last_5_orders,
+                'year_records'    => $monthNames,
             ], 200);
     
         } catch (\Exception $e) {
