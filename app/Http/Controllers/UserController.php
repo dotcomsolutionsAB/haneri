@@ -13,6 +13,7 @@ use App\Models\OrderModel;
 use App\Models\BrandModel;
 use App\Models\CategoryModel;
 use App\Models\ProductModel;
+use Illuminate\Support\Facades\DB;
 //use Illuminate\Support\Facades\Cookie;
 
 class UserController extends Controller
