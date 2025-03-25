@@ -41,6 +41,7 @@ class ProductController extends Controller
             'variants.*.variant_value' => 'required_with:variants|string',
             'variants.*.regular_price' => 'required_with:variants|numeric',
             'variants.*.selling_price' => 'required_with:variants|numeric',
+            'variants.*.sales_price_vendor	' => 'required_with:variants|numeric',
             'variants.*.hsn' => 'required_with:variants|string',
             'variants.*.regular_tax' => 'required_with:variants|numeric',
             'variants.*.selling_tax' => 'required_with:variants|numeric',
@@ -83,6 +84,7 @@ class ProductController extends Controller
                     'variant_value' => $variant['variant_value'],
                     'regular_price' => $variant['regular_price'],
                     'selling_price' => $variant['selling_price'],
+                    'sales_price_vendor	' => $variant['sales_price_vendor'],
                     'hsn' => $variant['hsn'],
                     'regular_tax' => $variant['regular_tax'],
                     'selling_tax' => $variant['selling_tax'],
@@ -125,7 +127,7 @@ class ProductController extends Controller
     public function index(Request $request, $id = null)
     {
         try {
-            // ✅ Fetch single product by ID if provided
+            // Fetch single product by ID if provided
             if ($id) {
                 $product = ProductModel::with([
                     'brand:id,name',
@@ -141,12 +143,12 @@ class ProductController extends Controller
                     ], 404);
                 }
 
-                // ✅ Process images
+                // Process images
                 $uploadIds = $product->image ? explode(',', $product->image) : [];
                 $uploads = UploadModel::whereIn('id', $uploadIds)->pluck('file_path', 'id');
                 $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-                // ✅ Response Data
+                // Response Data
                 $responseData = [
                     'brand'    => $product->brand?->name,
                     'category' => $product->category?->name,
@@ -161,7 +163,7 @@ class ProductController extends Controller
                 ], 200);
             }
 
-            // ✅ Fetch multiple products with filters
+            // Fetch multiple products with filters
             $searchProduct  = $request->input('search_product');   // Product name filter (comma-separated)
             $searchBrand    = $request->input('search_brand');     // Brand name filter (comma-separated)
             $searchCategory = $request->input('search_category');  // Category name filter (comma-separated)
@@ -174,7 +176,7 @@ class ProductController extends Controller
             $minPriceFilter  = $request->input('min_priceFilter');  // Minimum selling price
             $maxPriceFilter  = $request->input('max_priceFilter');  // Maximum selling price
 
-            // ✅ Query with filters
+            // Query with filters
             $query = ProductModel::with([
                 'brand:id,name',
                 'category:id,name',
@@ -271,13 +273,13 @@ class ProductController extends Controller
                 });
             }
 
-            // ✅ Get total records before pagination
+            // Get total records before pagination
             $totalRecords = $query->count();
 
-            // ✅ Apply pagination
+            // Apply pagination
             $products = $query->offset($offset)->limit($limit)->get();
 
-            // ✅ Handle empty results
+            // Handle empty results
             if ($products->isEmpty()) {
                 return response()->json([
                     'success' => false,
@@ -287,16 +289,16 @@ class ProductController extends Controller
                 ], 404);
             }
 
-            // ✅ Process images (fetch all image IDs and get URLs)
+            // Process images (fetch all image IDs and get URLs)
             $allImageIds = $products->flatMap(fn($p) => explode(',', $p->image ?? ''))->unique()->filter();
             $uploads = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
 
-            // ✅ Transform product data
+            // Transform product data
             $products->transform(function ($prod) use ($uploads) {
                 $uploadIds = $prod->image ? explode(',', $prod->image) : [];
                 $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-                // ✅ Keep only required fields
+                // Keep only required fields
                 $prod->brand = $prod->brand?->name;
                 $prod->category = $prod->category?->name;
                 $prod->features = $prod->features;
@@ -305,7 +307,7 @@ class ProductController extends Controller
                 return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
             });
 
-            // ✅ Return response
+            // Return response
             return response()->json([
                 'success' => true,
                 'message' => 'Products fetched successfully!',
