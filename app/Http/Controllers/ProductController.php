@@ -41,7 +41,7 @@ class ProductController extends Controller
             'variants.*.variant_value' => 'required_with:variants|string',
             'variants.*.regular_price' => 'required_with:variants|numeric',
             'variants.*.selling_price' => 'required_with:variants|numeric',
-            'variants.*.sales_price_vendor	' => 'required_with:variants|numeric',
+            'variants.*.sales_price_vendor' => 'required_with:variants|numeric',
             'variants.*.hsn' => 'required_with:variants|string',
             'variants.*.regular_tax' => 'required_with:variants|numeric',
             'variants.*.selling_tax' => 'required_with:variants|numeric',
