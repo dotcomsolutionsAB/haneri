@@ -84,7 +84,7 @@ class ProductController extends Controller
                     'variant_value' => $variant['variant_value'],
                     'regular_price' => $variant['regular_price'],
                     'selling_price' => $variant['selling_price'],
-                    'sales_price_vendor	' => $variant['sales_price_vendor'],
+                    'sales_price_vendor' => $variant['sales_price_vendor'],
                     'hsn' => $variant['hsn'],
                     'regular_tax' => $variant['regular_tax'],
                     'selling_tax' => $variant['selling_tax'],
