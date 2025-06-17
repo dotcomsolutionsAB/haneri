@@ -14,47 +14,107 @@ class CartController extends Controller
 {
     //
     // Store
+    // public function store(Request $request)
+    // {
+    //     $request->validate([
+    //         'product_id' => 'required|integer|exists:t_products,id',
+    //         'variant_id' => 'nullable|integer|exists:t_product_variants,id',
+    //         'quantity' => 'required|integer|min:1',
+    //         // Note: cart_id is optional for guest users
+    //         'cart_id' => 'nullable|string'
+    //     ]);
+
+    //     // Manually check for Bearer Token (optional)
+    //     $token = $request->bearerToken();
+    //     $user = null; // Initialize the $user variable to avoid "undefined variable" error
+
+    //     if ($token) {
+    //         $user = Auth::guard('sanctum')->user(); // Manually authenticate using Sanctum
+    //     }
+
+    //     if ($user) {
+    //         // If user is logged in, use their ID
+    //         $userId = $user->id;
+    //     } else {
+    //         // For guest users, get cart_id from request input
+    //         $cartId = $request->input('cart_id');
+
+    //         // If no cart_id is provided, generate a new one
+    //         if (!$cartId) {
+    //             do {
+    //                 $cartId = (string) Str::uuid();
+    //             } while (CartModel::where('user_id', $cartId)->exists());
+    //         }
+    //         // Use the cart_id as the user_id for guest users
+    //         $userId = $cartId;        
+    //     }
+
+    //     $cart = CartModel::create([
+    //         'user_id' => $userId,
+    //         'product_id' => $request->input('product_id'),
+    //         'variant_id' => $request->input('variant_id', null),
+    //         'quantity' => $request->input('quantity'),
+    //     ]);
+
+    //     unset($cart['id'], $cart['created_at'], $cart['updated_at']);
+
+    //     return response()->json(['message' => 'Item added to cart successfully!', 'data' => $cart], 201);
+    // }
+
     public function store(Request $request)
     {
         $request->validate([
             'product_id' => 'required|integer|exists:t_products,id',
             'variant_id' => 'nullable|integer|exists:t_product_variants,id',
             'quantity' => 'required|integer|min:1',
-            // Note: cart_id is optional for guest users
             'cart_id' => 'nullable|string'
         ]);
 
-        // Manually check for Bearer Token (optional)
         $token = $request->bearerToken();
-        $user = null; // Initialize the $user variable to avoid "undefined variable" error
+        $user = null;
 
         if ($token) {
-            $user = Auth::guard('sanctum')->user(); // Manually authenticate using Sanctum
+            $user = Auth::guard('sanctum')->user();
         }
 
         if ($user) {
-            // If user is logged in, use their ID
             $userId = $user->id;
         } else {
-            // For guest users, get cart_id from request input
             $cartId = $request->input('cart_id');
-
-            // If no cart_id is provided, generate a new one
             if (!$cartId) {
                 do {
                     $cartId = (string) Str::uuid();
                 } while (CartModel::where('user_id', $cartId)->exists());
             }
-            // Use the cart_id as the user_id for guest users
-            $userId = $cartId;        
+            $userId = $cartId;
         }
 
-        $cart = CartModel::create([
-            'user_id' => $userId,
-            'product_id' => $request->input('product_id'),
-            'variant_id' => $request->input('variant_id', null),
-            'quantity' => $request->input('quantity'),
-        ]);
+        // FIND if item already in cart
+        $existingCartItem = CartModel::where('user_id', $userId)
+            ->where('product_id', $request->input('product_id'))
+            ->where(function ($q) use ($request) {
+                if ($request->filled('variant_id')) {
+                    $q->where('variant_id', $request->input('variant_id'));
+                } else {
+                    $q->whereNull('variant_id');
+                }
+            })
+            ->first();
+
+        if ($existingCartItem) {
+            // Update the quantity
+            $existingCartItem->quantity += $request->input('quantity');
+            $existingCartItem->save();
+            $cart = $existingCartItem;
+        } else {
+            // Create new cart row
+            $cart = CartModel::create([
+                'user_id' => $userId,
+                'product_id' => $request->input('product_id'),
+                'variant_id' => $request->input('variant_id', null),
+                'quantity' => $request->input('quantity'),
+            ]);
+        }
 
         unset($cart['id'], $cart['created_at'], $cart['updated_at']);
 
