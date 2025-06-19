@@ -316,7 +316,6 @@ class ProductController extends Controller
                                 ->filter()   // drop any nulls
                                 ->values()   // re-index
                                 ->all();
-                                dd($fileUrls);
                         }
                     }
 
