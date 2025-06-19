@@ -299,37 +299,38 @@ class ProductController extends Controller
             $uploadIds = $prod->image ? explode(',', $prod->image) : [];
             $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-            // For each variant, update photo_id to file URLs
+            // Properly map variants so you can transform the photo_id field
             if ($prod->variants && count($prod->variants)) {
-                foreach ($prod->variants as $variant) {
-                    if (!empty($variant->photo_id)) {
-                        $photoIds = array_filter(explode(',', $variant->photo_id));
+                $prod->variants = $prod->variants->map(function ($variant) {
+                    $data = $variant->toArray();
+                    if (!empty($data['photo_id'])) {
+                        $photoIds = array_filter(explode(',', $data['photo_id']));
                         if (!empty($photoIds)) {
-                            // Get all Upload records for those photoIds, keyed by id
-                            $uploadRecords = UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
-                            $variant->photo_id = [];
+                            $uploadRecords = \App\Models\UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
+                            $data['photo_id'] = [];
                             foreach ($photoIds as $pid) {
                                 if (isset($uploadRecords[$pid])) {
-                                    $variant->photo_id[] = Storage::disk('public')->url($uploadRecords[$pid]->file_path);
+                                    $data['photo_id'][] = \Storage::disk('public')->url($uploadRecords[$pid]->file_path);
                                 }
                             }
                         } else {
-                            $variant->photo_id = [];
+                            $data['photo_id'] = [];
                         }
                     } else {
-                        $variant->photo_id = [];
+                        $data['photo_id'] = [];
                     }
-                }
+                    return $data;
+                });
             }
 
-            // Keep only required fields
             $prod->brand = $prod->brand?->name;
             $prod->category = $prod->category?->name;
             $prod->features = $prod->features;
-            $prod->variants = $prod->variants;
+            // $prod->variants already mapped above
 
             return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
         });
+
 
 
             // Return response
