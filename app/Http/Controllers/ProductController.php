@@ -638,7 +638,7 @@ class ProductController extends Controller
             foreach ($variants as $variant) {
                 try {
                     $folder = $baseFolder . '/' . $variant->variant_value;
-                    dd(Storage::exists($folder));
+                    dd(Storage::path($folder));
                     if (!Storage::exists($folder)) {
                         $summary[] = [
                             'variant_id' => $variant->id,
