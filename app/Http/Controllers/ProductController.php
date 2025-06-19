@@ -301,6 +301,7 @@ class ProductController extends Controller
 
             // For each variant, update photo_id to file URLs
             if ($prod->variants && count($prod->variants)) {
+                dd("lll");
                 foreach ($prod->variants as $variant) {
                     if (!empty($variant->photo_id)) {
                         $photoIds = array_filter(explode(',', $variant->photo_id));
@@ -323,6 +324,7 @@ class ProductController extends Controller
                     }
                 }
             }
+            dd("aaa");
 
             // Keep only required fields
             $prod->brand = $prod->brand?->name;
