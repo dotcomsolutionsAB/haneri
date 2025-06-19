@@ -522,11 +522,11 @@ $products->transform(function ($prod) use ($uploads) {
     $prod->brand = $prod->brand?->name;
     $prod->category = $prod->category?->name;
     $prod->features = $prod->features;
-dd($prod);
+
     return $prod->makeHidden(['brand_id','category_id','created_at','updated_at']);
 });
 
-
+dd($products);
             return response()->json([
                 'success'       => true,
                 'message'       => 'Products fetched successfully!',
