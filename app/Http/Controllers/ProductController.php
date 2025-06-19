@@ -140,7 +140,7 @@ class ProductController extends Controller
                     return response()->json([
                         'success' => false,
                         'message' => 'Product not found!',
-                    ], 404);
+                    ], 200);
                 }
 
                 // Process images
@@ -349,7 +349,7 @@ class ProductController extends Controller
 
             return response()->json(['message' => 'Product fetched successfully!', 'data' => $response], 200);
         } else {
-                return response()->json(['message' => 'Product not found.'], 404);
+                return response()->json(['message' => 'Product not found.'], 200);
             }
     }
 
