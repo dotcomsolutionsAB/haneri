@@ -280,14 +280,14 @@ class ProductController extends Controller
             $products = $query->offset($offset)->limit($limit)->get();
 
             // Handle empty results
-            if ($products->isEmpty()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No products found!',
-                    'data'    => [],
-                    'total_records' => $totalRecords,
-                ], 404);
-            }
+            // if ($products->isEmpty()) {
+            //     return response()->json([
+            //         'success' => false,
+            //         'message' => 'No products found!',
+            //         'data'    => [],
+            //         'total_records' => $totalRecords,
+            //     ], 404);
+            // }
 
             // Process images (fetch all image IDs and get URLs)
             $allImageIds = $products->flatMap(fn($p) => explode(',', $p->image ?? ''))->unique()->filter();
