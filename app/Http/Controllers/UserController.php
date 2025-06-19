@@ -307,7 +307,6 @@ class UserController extends Controller
             Mail::to($user->email)->send(new PasswordResetMail($user, $newPassword));
         } catch (\Exception $e) {
             return response()->json([
-                'code' => 500,
                 'success' => false,
                 'message' => 'Failed to send email. Try again later.',
                 'error' => $e->getMessage()
@@ -315,7 +314,6 @@ class UserController extends Controller
         }
 
         return response()->json([
-            'code' => 200,
             'success' => true,
             'message' => 'A new password has been sent to your email address.'
         ]);
