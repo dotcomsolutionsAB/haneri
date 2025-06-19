@@ -510,11 +510,12 @@ $products->transform(function ($prod) use ($uploads) {
                         ->all();
                 }
             }
-            dd($data);
+            // dd($data);
 
             // REMOVE photo_id from output, add file_urls instead
             unset($data['photo_id']);
             $data['file_urls'] = $fileUrls;
+            dd($data);
             return $data;
         });
     }
