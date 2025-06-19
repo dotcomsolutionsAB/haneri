@@ -638,7 +638,7 @@ class ProductController extends Controller
             foreach ($variants as $variant) {
                 try {
                     $folder = $baseFolder . '/' . $variant->variant_value;
-                    dd(Storage::disk('public')->path($folder));  // This will show the correct absolute path
+                    // dd(Storage::disk('public')->path($folder));  // This will show the correct absolute path
 
                     if (!Storage::disk('public')->exists($folder)) {
                         $summary[] = [
