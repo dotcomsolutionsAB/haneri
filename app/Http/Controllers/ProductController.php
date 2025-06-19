@@ -530,7 +530,7 @@ $products->transform(function ($prod) use ($uploads) {
             return response()->json([
                 'success'       => true,
                 'message'       => 'Products fetched successfully!',
-                'data'          => $data,
+                'data'          => $prod,
                 'total_records' => $totalRecords,
             ], 200);
 
