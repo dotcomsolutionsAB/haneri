@@ -510,6 +510,7 @@ $products->transform(function ($prod) use ($uploads) {
                         ->all();
                 }
             }
+            dd($data);
 
             // REMOVE photo_id from output, add file_urls instead
             unset($data['photo_id']);
