@@ -1,5 +1,5 @@
 <?php
-dd(env('MAIL_ENCRYPTION'), config('mail.mailers.smtp'), env('MAIL_SCHEME'));
+// dd(env('MAIL_ENCRYPTION'), config('mail.mailers.smtp'), env('MAIL_SCHEME'));
 
 return [
 
@@ -40,7 +40,7 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            // 'scheme' => env('MAIL_SCHEME'),
+            'scheme' => 'smtps',
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),
