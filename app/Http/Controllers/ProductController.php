@@ -296,40 +296,45 @@ class ProductController extends Controller
 
             // Transform product data
             $products->transform(function ($prod) use ($uploads) {
+            // existing image logic
             $uploadIds = $prod->image ? explode(',', $prod->image) : [];
             $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-            // Properly map variants so you can transform the photo_id field
-            if ($prod->variants && count($prod->variants)) {
+            // now remap variants
+            if ($prod->variants && $prod->variants->count()) {
                 $prod->variants = $prod->variants->map(function ($variant) {
                     $data = $variant->toArray();
+
+                    // build file_urls from photo_id
+                    $fileUrls = [];
                     if (!empty($data['photo_id'])) {
-                        $photoIds = array_filter(explode(',', $data['photo_id']));
-                        if (!empty($photoIds)) {
-                            $uploadRecords = \App\Models\UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
-                            $data['photo_id'] = [];
-                            foreach ($photoIds as $pid) {
-                                if (isset($uploadRecords[$pid])) {
-                                    $data['photo_id'][] = \Storage::disk('public')->url($uploadRecords[$pid]->file_path);
-                                }
-                            }
-                        } else {
-                            $data['photo_id'] = [];
+                        $ids = array_filter(explode(',', $data['photo_id']));
+                        if ($ids) {
+                            $uploads = \App\Models\UploadModel::whereIn('id', $ids)->get();
+                            $fileUrls = $uploads
+                                ->map(fn($u) => \Storage::disk('public')->url($u->file_path))
+                                ->filter()   // drop any nulls
+                                ->values()   // re-index
+                                ->all();
                         }
-                    } else {
-                        $data['photo_id'] = [];
                     }
+
+                    // replace keys
+                    unset($data['photo_id']);
+                    $data['file_urls'] = $fileUrls;
+
                     return $data;
                 });
             }
 
-            $prod->brand = $prod->brand?->name;
+            // rest of your transformations
+            $prod->brand    = $prod->brand?->name;
             $prod->category = $prod->category?->name;
             $prod->features = $prod->features;
-            // $prod->variants already mapped above
 
-            return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
+            return $prod->makeHidden(['brand_id','category_id','created_at','updated_at']);
         });
+
 
 
 
