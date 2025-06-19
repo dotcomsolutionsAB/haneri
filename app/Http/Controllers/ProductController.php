@@ -304,7 +304,9 @@ class ProductController extends Controller
                 foreach ($prod->variants as $variant) {
                     if (!empty($variant->photo_id)) {
                         $photoIds = array_filter(explode(',', $variant->photo_id));
+                        dd($photoIds);
                         if (!empty($photoIds)) {
+                            dd("ppp");
                             // Get all Upload records for those photoIds, keyed by id
                             $uploadRecords = UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
                             $variant->photo_id = [];
