@@ -495,28 +495,55 @@ class ProductController extends Controller
                 $prod->image = array_map(fn($u)=> $uploads[$u] ?? null, $uids);
 
                 // variants → file_urls
-                if ($prod->variants->count()) {
-                    $prod->variants = $prod->variants->map(function($variant) {
-                        $data     = $variant->toArray();
-                        $fileUrls = [];
+                // if ($prod->variants->count()) {
+                //     $prod->variants = $prod->variants->map(function($variant) {
+                //         $data     = $variant->toArray();
+                //         $fileUrls = [];
 
-                        if (! empty($data['photo_id'])) {
-                            $ids = array_filter(explode(',',$data['photo_id']));
-                            if ($ids) {
-                                $rows = UploadModel::whereIn('id',$ids)->get();
-                                $fileUrls = $rows
-                                    ->map(fn($u)=> Storage::disk('public')->url($u->file_path))
-                                    ->filter()
-                                    ->values()
-                                    ->all();
-                            }
-                        }
+                //         if (! empty($data['photo_id'])) {
+                //             $ids = array_filter(explode(',',$data['photo_id']));
+                //             if ($ids) {
+                //                 $rows = UploadModel::whereIn('id',$ids)->get();
+                //                 $fileUrls = $rows
+                //                     ->map(fn($u)=> Storage::disk('public')->url($u->file_path))
+                //                     ->filter()
+                //                     ->values()
+                //                     ->all();
+                //             }
+                //         }
 
-                        unset($data['photo_id']);
-                        $data['file_urls'] = $fileUrls;
-                        return $data;
-                    });
-                }
+                //         unset($data['photo_id']);
+                //         $data['file_urls'] = $fileUrls;
+                //         return $data;
+                //     });
+                // }
+                // now remap variants
+if ($prod->variants && $prod->variants->count()) {
+    $prod->variants = $prod->variants->map(function ($variant) {
+        $data = $variant->toArray();
+
+        // build file_urls from photo_id
+        $fileUrls = [];
+        if (! empty($data['photo_id'])) {
+            $ids = array_filter(explode(',', $data['photo_id']));
+            if ($ids) {
+                $uploads = UploadModel::whereIn('id', $ids)->get();
+                $fileUrls = $uploads
+                    ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+                    ->filter()   // drop any nulls
+                    ->values()   // re-index
+                    ->all();
+            }
+        }
+
+        // replace keys
+        unset($data['photo_id']);
+        $data['file_urls'] = $fileUrls;
+
+        return $data;
+    });
+}
+
 
                 $prod->brand    = $prod->brand?->name;
                 $prod->category = $prod->category?->name;
