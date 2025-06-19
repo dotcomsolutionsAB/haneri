@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use App\Mail\UserRegisteredMail;
+use App\Mail\PasswordResetMail;
 use Illuminate\Support\Facades\Mail;
 use App\Models\CartModel;
 use App\Models\OrderModel;
@@ -287,5 +288,42 @@ class UserController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    public function forgotPassword(Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email|exists:users,email'
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        $newPassword = $this->generateRandomPassword();
+
+        $user->password = bcrypt($newPassword);
+        $user->save();
+
+        try {
+            Mail::to($user->email)->send(new PasswordResetMail($user, $newPassword));
+        } catch (\Exception $e) {
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to send email. Try again later.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+
+        return response()->json([
+            'code' => 200,
+            'success' => true,
+            'message' => 'A new password has been sent to your email address.'
+        ]);
+    }
+
+    private function generateRandomPassword($length = 12)
+    {
+        $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-=+';
+        return substr(str_shuffle(str_repeat($chars, $length)), 0, $length);
     }
 }
