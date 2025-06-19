@@ -182,7 +182,7 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf'
+                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf'
             ]);
 
             // Apply search_product filter (comma-separated product names)
