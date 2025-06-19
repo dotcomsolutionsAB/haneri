@@ -296,17 +296,36 @@ class ProductController extends Controller
 
             // Transform product data
             $products->transform(function ($prod) use ($uploads) {
-                $uploadIds = $prod->image ? explode(',', $prod->image) : [];
-                $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
+            $uploadIds = $prod->image ? explode(',', $prod->image) : [];
+            $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-                // Keep only required fields
-                $prod->brand = $prod->brand?->name;
-                $prod->category = $prod->category?->name;
-                $prod->features = $prod->features;
-                $prod->variants = $prod->variants;
+            // Add here: For each variant, update photo_id to file URLs
+            if ($prod->variants && count($prod->variants)) {
+                foreach ($prod->variants as $variant) {
+                    if ($variant->photo_id) {
+                        $photoIds = array_filter(explode(',', $variant->photo_id));
+                        // Fetch upload records in one go
+                        $uploadRecords = \App\Models\UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
+                        $variant->photo_id = array_values(array_filter(array_map(function ($id) use ($uploadRecords) {
+                            if (isset($uploadRecords[$id])) {
+                                return \Storage::disk('public')->url($uploadRecords[$id]->file_path);
+                            }
+                            return null;
+                        }, $photoIds)));
+                    } else {
+                        $variant->photo_id = [];
+                    }
+                }
+            }
 
-                return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
-            });
+            // Keep only required fields
+            $prod->brand = $prod->brand?->name;
+            $prod->category = $prod->category?->name;
+            $prod->features = $prod->features;
+            $prod->variants = $prod->variants;
+
+            return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
+        });
 
             // Return response
             return response()->json([
