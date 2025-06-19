@@ -301,8 +301,8 @@ class ProductController extends Controller
 
             // For each variant, update photo_id to file URLs
             if ($prod->variants && count($prod->variants)) {
-                dd("lll");
                 foreach ($prod->variants as $variant) {
+                    dd($variant);
                     if (!empty($variant->photo_id)) {
                         $photoIds = array_filter(explode(',', $variant->photo_id));
                         dd($photoIds);
