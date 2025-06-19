@@ -302,12 +302,9 @@ class ProductController extends Controller
             // For each variant, update photo_id to file URLs
             if ($prod->variants && count($prod->variants)) {
                 foreach ($prod->variants as $variant) {
-                    dd($variant);
                     if (!empty($variant->photo_id)) {
                         $photoIds = array_filter(explode(',', $variant->photo_id));
-                        dd($photoIds);
                         if (!empty($photoIds)) {
-                            dd("ppp");
                             // Get all Upload records for those photoIds, keyed by id
                             $uploadRecords = UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
                             $variant->photo_id = [];
@@ -324,7 +321,6 @@ class ProductController extends Controller
                     }
                 }
             }
-            dd("aaa");
 
             // Keep only required fields
             $prod->brand = $prod->brand?->name;
