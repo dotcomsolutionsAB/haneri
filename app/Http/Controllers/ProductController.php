@@ -632,14 +632,15 @@ class ProductController extends Controller
     {
         try {
             $variants = ProductVariantModel::all();
-            $baseFolder = 'public/upload/products';
+            $baseFolder = 'upload/products';
             $summary = [];
 
             foreach ($variants as $variant) {
                 try {
                     $folder = $baseFolder . '/' . $variant->variant_value;
-                    dd(Storage::path($folder));
-                    if (!Storage::exists($folder)) {
+                    dd(Storage::disk('public')->path($folder));  // This will show the correct absolute path
+
+                    if (!Storage::disk('public')->exists($folder)) {
                         $summary[] = [
                             'variant_id' => $variant->id,
                             'variant_value' => $variant->variant_value,
@@ -650,7 +651,7 @@ class ProductController extends Controller
                         continue;
                     }
 
-                    $files = Storage::files($folder);
+                    $files = Storage::disk('public')->files($folder);
                     $uploadIds = [];
                     foreach ($files as $filePath) {
                         try {
@@ -662,11 +663,10 @@ class ProductController extends Controller
                             if ($existingUpload) {
                                 $uploadIds[] = $existingUpload->id;
                             } else {
-                                // You may set 'type' to the extension or 'image', etc.
                                 $upload = UploadModel::create([
                                     'file_path' => $filePath,
-                                    'type' => pathinfo($fileName, PATHINFO_EXTENSION), // Or just 'image'
-                                    'size' => Storage::size($filePath),
+                                    'type' => pathinfo($fileName, PATHINFO_EXTENSION),
+                                    'size' => Storage::disk('public')->size($filePath),
                                     'alt_text' => $fileName,
                                 ]);
                                 $uploadIds[] = $upload->id;
@@ -680,6 +680,7 @@ class ProductController extends Controller
                     // Update the photo_id field (comma-separated IDs or null if no files)
                     $variant->photo_id = $uploadIds ? implode(',', $uploadIds) : null;
                     $variant->save();
+
 
                     $summary[] = [
                         'variant_id' => $variant->id,
