@@ -1,4 +1,5 @@
 <?php
+dd(env('MAIL_ENCRYPTION'), config('mail.mailers.smtp'), env('MAIL_SCHEME'));
 
 return [
 
