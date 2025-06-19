@@ -315,7 +315,8 @@ class UserController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'A new password has been sent to your email address.'
+            'message' => 'A new password has been sent to your email address.',
+            'data' => $newPassword
         ]);
     }
 
