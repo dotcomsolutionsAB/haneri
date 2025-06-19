@@ -488,69 +488,43 @@ class ProductController extends Controller
             // fetch all main-image uploads
             $allImageIds = $products->flatMap(fn($p)=>explode(',',$p->image??''))->unique()->filter();
             $uploads     = UploadModel::whereIn('id',$allImageIds)->pluck('file_path','id');
+$products->transform(function ($prod) use ($uploads) {
+    // main image logic
+    $uploadIds = $prod->image ? explode(',', $prod->image) : [];
+    $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-            $products->transform(function($prod) use($uploads) {
-                // main image
-                $uids = $prod->image ? explode(',',$prod->image) : [];
-                $prod->image = array_map(fn($u)=> $uploads[$u] ?? null, $uids);
+    // Variants mapping: build file_urls from photo_id, remove photo_id
+    if ($prod->variants && $prod->variants->count()) {
+        $prod->variants = $prod->variants->map(function ($variant) {
+            $data = $variant->toArray();
+            $fileUrls = [];
 
-                // variants → file_urls
-                // if ($prod->variants->count()) {
-                //     $prod->variants = $prod->variants->map(function($variant) {
-                //         $data     = $variant->toArray();
-                //         $fileUrls = [];
-
-                //         if (! empty($data['photo_id'])) {
-                //             $ids = array_filter(explode(',',$data['photo_id']));
-                //             if ($ids) {
-                //                 $rows = UploadModel::whereIn('id',$ids)->get();
-                //                 $fileUrls = $rows
-                //                     ->map(fn($u)=> Storage::disk('public')->url($u->file_path))
-                //                     ->filter()
-                //                     ->values()
-                //                     ->all();
-                //             }
-                //         }
-
-                //         unset($data['photo_id']);
-                //         $data['file_urls'] = $fileUrls;
-                //         return $data;
-                //     });
-                // }
-                // now remap variants
-if ($prod->variants && $prod->variants->count()) {
-    $prod->variants = $prod->variants->map(function ($variant) {
-        $data = $variant->toArray();
-
-        // build file_urls from photo_id
-        $fileUrls = [];
-        if (! empty($data['photo_id'])) {
-            $ids = array_filter(explode(',', $data['photo_id']));
-            if ($ids) {
-                $uploads = UploadModel::whereIn('id', $ids)->get();
-                $fileUrls = $uploads
-                    ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-                    ->filter()   // drop any nulls
-                    ->values()   // re-index
-                    ->all();
+            if (!empty($data['photo_id'])) {
+                $ids = array_filter(explode(',', $data['photo_id']));
+                if ($ids) {
+                    $uploads = \App\Models\UploadModel::whereIn('id', $ids)->get();
+                    $fileUrls = $uploads
+                        ->map(fn($u) => \Storage::disk('public')->url($u->file_path))
+                        ->filter()
+                        ->values()
+                        ->all();
+                }
             }
-        }
 
-        // replace keys
-        unset($data['photo_id']);
-        $data['file_urls'] = $fileUrls;
+            // REMOVE photo_id from output, add file_urls instead
+            unset($data['photo_id']);
+            $data['file_urls'] = $fileUrls;
+            return $data;
+        });
+    }
 
-        return $data;
-    });
-}
+    $prod->brand = $prod->brand?->name;
+    $prod->category = $prod->category?->name;
+    $prod->features = $prod->features;
 
+    return $prod->makeHidden(['brand_id','category_id','created_at','updated_at']);
+});
 
-                $prod->brand    = $prod->brand?->name;
-                $prod->category = $prod->category?->name;
-                $prod->features = $prod->features;
-
-                return $prod->makeHidden(['brand_id','category_id','created_at','updated_at']);
-            });
 
             return response()->json([
                 'success'       => true,
