@@ -12,6 +12,7 @@ use App\Models\CategoryModel;
 use App\Models\UploadModel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class ProductController extends Controller
 {
@@ -626,4 +627,91 @@ class ProductController extends Controller
         }
     }
 
+    // map product variant image
+    public function mapVariantImagesToPhotoId(Request $request)
+    {
+        try {
+            $variants = ProductVariantModel::all();
+            $baseFolder = 'public/upload/products';
+            $summary = [];
+
+            foreach ($variants as $variant) {
+                try {
+                    $folder = $baseFolder . '/' . $variant->variant_value;
+                    if (!Storage::exists($folder)) {
+                        $summary[] = [
+                            'variant_id' => $variant->id,
+                            'variant_value' => $variant->variant_value,
+                            'status' => 'folder_not_found',
+                            'photo_id' => null,
+                            'files' => [],
+                        ];
+                        continue;
+                    }
+
+                    $files = Storage::files($folder);
+                    $uploadIds = [];
+                    foreach ($files as $filePath) {
+                        try {
+                            $fileName = basename($filePath);
+
+                            // Check for existing upload (matching file_path)
+                            $existingUpload = UploadModel::where('file_path', $filePath)->first();
+
+                            if ($existingUpload) {
+                                $uploadIds[] = $existingUpload->id;
+                            } else {
+                                // You may set 'type' to the extension or 'image', etc.
+                                $upload = UploadModel::create([
+                                    'file_path' => $filePath,
+                                    'type' => pathinfo($fileName, PATHINFO_EXTENSION), // Or just 'image'
+                                    'size' => Storage::size($filePath),
+                                    'alt_text' => $fileName,
+                                ]);
+                                $uploadIds[] = $upload->id;
+                            }
+                        } catch (\Exception $e) {
+                            Log::error("File processing failed for variant_id {$variant->id} file {$filePath}: {$e->getMessage()}");
+                            continue;
+                        }
+                    }
+
+                    // Update the photo_id field (comma-separated IDs or null if no files)
+                    $variant->photo_id = $uploadIds ? implode(',', $uploadIds) : null;
+                    $variant->save();
+
+                    $summary[] = [
+                        'variant_id' => $variant->id,
+                        'variant_value' => $variant->variant_value,
+                        'status' => $uploadIds ? 'updated' : 'no_files',
+                        'photo_id' => $variant->photo_id,
+                        'files' => $uploadIds,
+                    ];
+                } catch (\Exception $e) {
+                    Log::error("Variant processing failed for variant_id {$variant->id}: {$e->getMessage()}");
+                    $summary[] = [
+                        'variant_id' => $variant->id,
+                        'variant_value' => $variant->variant_value,
+                        'status' => 'error',
+                        'photo_id' => null,
+                        'error' => $e->getMessage(),
+                    ];
+                    continue;
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Photo IDs mapped to variants based on folder images.',
+                'summary' => $summary,
+            ]);
+        } catch (\Exception $e) {
+            Log::error("Error in mapVariantImagesToPhotoId API: {$e->getMessage()}");
+            return response()->json([
+                'success' => false,
+                'message' => 'Error mapping images to product variants.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

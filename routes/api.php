@@ -103,6 +103,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
+            Route::get('/pull_images', [ProductController::class, 'mapVariantImagesToPhotoId']);
         });
 
         // for all orders

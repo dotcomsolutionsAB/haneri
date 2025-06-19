@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             // $table->foreignId('product_id')->constrained('t_products');
             $table->integer('product_id');
-            $table->integer('photo_id')->nullable(); 
+            $table->string('photo_id')->nullable(); 
             $table->integer('min_qty')->default(1); // Minimum quantity to order
             $table->boolean('is_cod')->default(true); // Supports cash on delivery
             $table->decimal('weight', 8, 2)->nullable(); // Product weight in kg
@@ -25,6 +25,7 @@ return new class extends Migration
             $table->decimal('discount_price', 8, 2)->nullable();
             $table->decimal('regular_price', 8, 2); // New column for variant price
             $table->decimal('selling_price', 8, 2); // New column for variant price
+            $table->decimal('sales_price_vendor', 8, 2);
             $table->string('hsn'); // Harmonized System Number
             $table->decimal('regular_tax', 5, 2); // Tax percentage
             $table->decimal('selling_tax', 5, 2); // Tax percentage
