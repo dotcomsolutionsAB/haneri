@@ -502,9 +502,9 @@ $products->transform(function ($prod) use ($uploads) {
             if (!empty($data['photo_id'])) {
                 $ids = array_filter(explode(',', $data['photo_id']));
                 if ($ids) {
-                    $uploads = \App\Models\UploadModel::whereIn('id', $ids)->get();
+                    $uploads = UploadModel::whereIn('id', $ids)->get();
                     $fileUrls = $uploads
-                        ->map(fn($u) => \Storage::disk('public')->url($u->file_path))
+                        ->map(fn($u) => Storage::disk('public')->url($u->file_path))
                         ->filter()
                         ->values()
                         ->all();
