@@ -299,19 +299,23 @@ class ProductController extends Controller
             $uploadIds = $prod->image ? explode(',', $prod->image) : [];
             $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-            // Add here: For each variant, update photo_id to file URLs
+            // For each variant, update photo_id to file URLs
             if ($prod->variants && count($prod->variants)) {
                 foreach ($prod->variants as $variant) {
-                    if ($variant->photo_id) {
+                    if (!empty($variant->photo_id)) {
                         $photoIds = array_filter(explode(',', $variant->photo_id));
-                        // Fetch upload records in one go
-                        $uploadRecords = \App\Models\UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
-                        $variant->photo_id = array_values(array_filter(array_map(function ($id) use ($uploadRecords) {
-                            if (isset($uploadRecords[$id])) {
-                                return \Storage::disk('public')->url($uploadRecords[$id]->file_path);
+                        if (!empty($photoIds)) {
+                            // Get all Upload records for those photoIds, keyed by id
+                            $uploadRecords = UploadModel::whereIn('id', $photoIds)->get()->keyBy('id');
+                            $variant->photo_id = [];
+                            foreach ($photoIds as $pid) {
+                                if (isset($uploadRecords[$pid])) {
+                                    $variant->photo_id[] = Storage::disk('public')->url($uploadRecords[$pid]->file_path);
+                                }
                             }
-                            return null;
-                        }, $photoIds)));
+                        } else {
+                            $variant->photo_id = [];
+                        }
                     } else {
                         $variant->photo_id = [];
                     }
@@ -326,6 +330,7 @@ class ProductController extends Controller
 
             return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
         });
+
 
             // Return response
             return response()->json([
