@@ -515,7 +515,6 @@ $products->transform(function ($prod) use ($uploads) {
             // REMOVE photo_id from output, add file_urls instead
             unset($data['photo_id']);
             $data['file_urls'] = $fileUrls;
-            dd($data);
             return $data;
         });
     }
@@ -531,7 +530,7 @@ $products->transform(function ($prod) use ($uploads) {
             return response()->json([
                 'success'       => true,
                 'message'       => 'Products fetched successfully!',
-                'data'          => $products,
+                'data'          => $data,
                 'total_records' => $totalRecords,
             ], 200);
 
