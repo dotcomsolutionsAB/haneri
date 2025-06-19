@@ -525,7 +525,7 @@ $products->transform(function ($prod) use ($uploads) {
 
     return $prod->makeHidden(['brand_id','category_id','created_at','updated_at']);
 });
-
+dd($products->toArray());
 
             return response()->json([
                 'success'       => true,
