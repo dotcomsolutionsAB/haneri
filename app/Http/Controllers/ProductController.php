@@ -628,7 +628,7 @@ class ProductController extends Controller
     }
 
     // map product variant image
-    public function mapVariantImagesToPhotoId(Request $request)
+    public function mapVariantImagesToPhotoId()
     {
         try {
             $variants = ProductVariantModel::all();
@@ -638,6 +638,7 @@ class ProductController extends Controller
             foreach ($variants as $variant) {
                 try {
                     $folder = $baseFolder . '/' . $variant->variant_value;
+                    dd(Storage::exists($folder));
                     if (!Storage::exists($folder)) {
                         $summary[] = [
                             'variant_id' => $variant->id,
