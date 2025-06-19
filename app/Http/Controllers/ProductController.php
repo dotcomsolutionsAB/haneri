@@ -134,7 +134,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf'
+                    'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_type,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf'
                 ])->find($id);
 
                 if (!$product) {
@@ -310,12 +310,13 @@ class ProductController extends Controller
                     if (!empty($data['photo_id'])) {
                         $ids = array_filter(explode(',', $data['photo_id']));
                         if ($ids) {
-                            $uploads = \App\Models\UploadModel::whereIn('id', $ids)->get();
+                            $uploads = UploadModel::whereIn('id', $ids)->get();
                             $fileUrls = $uploads
-                                ->map(fn($u) => \Storage::disk('public')->url($u->file_path))
+                                ->map(fn($u) => Storage::disk('public')->url($u->file_path))
                                 ->filter()   // drop any nulls
                                 ->values()   // re-index
                                 ->all();
+                                dd($fileUrls);
                         }
                     }
 
