@@ -41,7 +41,7 @@ class UserController extends Controller
         ]);
 
         // Automatically log in the user
-        $token = $get_user->createToken('authToken')->plainTextToken;
+        $token = $user->createToken('authToken')->plainTextToken;
 
         unset($user['id'], $user['created_at'], $user['updated_at']);
 
