@@ -141,7 +141,7 @@ class UserController extends Controller
         CartModel::where('user_id', $cartId)->update(['user_id' => $userId]);
 
         // Send email using Mailable
-        Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
+        //Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
 
         // Retrieve the user
         $get_user = User::where('mobile', $request->mobile)->first();
@@ -154,6 +154,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully! Cart updated and login credentials sent to email.',
+            'password' => $randomPassword,
             'token' => $token,
             'user' => $user
         ], 201);
