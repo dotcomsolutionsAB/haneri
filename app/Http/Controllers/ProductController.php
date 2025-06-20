@@ -451,10 +451,22 @@ class ProductController extends Controller
                 $query->whereHas('brand', fn($q) => collect($brands)
                     ->each(fn($b) => $q->orWhere('name','LIKE','%'.trim($b).'%')));
             }
+            // if (! empty($searchCategory)) {
+            //     $cats = explode(',', $searchCategory);
+            //     $query->whereHas('category', fn($q) => collect($cats)
+            //         ->each(fn($c) => $q->orWhere('name','LIKE','%'.trim($c).'%')));
+            // }
             if (! empty($searchCategory)) {
-                $cats = explode(',', $searchCategory);
-                $query->whereHas('category', fn($q) => collect($cats)
-                    ->each(fn($c) => $q->orWhere('name','LIKE','%'.trim($c).'%')));
+                // split, trim, and throw away any empty strings
+                $categoryNames = array_filter(array_map('trim', explode(',', $searchCategory)));
+
+                $query->whereHas('category', function($q) use ($categoryNames) {
+                    $q->where(function($q2) use ($categoryNames) {
+                        foreach ($categoryNames as $name) {
+                            $q2->orWhere('name', 'LIKE', "%{$name}%");
+                        }
+                    });
+                });
             }
             if (! is_null($isActive)) {
                 $query->where('is_active',$isActive);
