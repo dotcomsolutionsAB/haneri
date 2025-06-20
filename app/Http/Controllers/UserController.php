@@ -40,9 +40,12 @@ class UserController extends Controller
             'role' => $request->input('role'),
         ]);
 
+        // Automatically log in the user
+        $token = $get_user->createToken('authToken')->plainTextToken;
+
         unset($user['id'], $user['created_at'], $user['updated_at']);
 
-        return response()->json(['message' => 'User registered successfully!', 'data' => $user], 201);
+        return response()->json(['message' => 'User registered successfully!', 'data' => $user, 'token' => $token], 201);
     }
 
     // Get logged-in user details
