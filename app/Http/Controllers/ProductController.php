@@ -451,7 +451,6 @@ class ProductController extends Controller
                 $query->whereHas('brand', fn($q) => collect($brands)
                     ->each(fn($b) => $q->orWhere('name','LIKE','%'.trim($b).'%')));
             }
-            dd($searchCategory);
             if (! empty($searchCategory)) {
                 $cats = explode(',', $searchCategory);
                 $query->whereHas('category', fn($q) => collect($cats)
