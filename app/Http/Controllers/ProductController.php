@@ -496,27 +496,31 @@ class ProductController extends Controller
 
             // Variants mapping: build file_urls from photo_id, remove photo_id
             if ($prod->variants && $prod->variants->count()) {
-                $prod->variants = $prod->variants->map(function ($variant) {
-                    $data = $variant->toArray();
+                $mapped = $prod->variants->map(function ($variant) {
+                    $data     = $variant->toArray();
                     $fileUrls = [];
 
-                    if (!empty($data['photo_id'])) {
+                    if (! empty($data['photo_id'])) {
                         $ids = array_filter(explode(',', $data['photo_id']));
                         if ($ids) {
-                            $uploads = UploadModel::whereIn('id', $ids)->get();
-                            $fileUrls = $uploads
+                            $rows = UploadModel::whereIn('id', $ids)->get();
+                            $fileUrls = $rows
                                 ->map(fn($u) => Storage::disk('public')->url($u->file_path))
                                 ->filter()
                                 ->values()
                                 ->all();
                         }
                     }
+
                     unset($data['photo_id']);
                     $data['file_urls'] = $fileUrls;
                     return $data;
-                })->all(); // <- Converts to plain array!
+                })->all();
+
+                // **This is the critical change** — override the loaded relation
+                $prod->setRelation('variants', collect($mapped));
             } else {
-                $prod->variants = [];
+                $prod->setRelation('variants', collect([]));
             }
 
             $prod->brand = $prod->brand?->name;
