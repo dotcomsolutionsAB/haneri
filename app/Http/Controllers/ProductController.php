@@ -451,11 +451,6 @@ class ProductController extends Controller
                 $query->whereHas('brand', fn($q) => collect($brands)
                     ->each(fn($b) => $q->orWhere('name','LIKE','%'.trim($b).'%')));
             }
-            // if (! empty($searchCategory)) {
-            //     $cats = explode(',', $searchCategory);
-            //     $query->whereHas('category', fn($q) => collect($cats)
-            //         ->each(fn($c) => $q->orWhere('name','LIKE','%'.trim($c).'%')));
-            // }
             if (! empty($searchCategory)) {
                 // split, trim, and throw away any empty strings
                 $categoryNames = array_filter(array_map('trim', explode(',', $searchCategory)));
