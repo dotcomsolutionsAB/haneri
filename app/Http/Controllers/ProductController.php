@@ -535,7 +535,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,selling_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf'
+                    'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf'
                 ])->find($id);
 
                 if (!$product) {
@@ -547,40 +547,44 @@ class ProductController extends Controller
 
                 // Get the logged-in user (assumes you're using auth)
                 $user = auth()->user();
-                $discount = 0;  // Default discount is 0
 
                 // If the user is authenticated, check the discount logic
                 if ($user) {
-                    // Check if the user has a discount record in UsersDiscountModel
-                    $userDiscount = UsersDiscountModel::where('user_id', $user->id)
-                        ->where('product_variant_id', $product->id)
-                        ->first();
-                    
-                    // If a discount record exists, apply it
-                    if ($userDiscount) {
-                        $discount = $userDiscount->discount;
-                    } else {
-                        // If no discount in UsersDiscountModel, apply discount based on role
-                        switch ($user->role) {
-                            case 'customer':
-                                $discount = 10; // customer discount (hardcoded)
-                                break;
-                            case 'dealer':
-                                $discount = 15; // dealer discount (hardcoded)
-                                break;
-                            case 'architect':
-                                $discount = 25; // architect discount (hardcoded)
-                                break;
-                            case 'admin':
-                                $discount = 0; // Admin gets regular price, no discount
-                                break;
+                    // Check if the user has a discount record in UsersDiscountModel for each variant
+                    foreach ($product->variants as $variant) {
+                        $discount = 0; // Default discount is 0
+
+                        // Look for any user-specific discount from UsersDiscountModel
+                        $userDiscount = UsersDiscountModel::where('user_id', $user->id)
+                            ->where('product_variant_id', $variant->id)
+                            ->first();
+
+                        if ($userDiscount) {
+                            // If a discount is found in UsersDiscountModel, apply that
+                            $discount = $userDiscount->discount;
+                        } else {
+                            // If no discount is found in UsersDiscountModel, apply based on the user's role
+                            switch ($user->role) {
+                                case 'customer':
+                                    $discount = $variant->customer_discount;
+                                    break;
+                                case 'dealer':
+                                    $discount = $variant->dealer_discount;
+                                    break;
+                                case 'architect':
+                                    $discount = $variant->architect_discount;
+                                    break;
+                                case 'admin':
+                                    $discount = 0; // Admin gets regular price, no discount
+                                    break;
+                            }
                         }
+
+                        // Calculate the selling price for this variant
+                        $regularPrice = $variant->regular_price;
+                        $variant->selling_price = $regularPrice - ($regularPrice * ($discount / 100));
                     }
                 }
-
-                // Calculate the selling price after applying the discount
-                $regularPrice = $product->regular_price;
-                $sellingPrice = $regularPrice - ($regularPrice * ($discount / 100));
 
                 // process main images
                 $uploadIds = $product->image ? explode(',', $product->image) : [];
@@ -588,7 +592,7 @@ class ProductController extends Controller
                 $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
                 // map each variant → replace photo_id with file_urls and calculate selling_price
-                $product->variants = $product->variants->map(function ($variant) use ($discount) {
+                $product->variants = $product->variants->map(function ($variant) {
                     $data = $variant->toArray();
                     $fileUrls = [];
 
@@ -608,10 +612,6 @@ class ProductController extends Controller
                     unset($data['photo_id']);
                     $data['file_urls'] = $fileUrls;
 
-                    // Apply discount to regular price to calculate selling price
-                    $data['regular_price'] = $variant->regular_price;
-                    $data['selling_price'] = $variant->regular_price - ($variant->regular_price * ($discount / 100));
-
                     return $data;
                 });
 
@@ -627,13 +627,15 @@ class ProductController extends Controller
                     'success' => true,
                     'message' => 'Product details fetched successfully!',
                     'data'    => collect($responseData)
-                        ->except(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']),
+                        ->except(['id', 'brand_id', 'category_id', 'created_at', 'updated_at', 'customer_discount', 'dealer_discount', 'architect_discount']),
                 ], 200);
             }
 
             //
             // ─── MULTIPLE PRODUCTS ───────────────────────────────────────────────────
             //
+            // Similar logic can be applied for multiple products as needed
+
             $searchProduct = $request->input('search_product');
             $searchBrand = $request->input('search_brand');
             $searchCategory = $request->input('search_category');
@@ -692,7 +694,7 @@ class ProductController extends Controller
                 $uploadIds = $prod->image ? explode(',', $prod->image) : [];
                 $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-                // Variants mapping: build file_urls from photo_id, remove photo_id
+                // Variants mapping: build file_urls from photo_id, remove photo_id and calculate selling_price for each variant
                 if ($prod->variants && $prod->variants->count()) {
                     $mapped = $prod->variants->map(function ($variant) {
                         $data = $variant->toArray();
