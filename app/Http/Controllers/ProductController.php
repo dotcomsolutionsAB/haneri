@@ -727,11 +727,10 @@ class ProductController extends Controller
                 }
 
                 unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
-                dd($data);
                 $data['file_urls'] = $fileUrls;
                 return $data;
             });
-
+dd($prod);
             $prod->brand    = $prod->brand?->name;
             $prod->category = $prod->category?->name;
             $prod->features = $prod->features instanceof \Illuminate\Support\Collection
