@@ -29,7 +29,8 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
-            'role' => 'required|in:admin,customer,architect,dealer',
+            // 'role' => 'required|in:admin,customer,architect,dealer',
+            'selected_type' => 'nullable|string',
         ]);
 
         $user = User::create([
@@ -37,7 +38,8 @@ class UserController extends Controller
             'email' => $request->input('email'),
             'password' => Hash::make($request->input('password')),
             'mobile' => $request->input('mobile'),
-            'role' => $request->input('role'),
+            'role' => "customer",
+            'selected_type' => $request->input('selected_type')
         ]);
 
         // Automatically log in the user

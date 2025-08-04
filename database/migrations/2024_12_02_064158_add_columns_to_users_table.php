@@ -15,7 +15,8 @@ return new class extends Migration
             //
             $table->string('mobile')->unique()->after('password');
             $table->enum('role', ['admin', 'customer', 'architect','dealer'])->default('customer')->after('mobile');
-            $table->string('otp')->nullable()->after('role');
+            $table->string('selected_type')->after('role');
+            $table->string('otp')->nullable()->after('selected_type');
             $table->timestamp('expires_at')->nullable()->after('otp');
             $table->boolean('is_present')->default(true)->after('expires_at');
             $table->string('price_type')->nullable()->after('is_present');
