@@ -133,9 +133,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Users Discount Routes
         Route::prefix('discount')->group(function () {
             Route::post('/add', [UsersDiscountController::class, 'store']); // Add a new discount record 
-            Route::post('/fetch/{id?}', [ProductController::class, 'fetch']); // Fetch record
-            Route::post('/edit/{id}', [ProductController::class, 'update']); // Update record
-            Route::delete('/{id}', [ProductController::class, 'delete']); // Delete record
+            Route::post('/fetch/{id?}', [UsersDiscountController::class, 'fetch']); // Fetch record
+            Route::post('/edit/{id}', [UsersDiscountController::class, 'update']); // Update record
+            Route::delete('/{id}', [UsersDiscountController::class, 'delete']); // Delete record
         });
     });
 
