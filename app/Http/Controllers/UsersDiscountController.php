@@ -135,7 +135,7 @@ class UsersDiscountController extends Controller
     {
         try {
             // Find and delete
-            $discount = UsersDiscount::findOrFail($id);
+            $discount = UsersDiscountModel::findOrFail($id);
             $discount->delete();
 
             return response()->json([
