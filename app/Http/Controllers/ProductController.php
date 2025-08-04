@@ -693,47 +693,43 @@ class ProductController extends Controller
             $products = $products->map(function ($prod) use ($uploads) {
             $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
 
-            $product->variants = $product->variants->map(function ($variant) use ($user) {
+            $prod->variants = $prod->variants->map(function ($variant) {
+                $user = auth()->user();
+                $discount = 0;
 
-    /* 1. discount */
-    $discount = 0;
-    if ($user) {
-        $userDiscount = UsersDiscountModel::where('user_id', $user->id)
-            ->where('product_variant_id', $variant->id)
-            ->first();
-        $discount = $userDiscount?->discount
-            ?? match ($user->role) {
-                'customer'  => $variant->customer_discount,
-                'dealer'    => $variant->dealer_discount,
-                'architect' => $variant->architect_discount,
-                default     => 0,
-            };
-    }
+                if ($user) {
+                    $discount = UsersDiscountModel::where('user_id', $user->id)
+                        ->where('product_variant_id', $variant->id)
+                        ->value('discount')
+                        ?? match ($user->role) {
+                            'customer'  => $variant->customer_discount,
+                            'dealer'    => $variant->dealer_discount,
+                            'architect' => $variant->architect_discount,
+                            default     => 0,
+                        };
+                }
 
-    /* 2. selling price */
-    $regularPrice = $variant->regular_price;
-    $data = $variant->toArray();
-    $data['selling_price'] = $regularPrice - ($regularPrice * ($discount / 100));
+                // Calculate selling price
+                $regularPrice = $variant->regular_price;
+                $data = $variant->toArray();
+                $data['selling_price'] = $regularPrice - ($regularPrice * ($discount / 100));
 
-    /* 3. images */
-    $fileUrls = [];
-    if (!empty($data['photo_id'])) {
-        $ids = array_filter(explode(',', $data['photo_id']));
-        $rows = UploadModel::whereIn('id', $ids)->get();
-        $fileUrls = $rows
-            ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-            ->filter()
-            ->values()
-            ->all();
-    }
+                // Process images
+                $fileUrls = [];
+                if (!empty($data['photo_id'])) {
+                    $ids = array_filter(explode(',', $data['photo_id']));
+                    $rows = UploadModel::whereIn('id', $ids)->get();
+                    $fileUrls = $rows
+                        ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+                        ->filter()
+                        ->values()
+                        ->all();
+                }
 
-    // Unset the discount fields here before returning
-    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
-    $data['file_urls'] = $fileUrls;
-
-    return $data;
-});
-
+                unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
+                $data['file_urls'] = $fileUrls;
+                return $data;
+            });
 
             $prod->brand    = $prod->brand?->name;
             $prod->category = $prod->category?->name;
@@ -747,7 +743,7 @@ class ProductController extends Controller
             return response()->json([
                 'success'       => true,
                 'message'       => 'Products fetched successfully!',
-                'data'          => $products->toArray(),
+                'data'          => $products,
                 'total_records' => $totalRecords,
             ], 200);
 
