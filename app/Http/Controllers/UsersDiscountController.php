@@ -97,7 +97,7 @@ class UsersDiscountController extends Controller
             ]);
 
             // Find record
-            $discount = UsersDiscount::findOrFail($id);
+            $discount = UsersDiscountModel::findOrFail($id);
 
             // Update record
             $discount->update($validated);
