@@ -778,7 +778,7 @@ class ProductController extends Controller
         $data['file_urls'] = $fileUrls;
         return $data;
     });
-    dd($prd);
+    dd($prod);
     $prod->brand = $prod->brand?->name;
     $prod->category = $prod->category?->name;
     $prod->features = $prod->features instanceof \Illuminate\Support\Collection
