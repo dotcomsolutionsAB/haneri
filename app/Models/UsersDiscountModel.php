@@ -18,12 +18,12 @@ class UsersDiscountModel extends Model
 
     public function productVariant()
     {
-        return $this->belongsTo(ProductVariant::class, 'product_variant_id');
+        return $this->belongsTo(ProductVariantModel::class, 'product_variant_id');
     }
 
     public function category()
     {
-        return $this->belongsTo(Category::class, 'category_id');
+        return $this->belongsTo(CategoryModel::class, 'category_id');
     }
 
 }
