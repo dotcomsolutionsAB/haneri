@@ -641,54 +641,104 @@ class ProductController extends Controller
             $uploads     = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
 
             /* --- transform products --- */
+            // $products = $products->map(function ($prod) use ($uploads) {
+            //     $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
+
+            //     $prod->variants = $prod->variants->map(function ($variant) {
+            //         $user = auth()->user();
+            //         $discount = 0;
+
+            //         if ($user) {
+            //             $discount = UsersDiscountModel::where('user_id', $user->id)
+            //                 ->where('product_variant_id', $variant->id)
+            //                 ->value('discount')
+            //                 ?? match ($user->role) {
+            //                     'customer'  => $variant->customer_discount,
+            //                     'dealer'    => $variant->dealer_discount,
+            //                     'architect' => $variant->architect_discount,
+            //                     default     => 0,
+            //                 };
+            //         }
+
+            //         $regularPrice = $variant->regular_price;
+            //         $data = $variant->toArray();
+            //         $data['selling_price'] = $regularPrice - ($regularPrice * ($discount / 100));
+
+            //         /* images */
+            //         $fileUrls = [];
+            //         if (!empty($data['photo_id'])) {
+            //             $ids = array_filter(explode(',', $data['photo_id']));
+            //             $rows = UploadModel::whereIn('id', $ids)->get();
+            //             $fileUrls = $rows
+            //                 ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+            //                 ->filter()
+            //                 ->values()
+            //                 ->all();
+            //         }
+
+            //         unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
+            //         $data['file_urls'] = $fileUrls;
+            //         return $data;
+            //     });
+
+            //     $prod->brand    = $prod->brand?->name;
+            //     $prod->category = $prod->category?->name;
+            //     $prod->features = $prod->features instanceof \Illuminate\Support\Collection
+            //         ? $prod->features->toArray()
+            //         : $prod->features;
+
+            //     return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
+            // });
+
             $products = $products->map(function ($prod) use ($uploads) {
-                $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
+            $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
 
-                $prod->variants = $prod->variants->map(function ($variant) {
-                    $user = auth()->user();
-                    $discount = 0;
+            $prod->variants = $prod->variants->map(function ($variant) {
+                $user = auth()->user();
+                $discount = 0;
 
-                    if ($user) {
-                        $discount = UsersDiscountModel::where('user_id', $user->id)
-                            ->where('product_variant_id', $variant->id)
-                            ->value('discount')
-                            ?? match ($user->role) {
-                                'customer'  => $variant->customer_discount,
-                                'dealer'    => $variant->dealer_discount,
-                                'architect' => $variant->architect_discount,
-                                default     => 0,
-                            };
-                    }
+                if ($user) {
+                    $discount = UsersDiscountModel::where('user_id', $user->id)
+                        ->where('product_variant_id', $variant->id)
+                        ->value('discount')
+                        ?? match ($user->role) {
+                            'customer'  => $variant->customer_discount,
+                            'dealer'    => $variant->dealer_discount,
+                            'architect' => $variant->architect_discount,
+                            default     => 0,
+                        };
+                }
 
-                    $regularPrice = $variant->regular_price;
-                    $data = $variant->toArray();
-                    $data['selling_price'] = $regularPrice - ($regularPrice * ($discount / 100));
+                // Calculate selling price
+                $regularPrice = $variant->regular_price;
+                $data = $variant->toArray();
+                $data['selling_price'] = $regularPrice - ($regularPrice * ($discount / 100));
 
-                    /* images */
-                    $fileUrls = [];
-                    if (!empty($data['photo_id'])) {
-                        $ids = array_filter(explode(',', $data['photo_id']));
-                        $rows = UploadModel::whereIn('id', $ids)->get();
-                        $fileUrls = $rows
-                            ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-                            ->filter()
-                            ->values()
-                            ->all();
-                    }
+                // Process images
+                $fileUrls = [];
+                if (!empty($data['photo_id'])) {
+                    $ids = array_filter(explode(',', $data['photo_id']));
+                    $rows = UploadModel::whereIn('id', $ids)->get();
+                    $fileUrls = $rows
+                        ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+                        ->filter()
+                        ->values()
+                        ->all();
+                }
 
-                    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
-                    $data['file_urls'] = $fileUrls;
-                    return $data;
-                });
-
-                $prod->brand    = $prod->brand?->name;
-                $prod->category = $prod->category?->name;
-                $prod->features = $prod->features instanceof \Illuminate\Support\Collection
-                    ? $prod->features->toArray()
-                    : $prod->features;
-
-                return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
+                unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
+                $data['file_urls'] = $fileUrls;
+                return $data;
             });
+
+            $prod->brand    = $prod->brand?->name;
+            $prod->category = $prod->category?->name;
+            $prod->features = $prod->features instanceof \Illuminate\Support\Collection
+                ? $prod->features->toArray()
+                : $prod->features;
+
+            return $prod->makeHidden(['brand_id', 'category_id', 'created_at', 'updated_at']);
+        });
 
             return response()->json([
                 'success'       => true,
