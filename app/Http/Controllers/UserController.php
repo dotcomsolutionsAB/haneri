@@ -29,7 +29,7 @@ class UserController extends Controller
             'email' => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
             'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
-            'role' => 'required|in:admin,customer,vendor',
+            'role' => 'required|in:admin,customer,architect,dealer',
         ]);
 
         $user = User::create([

@@ -73,18 +73,31 @@ Route::prefix('brands')->group(function () {
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
 
     // User Routes
     Route::prefix('users')->group(function () {
         Route::post('/register', [UserController::class, 'register']); // Register a new user
         // Route::post('/login', [UserController::class, 'login']);       // Log in a user
-        Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
+        // Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
         Route::post('/update', [UserController::class, 'update']);     // Update user details
         // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
     });
     
-    // for vendors
-    Route::middleware('role:vendor')->group(function () {
+    // for architect
+    Route::middleware('role:architect')->group(function () {
+        
+        // Quotation Routes
+        Route::prefix('quotation')->group(function () {
+            Route::get('/', [QuotationController::class, 'index']);            // List all orders for a user
+            Route::get('/{id}', [QuotationController::class, 'show']);         // Get details of a single order
+            Route::post('/', [QuotationController::class, 'store']);           // Create a new order
+            Route::delete('/{id}', [QuotationController::class, 'delete']);           // Create a new quotation
+        });
+    });
+
+    // for dealer
+    Route::middleware('role:dealer')->group(function () {
         
         // Quotation Routes
         Route::prefix('quotation')->group(function () {
@@ -114,6 +127,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         Route::prefix('users')->group(function () {
             Route::get('/admin_dashboard', [UserController::class, 'record_count']); //get product count
+        });
+
+        // Users Discount Routes
+        Route::prefix('discount')->group(function () {
+            Route::post('/add', [UsersDiscountController::class, 'store']); // Add a new discount record 
+            Route::post('/fetch/{id?}', [ProductController::class, 'fetch']); // Fetch record
+            Route::post('/edit/{id}', [ProductController::class, 'update']); // Update record
+            Route::delete('/{id}', [ProductController::class, 'delete']); // Delete record
         });
     });
 
