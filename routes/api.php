@@ -16,6 +16,7 @@ use App\Http\Controllers\CouponController;
 use App\Http\Controllers\AddressController;
 use App\Http\Controllers\RazorpayController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\UsersDiscountController;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
