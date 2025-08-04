@@ -527,96 +527,66 @@ class ProductController extends Controller
     public function index(Request $request, $id = null)
     {
         try {
-            //
-            // ─── SINGLE PRODUCT ───────────────────────────────────────────────────────
-            //
+            /* ---------------- SINGLE PRODUCT ---------------- */
             if ($id) {
                 $product = ProductModel::with([
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf'
-                ])->find($id);
+                    'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                ])->findOrFail($id);
 
-                if (!$product) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Product not found!',
-                    ], 200);
-                }
-
-                // Get the logged-in user (assumes you're using auth)
                 $user = auth()->user();
 
-                // If the user is authenticated, check the discount logic
-                if ($user) {
-                    // Check if the user has a discount record in UsersDiscountModel for each variant
-                    foreach ($product->variants as $variant) {
-                        $discount = 0; // Default discount is 0
+                /* --- main images --- */
+                $uploadIds = $product->image ? explode(',', $product->image) : [];
+                $uploads   = UploadModel::whereIn('id', $uploadIds)->pluck('file_path', 'id');
+                $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
-                        // Look for any user-specific discount from UsersDiscountModel
+                /* --- variants: compute selling_price & file_urls --- */
+                $product->variants = $product->variants->map(function ($variant) use ($user) {
+
+                    /* 1. discount */
+                    $discount = 0;
+                    if ($user) {
                         $userDiscount = UsersDiscountModel::where('user_id', $user->id)
                             ->where('product_variant_id', $variant->id)
                             ->first();
-
                         if ($userDiscount) {
-                            // If a discount is found in UsersDiscountModel, apply that
                             $discount = $userDiscount->discount;
                         } else {
-                            // If no discount is found in UsersDiscountModel, apply based on the user's role
-                            switch ($user->role) {
-                                case 'customer':
-                                    $discount = $variant->customer_discount;
-                                    break;
-                                case 'dealer':
-                                    $discount = $variant->dealer_discount;
-                                    break;
-                                case 'architect':
-                                    $discount = $variant->architect_discount;
-                                    break;
-                                case 'admin':
-                                    $discount = 0; // Admin gets regular price, no discount
-                                    break;
-                            }
+                            $discount = match ($user->role) {
+                                'customer'  => $variant->customer_discount,
+                                'dealer'    => $variant->dealer_discount,
+                                'architect' => $variant->architect_discount,
+                                default     => 0,
+                            };
                         }
-
-                        // Calculate the selling price for this variant
-                        $regularPrice = $variant->regular_price;
-                        $variant->selling_price = $regularPrice - ($regularPrice * ($discount / 100));
                     }
-                }
 
-                // process main images
-                $uploadIds = $product->image ? explode(',', $product->image) : [];
-                $uploads = UploadModel::whereIn('id', $uploadIds)->pluck('file_path', 'id');
-                $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
-
-                // map each variant → replace photo_id with file_urls and calculate selling_price
-                $product->variants = $product->variants->map(function ($variant) {
+                    /* 2. selling price */
+                    $regularPrice = $variant->regular_price;
                     $data = $variant->toArray();
-                    $fileUrls = [];
+                    $data['selling_price'] = $regularPrice - ($regularPrice * ($discount / 100));
 
-                    // Process images for variants
+                    /* 3. images */
+                    $fileUrls = [];
                     if (!empty($data['photo_id'])) {
                         $ids = array_filter(explode(',', $data['photo_id']));
-                        if ($ids) {
-                            $rows = UploadModel::whereIn('id', $ids)->get();
-                            $fileUrls = $rows
-                                ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-                                ->filter()
-                                ->values()
-                                ->all();
-                        }
+                        $rows = UploadModel::whereIn('id', $ids)->get();
+                        $fileUrls = $rows
+                            ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+                            ->filter()
+                            ->values()
+                            ->all();
                     }
-
-                    unset($data['photo_id']);
+                    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
                     $data['file_urls'] = $fileUrls;
 
                     return $data;
                 });
 
-                // build the response payload
-                $responseData = [
+                $response = [
                     'brand'    => $product->brand?->name,
                     'category' => $product->category?->name,
                     'features' => $product->features,
@@ -626,109 +596,81 @@ class ProductController extends Controller
                 return response()->json([
                     'success' => true,
                     'message' => 'Product details fetched successfully!',
-                    'data'    => collect($responseData)
-                        ->except(['id', 'brand_id', 'category_id', 'created_at', 'updated_at', 'customer_discount', 'dealer_discount', 'architect_discount']),
+                    'data'    => collect($response)
+                        ->except(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']),
                 ], 200);
             }
 
-            //
-            // ─── MULTIPLE PRODUCTS ───────────────────────────────────────────────────
-            //
-            // Similar logic can be applied for multiple products as needed
-
-            $searchProduct = $request->input('search_product');
-            $searchBrand = $request->input('search_brand');
+            /* ---------------- MULTIPLE PRODUCTS ---------------- */
+            $searchProduct  = $request->input('search_product');
+            $searchBrand    = $request->input('search_brand');
             $searchCategory = $request->input('search_category');
-            $isActive = $request->input('is_active');
-            $limit = $request->input('limit', 10);
-            $offset = $request->input('offset', 0);
-            $priceRange = $request->input('price_range');
-            $variantType = $request->input('variant_type');
-            $orderPrice = strtolower($request->input('order_price'));
-            $minPriceFilter = $request->input('min_priceFilter');
-            $maxPriceFilter = $request->input('max_priceFilter');
+            $isActive       = $request->input('is_active');
+            $limit          = $request->input('limit', 10);
+            $offset         = $request->input('offset', 0);
+            $variantType    = $request->input('variant_type');
 
             $query = ProductModel::with([
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,customer_discount,dealer_discount,architect_discount,hsn,regular_tax,selling_tax,video_url,product_pdf'
+                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,selling_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
             ]);
 
-            if (!empty($searchProduct)) {
+            // filters
+            if ($searchProduct) {
                 $names = explode(',', $searchProduct);
-                $query->where(fn($q) => collect($names)
-                    ->each(fn($n) => $q->orWhere('name', 'LIKE', '%' . trim($n) . '%')));
+                $query->where(fn($q) => collect($names)->each(fn($n) => $q->orWhere('name', 'LIKE', '%' . trim($n) . '%')));
             }
-            if (!empty($searchBrand)) {
+            if ($searchBrand) {
                 $brands = explode(',', $searchBrand);
-                $query->whereHas('brand', fn($q) => collect($brands)
-                    ->each(fn($b) => $q->orWhere('name', 'LIKE', '%' . trim($b) . '%')));
+                $query->whereHas('brand', fn($q) => collect($brands)->each(fn($b) => $q->orWhere('name', 'LIKE', '%' . trim($b) . '%')));
             }
-            if (!empty($searchCategory)) {
-                $categoryNames = array_filter(array_map('trim', explode(',', $searchCategory)));
-                $query->whereHas('category', function ($q) use ($categoryNames) {
-                    $q->where(function ($q2) use ($categoryNames) {
-                        foreach ($categoryNames as $name) {
-                            $q2->orWhere('name', 'LIKE', "%{$name}%");
-                        }
-                    });
-                });
+            if ($searchCategory) {
+                $cats = array_filter(array_map('trim', explode(',', $searchCategory)));
+                $query->whereHas('category', fn($q) => $q->where(function ($q2) use ($cats) {
+                    foreach ($cats as $c) $q2->orWhere('name', 'LIKE', "%{$c}%");
+                }));
             }
-            if (!is_null($isActive)) {
-                $query->where('is_active', $isActive);
-            }
-            if (!empty($variantType)) {
-                $query->whereHas('variants', fn($q) => $q->where('variant_type', $variantType));
-            }
+            if (!is_null($isActive)) $query->where('is_active', $isActive);
+            if ($variantType) $query->whereHas('variants', fn($q) => $q->where('variant_type', $variantType));
 
             $totalRecords = $query->count();
-            $products = $query->offset($offset)->limit($limit)->get();
+            $products     = $query->offset($offset)->limit($limit)->get();
 
-            // Fetch all main-image uploads
+            // common image helper
             $allImageIds = $products->flatMap(fn($p) => explode(',', $p->image ?? ''))->unique()->filter();
-            $uploads = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
+            $uploads     = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
 
-            $products->transform(function ($prod) use ($uploads) {
-                // Main image logic
-                $uploadIds = $prod->image ? explode(',', $prod->image) : [];
-                $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
+            $products = $products->map(function ($prod) use ($uploads) {
+                // main images
+                $prod->image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
 
-                // Variants mapping: build file_urls from photo_id, remove photo_id and calculate selling_price for each variant
+                // variants
                 if ($prod->variants && $prod->variants->count()) {
-                    $mapped = $prod->variants->map(function ($variant) {
+                    $prod->variants = $prod->variants->map(function ($variant) {
                         $data = $variant->toArray();
                         $fileUrls = [];
 
                         if (!empty($data['photo_id'])) {
                             $ids = array_filter(explode(',', $data['photo_id']));
-                            if ($ids) {
-                                $rows = UploadModel::whereIn('id', $ids)->get();
-                                $fileUrls = $rows
-                                    ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-                                    ->filter()
-                                    ->values()
-                                    ->all();
-                            }
+                            $rows = UploadModel::whereIn('id', $ids)->get();
+                            $fileUrls = $rows
+                                ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+                                ->filter()
+                                ->values()
+                                ->all();
                         }
 
-                        unset($data['photo_id']);
+                        unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
                         $data['file_urls'] = $fileUrls;
-
-                        // Unset the discount fields
-                        unset($data['customer_discount']);
-                        unset($data['dealer_discount']);
-                        unset($data['architect_discount']);
-
                         return $data;
-                    })->all();
-
-                    $prod->setRelation('variants', collect($mapped));
+                    });
                 } else {
-                    $prod->setRelation('variants', collect([]));
+                    $prod->variants = collect([]);
                 }
 
-                $prod->brand = $prod->brand?->name;
+                $prod->brand    = $prod->brand?->name;
                 $prod->category = $prod->category?->name;
                 $prod->features = $prod->features instanceof \Illuminate\Support\Collection
                     ? $prod->features->toArray()
@@ -738,9 +680,9 @@ class ProductController extends Controller
             });
 
             return response()->json([
-                'success' => true,
-                'message' => 'Products fetched successfully!',
-                'data' => $products->toArray(),
+                'success'       => true,
+                'message'       => 'Products fetched successfully!',
+                'data'          => $products->toArray(),
                 'total_records' => $totalRecords,
             ], 200);
 
@@ -752,6 +694,7 @@ class ProductController extends Controller
         }
     }
 
+    
     // View Single
     public function show($slug)
     {
