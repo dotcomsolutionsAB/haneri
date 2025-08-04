@@ -715,6 +715,11 @@ class ProductController extends Controller
                         unset($data['photo_id']);
                         $data['file_urls'] = $fileUrls;
 
+                        // Unset the discount fields
+                        unset($data['customer_discount']);
+                        unset($data['dealer_discount']);
+                        unset($data['architect_discount']);
+
                         return $data;
                     })->all();
 
