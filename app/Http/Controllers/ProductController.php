@@ -10,6 +10,7 @@ use App\Models\ProductVariantModel;
 use App\Models\BrandModel;
 use App\Models\CategoryModel;
 use App\Models\UploadModel;
+use App\Models\UsersDiscountModel;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
