@@ -146,7 +146,7 @@ class ProductController extends Controller
                     /* 2. selling price */
                     $regularPrice = $variant->regular_price;
                     $data = $variant->toArray();
-                    $data['selling_price'] = round($regularPrice - ($regularPrice * ($discount / 100)), 2);
+                    $data['selling_price'] = round($regularPrice - ($regularPrice * ($discount / 100)), 0);
 
                     /* 3. images */
                     $fileUrls = [];
@@ -241,7 +241,7 @@ class ProductController extends Controller
                     // Calculate selling price
                     $regularPrice = $variant->regular_price;
                     $data = $variant->toArray();
-                    $data['selling_price'] = number_format($regularPrice - ($regularPrice * ($discount / 100)), 2);
+                    $data['selling_price'] = number_format($regularPrice - ($regularPrice * ($discount / 100)), 0);
                     // Process images
                     $fileUrls = [];
                     if (!empty($data['photo_id'])) {
