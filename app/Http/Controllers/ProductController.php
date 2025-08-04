@@ -41,8 +41,8 @@ class ProductController extends Controller
             'variants.*.variant_type' => 'required_with:variants|string',
             'variants.*.variant_value' => 'required_with:variants|string',
             'variants.*.regular_price' => 'required_with:variants|numeric',
-            'variants.*.selling_price' => 'required_with:variants|numeric',
-            'variants.*.sales_price_vendor' => 'required_with:variants|numeric',
+            // 'variants.*.selling_price' => 'required_with:variants|numeric',
+            // 'variants.*.sales_price_vendor' => 'required_with:variants|numeric',
             'variants.*.customer_discount' => 'nullable|numeric',
             'variants.*.dealer_discount' => 'nullable|numeric',
             'variants.*.architect_discount' => 'nullable|numeric',
@@ -533,7 +533,7 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
             ])->findOrFail($id);
 
             $user = auth()->user();
@@ -611,7 +611,7 @@ class ProductController extends Controller
             'brand:id,name',
             'category:id,name',
             'features:id,product_id,feature_name,feature_value,is_filterable',
-            'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,sales_price_vendor,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+            'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
         ]);
 
         /* --- filters --- */
@@ -770,8 +770,8 @@ class ProductController extends Controller
             'variants.*.variant_value' => 'required_with:variants|string',
             'variants.*.discount_price' => 'nullable|numeric',
             'variants.*.regular_price' => 'sometimes|numeric',
-            'variants.*.selling_price' => 'sometimes|numeric',
-            'variants.*.sales_price_vendor' => 'required_with:variants|numeric',
+            // 'variants.*.selling_price' => 'sometimes|numeric',
+            // 'variants.*.sales_price_vendor' => 'required_with:variants|numeric',
             'variants.*.customer_discount' => 'nullable|numeric',
             'variants.*.dealer_discount' => 'nullable|numeric',
             'variants.*.architect_discount' => 'nullable|numeric',
