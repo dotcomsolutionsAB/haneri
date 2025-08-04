@@ -527,7 +527,6 @@ class ProductController extends Controller
 
     public function index(Request $request, $id = null)
     {
-        dd("ppp");
         try {
             /* ----------  SINGLE PRODUCT  ---------- */
             if ($id) {
