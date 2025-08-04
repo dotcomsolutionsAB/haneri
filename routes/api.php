@@ -76,6 +76,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
 
+    Route::prefix('products')->group(function () {
+        Route::post('/get_products/{id?}', [ProductController::class, 'index']);  // List all products
+    });
+    
     // User Routes
     Route::prefix('users')->group(function () {
         Route::post('/register', [UserController::class, 'register']); // Register a new user
