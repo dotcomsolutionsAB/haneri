@@ -142,7 +142,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
         });
 
-        Route::get('/switch_user', [UserController::class, 'switchUser']);
+        Route::post('/switch_user', [UserController::class, 'switchUser']);
     });
 
     // Category Routes
