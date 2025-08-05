@@ -40,7 +40,7 @@ use App\Http\Controllers\UsersDiscountController;
 // });
 
 Route::post('/register', [UserController::class, 'register']);
-Route::post('/login/{otp?}', [AuthController::class, 'login']);
+Route::post('/login/{otp?}', [AuthController::class, 'login']); // Log in a user
 Route::post('/otp', [AuthController::class, 'generate_otp']);
 Route::post('/make_user', [UserController::class, 'guest_register']);
 Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
@@ -73,20 +73,13 @@ Route::prefix('brands')->group(function () {
 });
 
 Route::middleware(['auth:sanctum'])->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/logout', [AuthController::class, 'logout']);     // Log out the user
     Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
-
-    // Route::prefix('products')->group(function () {
-    //     Route::post('/get_products/{id?}', [ProductController::class, 'index']);  // List all products
-    // });
     
     // User Routes
     Route::prefix('users')->group(function () {
         Route::post('/register', [UserController::class, 'register']); // Register a new user
-        // Route::post('/login', [UserController::class, 'login']);       // Log in a user
-        // Route::get('/profile', [UserController::class, 'profile']);    // Get logged-in user details
         Route::post('/update', [UserController::class, 'update']);     // Update user details
-        // Route::post('/logout', [UserController::class, 'logout']);     // Log out the user
     });
     
     // for architect
@@ -140,6 +133,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/fetch/{id?}', [UsersDiscountController::class, 'fetch']); // Fetch record
             Route::post('/edit/{id}', [UsersDiscountController::class, 'update']); // Update record
             Route::delete('/{id}', [UsersDiscountController::class, 'delete']); // Delete record
+        });
+
+        // delhivery
+        Route::prefix('delivery')->group(function () {
+            Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); 
+            Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
         });
     });
 

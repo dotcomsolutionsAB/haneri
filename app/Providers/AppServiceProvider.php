@@ -13,6 +13,9 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         //
+        $this->app->singleton(DelhiveryService::class, function ($app) {
+            return new DelhiveryService();
+        });
     }
 
     /**
