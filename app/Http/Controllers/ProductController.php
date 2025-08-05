@@ -112,6 +112,7 @@ class ProductController extends Controller
         try {
 
             $token = $request->bearerToken();
+            dd($token);
             $user = null;
 
             if ($token) {
