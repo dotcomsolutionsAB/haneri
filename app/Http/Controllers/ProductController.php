@@ -142,11 +142,11 @@ class ProductController extends Controller
                 $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
                 /* --- variants: compute selling_price & file_urls --- */
-                $product->variants = $product->variants->map(function ($variant) use ($user) {
+                $product->variants = $product->variants->map(function ($variant) use ($userId, $userRole) {
 
                     /* 1. discount */
                     $discount = 0;
-                    if ($user) {
+                    // if ($user) {
                         $userDiscount = UsersDiscountModel::where('user_id', $userId)
                             ->where('product_variant_id', $variant->id)
                             ->first();
@@ -157,7 +157,7 @@ class ProductController extends Controller
                                 'architect' => $variant->architect_discount,
                                 default     => 0,
                             };
-                    }
+                    // }
 
                     /* 2. selling price */
                     $regularPrice = $variant->regular_price;
@@ -243,7 +243,7 @@ class ProductController extends Controller
                 $variants = $prod->variants->map(function ($variant) {
                     //$user = auth()->user();
                     $discount = 0;
-                    if ($user) {
+                    // if ($user) {
                         $discount = UsersDiscountModel::where('user_id', $userId)
                             ->where('product_variant_id', $variant->id)
                             ->value('discount')
@@ -253,7 +253,7 @@ class ProductController extends Controller
                                 'architect' => $variant->architect_discount,
                                 default => 0,
                             };
-                    }
+                    // }
                     // Calculate selling price
                     $regularPrice = $variant->regular_price;
                     $data = $variant->toArray();
