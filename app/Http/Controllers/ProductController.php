@@ -240,7 +240,8 @@ class ProductController extends Controller
             /* --- transform products --- */
             $products = $products->map(function ($prod) use ($uploads, $userId, $userRole) {
                 $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
-                $variants = $prod->variants->map(function ($variant) {
+                // $variants = $prod->variants->map(function ($variant) {
+                $variants = $prod->variants->map(function ($variant) use ($userId, $userRole) {
                     //$user = auth()->user();
                     $discount = 0;
                     // if ($user) {
