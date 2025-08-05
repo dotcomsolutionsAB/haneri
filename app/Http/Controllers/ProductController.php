@@ -124,7 +124,7 @@ class ProductController extends Controller
                 $userId = 0;
                 $userRole = "customer";
             }
-dd($userId);
+
             /* ----------  SINGLE PRODUCT  ---------- */
             if ($id) {
                 $product = ProductModel::with([
@@ -244,6 +244,7 @@ dd($userId);
                     //$user = auth()->user();
                     $discount = 0;
                     // if ($user) {
+                    dd($userId);
                         $discount = UsersDiscountModel::where('user_id', $userId)
                             ->where('product_variant_id', $variant->id)
                             ->value('discount')
