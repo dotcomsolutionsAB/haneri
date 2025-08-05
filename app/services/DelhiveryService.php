@@ -278,9 +278,74 @@ class DelhiveryService
     //     }
     // }
 
-     public function placeOrder($orderData)
+    //  public function placeOrder($orderData)
+    // {
+    //     $endpoint = 'https://track.delhivery.com/api/cmu/create.json';
+    //     try {
+    //         $shipments = [
+    //             [
+    //                 'name' => $orderData['customer_name'],
+    //                 'add' => $orderData['customer_address'],
+    //                 'pin' => $orderData['pin'],
+    //                 'city' => $orderData['city'],
+    //                 'state' => $orderData['state'],
+    //                 'country' => 'India',
+    //                 'phone' => $orderData['phone'],
+    //                 'order' => $orderData['order'],
+    //                 'payment_mode' => 'Prepaid',
+    //                 'return_pin' => $orderData['return_pin'],
+    //                 'return_city' => $orderData['return_city'],
+    //                 'return_phone' => $orderData['return_phone'],
+    //                 'return_add' => $orderData['return_address'],
+    //                 'return_state' => $orderData['return_state'],
+    //                 'return_country' => $orderData['return_country'],
+    //                 'products_desc' => $orderData['products_description'],
+    //                 'hsn_code' => $orderData['hsn_code'],
+    //                 'cod_amount' => $orderData['cod_amount'],
+    //                 'order_date' => $orderData['order_date'],
+    //                 'total_amount' => $orderData['total_amount'],
+    //                 'seller_add' => $orderData['seller_address'],
+    //                 'seller_name' => $orderData['seller_name'],
+    //                 'seller_inv' => $orderData['seller_invoice'],
+    //                 'quantity' => $orderData['quantity'],
+    //                 'waybill' => $orderData['waybill'],
+    //                 'shipment_width' => $orderData['shipment_width'],
+    //                 'shipment_height' => $orderData['shipment_height'],
+    //                 'weight' => $orderData['weight'],
+    //                 'shipping_mode' => $orderData['shipping_mode'],
+    //                 'address_type' => $orderData['address_type'],
+    //             ],
+    //         ];
+
+    //         $data = [
+    //             'shipments' => $shipments,
+    //             'pickup_location' => [
+    //                 'name' => 'warehouse_name', // Replace with your warehouse name
+    //             ],
+    //         ];
+
+    //         $response = $this->client->post($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //             ],
+    //             'form_params' => [
+    //                 'format' => 'json',
+    //                 'data' => json_encode($data),
+    //             ],
+    //         ]);
+
+    //         return json_decode($response->getBody()->getContents(), true);
+    //     } catch (\Exception $e) {
+    //         Log::error("Failed to connect to Delhivery API: " . $e->getMessage());
+    //         return ['error' => 'API Request Error: ' . $e->getMessage()];
+    //     }
+    // }
+
+    public function placeOrder($orderData)
     {
-        $endpoint = 'https://track.delhivery.com/api/cmu/create.json';
+        // Make sure to use the correct endpoint for your environment
+        $endpoint = $this->getBaseUrl() . '/api/cmu/create.json';
+
         try {
             $shipments = [
                 [
@@ -296,7 +361,7 @@ class DelhiveryService
                     'return_pin' => $orderData['return_pin'],
                     'return_city' => $orderData['return_city'],
                     'return_phone' => $orderData['return_phone'],
-                    'return_add' => $orderData['return_address'],
+                    'return_add' => $orderData['return_address'], // Note: 'return_add' maps to 'return_address' from request
                     'return_state' => $orderData['return_state'],
                     'return_country' => $orderData['return_country'],
                     'products_desc' => $orderData['products_description'],
@@ -317,24 +382,37 @@ class DelhiveryService
                 ],
             ];
 
-            $data = [
-                'shipments' => $shipments,
-                'pickup_location' => [
-                    'name' => 'warehouse_name', // Replace with your warehouse name
-                ],
+            // The critical fix:
+            // The pickup_location object must be fully populated with correct details,
+            // not just the name. The API needs to verify the pincode, city, etc.
+            $pickupLocationData = [
+                'name' => 'Burhanuddin',
+                'add' => '26, Netaji Subhas Rd, opp. Goopta Mansion, China Bazar',
+                'pin' => '700001',
+                'city' => 'Kolkata',
+                'state' => 'West Bengal',
+                'phone' => '8597348785',
             ];
 
+            // Combine the pickup location and shipment data into the final API payload
+            $finalPayload = [
+                'shipments' => $shipments,
+                'pickup_location' => $pickupLocationData,
+            ];
+            
+            // This endpoint expects the data as 'form_params', with a 'data' key
             $response = $this->client->post($endpoint, [
                 'headers' => [
                     'Authorization' => 'Token ' . $this->apiKey,
                 ],
                 'form_params' => [
                     'format' => 'json',
-                    'data' => json_encode($data),
+                    'data' => json_encode($finalPayload),
                 ],
             ]);
 
             return json_decode($response->getBody()->getContents(), true);
+            
         } catch (\Exception $e) {
             Log::error("Failed to connect to Delhivery API: " . $e->getMessage());
             return ['error' => 'API Request Error: ' . $e->getMessage()];
