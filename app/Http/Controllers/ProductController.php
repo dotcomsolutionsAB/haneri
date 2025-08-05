@@ -109,6 +109,22 @@ class ProductController extends Controller
     public function index(Request $request, $id = null)
     {
         try {
+
+            $token = $request->bearerToken();
+            $user = null;
+
+            if ($token) {
+                $user = Auth::guard('sanctum')->user();
+            }
+
+            if ($user) {
+                $userId = $user->id;
+                $userRole = $user->role;
+            } else {
+                $userId = 0;
+                $userRole = "customer";
+            }
+
             /* ----------  SINGLE PRODUCT  ---------- */
             if ($id) {
                 $product = ProductModel::with([
@@ -131,11 +147,11 @@ class ProductController extends Controller
                     /* 1. discount */
                     $discount = 0;
                     if ($user) {
-                        $userDiscount = UsersDiscountModel::where('user_id', $user->id)
+                        $userDiscount = UsersDiscountModel::where('user_id', $userId)
                             ->where('product_variant_id', $variant->id)
                             ->first();
                         $discount = $userDiscount?->discount
-                            ?? match ($user->role) {
+                            ?? match ($userRole) {
                                 'customer'  => $variant->customer_discount,
                                 'dealer'    => $variant->dealer_discount,
                                 'architect' => $variant->architect_discount,
@@ -228,10 +244,10 @@ class ProductController extends Controller
                     $user = auth()->user();
                     $discount = 0;
                     if ($user) {
-                        $discount = UsersDiscountModel::where('user_id', $user->id)
+                        $discount = UsersDiscountModel::where('user_id', $userId)
                             ->where('product_variant_id', $variant->id)
                             ->value('discount')
-                            ?? match ($user->role) {
+                            ?? match ($userRole) {
                                 'customer' => $variant->customer_discount,
                                 'dealer' => $variant->dealer_discount,
                                 'architect' => $variant->architect_discount,
