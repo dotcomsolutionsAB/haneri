@@ -331,4 +331,45 @@ class UserController extends Controller
         $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-=+';
         return substr(str_shuffle(str_repeat($chars, $length)), 0, $length);
     }
+
+    public function switchUser(Request $request)
+    {
+        // Validate the input data
+        $validator = \Validator::make($request->all(), [
+            'user_id' => 'required|integer|exists:users,id',  // Ensure the user_id exists in the users table
+            'role' => 'required|string|in:customer,admin,manager,dealer,architect',  // Only valid roles
+        ]);
+
+        // Check if validation fails
+        if ($validator->fails()) {
+            return response()->json(['error' => $validator->errors()], 422);
+        }
+
+        // Get the validated data
+        $userId = $request->input('user_id');
+        $role = $request->input('role');
+
+        try {
+            // Find the user by user_id
+            $user = User::findOrFail($userId);
+
+            // Update the user's role
+            $user->role = $role;
+            $user->save();  // Save the updated user
+
+            // Return a success response
+            return response()->json([
+                'success' => true,
+                'message' => 'User role updated successfully!',
+                'data' => $user
+            ], 200);
+
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            // User not found
+            return response()->json(['error' => 'User not found'], 404);
+        } catch (\Exception $e) {
+            // General error (e.g., database issues)
+            return response()->json(['error' => 'Something went wrong: ' . $e->getMessage()], 500);
+        }
+    }
 }

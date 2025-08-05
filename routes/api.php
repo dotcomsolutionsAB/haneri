@@ -17,6 +17,7 @@ use App\Http\Controllers\AddressController;
 use App\Http\Controllers\RazorpayController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\UsersDiscountController;
+use App\Http\Controllers\DelhiveryServiceController;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
@@ -115,6 +116,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
             Route::get('/pull_images', [ProductController::class, 'mapVariantImagesToPhotoId']);
+
+            Route::get('/switch_user', [UserController::class, 'switchUser']);
         });
 
         // for all orders
