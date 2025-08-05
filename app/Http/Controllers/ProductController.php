@@ -245,7 +245,6 @@ class ProductController extends Controller
                     //$user = auth()->user();
                     $discount = 0;
                     // if ($user) {
-                    dd($userId);
                         $discount = UsersDiscountModel::where('user_id', $userId)
                             ->where('product_variant_id', $variant->id)
                             ->value('discount')
