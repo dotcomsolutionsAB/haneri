@@ -236,7 +236,7 @@ class ProductController extends Controller
             /* --- image helper --- */
             $allImageIds = $products->flatMap(fn($p) => explode(',', $p->image ?? ''))->unique()->filter();
             $uploads     = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
-
+dd($userId);
             /* --- transform products --- */
             $products = $products->map(function ($prod) use ($uploads, $userId, $userRole) {
                 $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
