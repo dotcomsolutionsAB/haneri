@@ -24,17 +24,28 @@ class DelhiveryServiceController extends Controller
 
     public function trackMultipleShipments(array $waybillNumbers)
     {
-        $response = $this->client->post($this->apiUrl, [
-            'json' => [
-                'waybill' => $waybillNumbers  // Pass the array of waybill numbers
-            ],
-            'headers' => [
-                'Authorization' => 'Bearer ' . $this->apiKey,
-            ],
+        // $response = $this->client->post($this->apiUrl, [
+        //     'json' => [
+        //         'waybill' => $waybillNumbers  // Pass the array of waybill numbers
+        //     ],
+        //     'headers' => [
+        //         'Authorization' => 'Bearer ' . $this->apiKey,
+        //     ],
+        // ]);
+
+        // // Parse and return the response
+        // return json_decode($response->getBody()->getContents(), true);
+
+        // Validate the waybill numbers array
+        $request->validate([
+            'waybill' => 'required|array',
+            'waybill.*' => 'string',
         ]);
 
-        // Parse and return the response
-        return json_decode($response->getBody()->getContents(), true);
+        $waybillNumbers = $request->input('waybill');
+        $response = $this->delhiveryService->trackMultipleShipments($waybillNumbers);
+
+        return response()->json($response);
     }
 
 }
