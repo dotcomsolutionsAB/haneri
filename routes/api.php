@@ -116,8 +116,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
             Route::get('/pull_images', [ProductController::class, 'mapVariantImagesToPhotoId']);
-
-            Route::get('/switch_user', [UserController::class, 'switchUser']);
         });
 
         // for all orders
@@ -143,6 +141,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); 
             Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
         });
+
+        Route::get('/switch_user', [UserController::class, 'switchUser']);
     });
 
     // Category Routes
