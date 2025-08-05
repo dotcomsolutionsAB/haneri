@@ -134,7 +134,7 @@ class ProductController extends Controller
                     'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
                 ])->findOrFail($id);
 
-                $user = auth()->user();
+                // $user = auth()->user();
 
                 /* --- main images --- */
                 $uploadIds = $product->image ? explode(',', $product->image) : [];
@@ -241,7 +241,7 @@ class ProductController extends Controller
             $products = $products->map(function ($prod) use ($uploads) {
                 $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
                 $variants = $prod->variants->map(function ($variant) {
-                    $user = auth()->user();
+                    //$user = auth()->user();
                     $discount = 0;
                     if ($user) {
                         $discount = UsersDiscountModel::where('user_id', $userId)
