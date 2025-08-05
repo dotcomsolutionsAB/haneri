@@ -126,6 +126,7 @@ class ProductController extends Controller
                 $userRole = "customer";
             }
 
+            dd($userId);
             /* ----------  SINGLE PRODUCT  ---------- */
             if ($id) {
                 $product = ProductModel::with([
