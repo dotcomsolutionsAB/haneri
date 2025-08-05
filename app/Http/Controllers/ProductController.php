@@ -238,7 +238,7 @@ class ProductController extends Controller
             $uploads     = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
 
             /* --- transform products --- */
-            $products = $products->map(function ($prod) use ($uploads) {
+            $products = $products->map(function ($prod) use ($uploads, $userId, $userRole) {
                 $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
                 $variants = $prod->variants->map(function ($variant) {
                     //$user = auth()->user();
