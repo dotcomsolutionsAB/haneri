@@ -425,6 +425,11 @@ class ProductController extends Controller
 
             // Add new variants
             foreach ($request->input('data.variants') as $variant) {
+                // Check if the discount fields are provided, if not, retain the old value
+                $customerDiscount = $variant['customer_discount'] !== null ? $variant['customer_discount'] : $product->customer_discount;
+                $dealerDiscount = $variant['dealer_discount'] !== null ? $variant['dealer_discount'] : $product->dealer_discount;
+                $architectDiscount = $variant['architect_discount'] !== null ? $variant['architect_discount'] : $product->architect_discount;
+
                 ProductVariantModel::create([
                     'product_id' => $product->id,
                     'photo_id' => $variant['photo_id'] ?? null,
@@ -435,9 +440,9 @@ class ProductController extends Controller
                     'variant_type' => $variant['variant_type'],
                     'variant_value' => $variant['variant_value'],
                     'regular_price' => $variant['regular_price'],
-                    'customer_discount' => $variant['customer_discount'],
-                    'dealer_discount' => $variant['dealer_discount'],
-                    'architect_discount' => $variant['architect_discount'],
+                    'customer_discount' => $customerDiscount,
+                    'dealer_discount' => $dealerDiscount,
+                    'architect_discount' => $architectDiscount,
                     'hsn' => $variant['hsn'],
                     'regular_tax' => $variant['regular_tax'],
                     'selling_tax' => $variant['selling_tax'],
