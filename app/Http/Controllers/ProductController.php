@@ -364,7 +364,7 @@ class ProductController extends Controller
             'features.*.is_filterable' => 'nullable|boolean',
             // Validate product variants
             'variants' => 'nullable|array',
-            'variants.*.photo_id' => 'nullable|integer|exists:t_uploads,id',
+            'variants.*.photo_id' => 'nullable|string|exists:t_uploads,id',
             'variants.*.min_qty' => 'sometimes|integer|min:1',
             'variants.*.is_cod' => 'sometimes|boolean',
             'variants.*.weight' => 'nullable|numeric',
@@ -380,7 +380,7 @@ class ProductController extends Controller
             'variants.*.architect_discount' => 'nullable|numeric',
             'variants.*.hsn' => 'sometimes|string',
             'variants.*.regular_tax' => 'sometimes|numeric',
-            'variants.*.selling_price' => 'required_with:variants|numeric',
+            // 'variants.*.selling_price' => 'required_with:variants|numeric',
             'variants.*.video_url' => 'sometimes|string',
             'variants.*.product_pdf' => 'sometimes|string',
         ]);
