@@ -139,7 +139,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // delhivery
         Route::prefix('delivery')->group(function () {
             Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); 
-            Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
+            //Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
+            Route::get('/track', [DelhiveryServiceController::class, 'trackShipments']);
+            Route::get('/pincode-serviceability', [DelhiveryServiceController::class, 'checkPincodeServiceability']);
+            Route::get('/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
         });
 
         Route::post('/switch_user', [UserController::class, 'switchUser']);

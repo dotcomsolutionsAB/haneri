@@ -355,7 +355,7 @@ class UserController extends Controller
 
             // Update the user's role
             $user->role = $role;
-            $user->selected_type = null;
+            //$user->selected_type = null;
             $user->save();  // Save the updated user
 
             // Return a success response
