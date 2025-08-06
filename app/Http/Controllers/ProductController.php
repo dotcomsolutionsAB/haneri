@@ -357,13 +357,17 @@ class ProductController extends Controller
             'slug' => 'sometimes|string|unique:t_products,slug,' . $id,
             'description' => 'sometimes|string',
             'is_active' => 'sometimes|boolean',
+
             // Validate product features
             'features' => 'nullable|array',
+            'features.*.id' => 'required_with:features|integer|exists:t_product_features,id',
             'features.*.feature_name' => 'required_with:features|string',
             'features.*.feature_value' => 'required_with:features|string',
             'features.*.is_filterable' => 'nullable|boolean',
+
             // Validate product variants
             'variants' => 'nullable|array',
+            'variants.*.id' => 'required_with:variants|integer|exists:t_product_variants,id',
             'variants.*.photo_id' => 'nullable|string|exists:t_uploads,id',
             'variants.*.min_qty' => 'sometimes|integer|min:1',
             'variants.*.is_cod' => 'sometimes|boolean',
@@ -373,14 +377,11 @@ class ProductController extends Controller
             'variants.*.variant_value' => 'required_with:variants|string',
             'variants.*.discount_price' => 'nullable|numeric',
             'variants.*.regular_price' => 'sometimes|numeric',
-            // 'variants.*.selling_price' => 'sometimes|numeric',
-            // 'variants.*.sales_price_vendor' => 'required_with:variants|numeric',
             'variants.*.customer_discount' => 'nullable|numeric',
             'variants.*.dealer_discount' => 'nullable|numeric',
             'variants.*.architect_discount' => 'nullable|numeric',
             'variants.*.hsn' => 'sometimes|string',
             'variants.*.regular_tax' => 'sometimes|numeric',
-            // 'variants.*.selling_price' => 'required_with:variants|numeric',
             'variants.*.video_url' => 'sometimes|string',
             'variants.*.product_pdf' => 'sometimes|string',
         ]);
@@ -403,52 +404,75 @@ class ProductController extends Controller
             'is_active' => $request->input('is_active', $product->is_active),
         ]);
 
-        // Update product features
-        if ($request->has('data.features') && is_array($request->input('data.features'))) {
-            // Remove existing features if needed (optional)
-            ProductFeatureModel::where('product_id', $product->id)->delete();
+       // Update product features
+        if ($request->has('features') && is_array($request->input('features'))) {
+            foreach ($request->input('features') as $feature) {
+                $existingFeature = ProductFeatureModel::find($feature['id']);
 
-            // Add new features
-            foreach ($request->input('data.features') as $feature) {
-                ProductFeatureModel::create([
-                    'product_id' => $product->id,
-                    'feature_name' => $feature['feature_name'],
-                    'is_filterable' => $feature['is_filterable'] ?? false,
-                ]);
+                if ($existingFeature) {
+                    // Update feature if the id is passed
+                    $existingFeature->update([
+                        'feature_name' => $feature['feature_name'],
+                        'is_filterable' => $feature['is_filterable'] ?? $existingFeature->is_filterable,
+                    ]);
+                } else {
+                    // Create new feature if id is not provided
+                    ProductFeatureModel::create([
+                        'product_id' => $product->id,
+                        'feature_name' => $feature['feature_name'],
+                        'is_filterable' => $feature['is_filterable'] ?? false,
+                    ]);
+                }
             }
         }
 
         // Update product variants
-        if ($request->has('data.variants') && is_array($request->input('data.variants'))) {
-            // Remove existing variants if needed (optional)
-            ProductVariantModel::where('product_id', $product->id)->delete();
+        if ($request->has('variants') && is_array($request->input('variants'))) {
+            foreach ($request->input('variants') as $variant) {
+                $existingVariant = ProductVariantModel::find($variant['id']);
 
-            // Add new variants
-            foreach ($request->input('data.variants') as $variant) {
-                // Check if the discount fields are provided, if not, retain the old value
-                $customerDiscount = $variant['customer_discount'] !== null ? $variant['customer_discount'] : $product->customer_discount;
-                $dealerDiscount = $variant['dealer_discount'] !== null ? $variant['dealer_discount'] : $product->dealer_discount;
-                $architectDiscount = $variant['architect_discount'] !== null ? $variant['architect_discount'] : $product->architect_discount;
-
-                ProductVariantModel::create([
-                    'product_id' => $product->id,
-                    'photo_id' => $variant['photo_id'] ?? null,
-                    'min_qty' => $variant['min_qty'] ?? 1,
-                    'is_cod' => $variant['is_cod'] ?? true,  // Default true if not provided
-                    'weight' => $variant['weight'] ?? null,
-                    'description' => $variant['description'] ?? null,
-                    'variant_type' => $variant['variant_type'],
-                    'variant_value' => $variant['variant_value'],
-                    'regular_price' => $variant['regular_price'],
-                    'customer_discount' => $customerDiscount,
-                    'dealer_discount' => $dealerDiscount,
-                    'architect_discount' => $architectDiscount,
-                    'hsn' => $variant['hsn'],
-                    'regular_tax' => $variant['regular_tax'],
-                    'selling_tax' => $variant['selling_tax'],
-                    'video_url' => $variant['video_url'] ?? null,
-                    'product_pdf' => $variant['product_pdf'] ?? null,
-                ]);
+                if ($existingVariant) {
+                    // Update variant if the id is passed
+                    $existingVariant->update([
+                        'photo_id' => $variant['photo_id'] ?? $existingVariant->photo_id,
+                        'min_qty' => $variant['min_qty'] ?? $existingVariant->min_qty,
+                        'is_cod' => $variant['is_cod'] ?? $existingVariant->is_cod,
+                        'weight' => $variant['weight'] ?? $existingVariant->weight,
+                        'description' => $variant['description'] ?? $existingVariant->description,
+                        'variant_type' => $variant['variant_type'] ?? $existingVariant->variant_type,
+                        'variant_value' => $variant['variant_value'] ?? $existingVariant->variant_value,
+                        'regular_price' => $variant['regular_price'] ?? $existingVariant->regular_price,
+                        'customer_discount' => $variant['customer_discount'] ?? $existingVariant->customer_discount,
+                        'dealer_discount' => $variant['dealer_discount'] ?? $existingVariant->dealer_discount,
+                        'architect_discount' => $variant['architect_discount'] ?? $existingVariant->architect_discount,
+                        'hsn' => $variant['hsn'] ?? $existingVariant->hsn,
+                        'regular_tax' => $variant['regular_tax'] ?? $existingVariant->regular_tax,
+                        'selling_price' => $variant['selling_price'] ?? $existingVariant->selling_price,
+                        'video_url' => $variant['video_url'] ?? $existingVariant->video_url,
+                        'product_pdf' => $variant['product_pdf'] ?? $existingVariant->product_pdf,
+                    ]);
+                } else {
+                    // Create new variant if id is not provided
+                    ProductVariantModel::create([
+                        'product_id' => $product->id,
+                        'photo_id' => $variant['photo_id'] ?? null,
+                        'min_qty' => $variant['min_qty'] ?? 1,
+                        'is_cod' => $variant['is_cod'] ?? true,
+                        'weight' => $variant['weight'] ?? null,
+                        'description' => $variant['description'] ?? null,
+                        'variant_type' => $variant['variant_type'],
+                        'variant_value' => $variant['variant_value'],
+                        'regular_price' => $variant['regular_price'],
+                        'customer_discount' => $variant['customer_discount'] ?? null,
+                        'dealer_discount' => $variant['dealer_discount'] ?? null,
+                        'architect_discount' => $variant['architect_discount'] ?? null,
+                        'hsn' => $variant['hsn'] ?? null,
+                        'regular_tax' => $variant['regular_tax'] ?? null,
+                        'selling_price' => $variant['selling_price'],
+                        'video_url' => $variant['video_url'] ?? null,
+                        'product_pdf' => $variant['product_pdf'] ?? null,
+                    ]);
+                }
             }
         }
         
@@ -456,7 +480,6 @@ class ProductController extends Controller
 
         return response()->json(['message' => 'Product updated successfully!', 'data' => $product], 200);
     }
-
 
     // Delete
     public function destroy($id)
