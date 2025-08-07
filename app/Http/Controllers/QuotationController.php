@@ -17,7 +17,6 @@ class QuotationController extends Controller
     // Store a new quotation
     public function store(Request $request)
     {
-        dd("kkk");
         // Validate request data
         $request->validate([
             'q_user' => 'required|string',
