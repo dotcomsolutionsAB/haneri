@@ -135,8 +135,7 @@ class CartController extends Controller
             $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
         // Calculate the selling price based on user role
-
-        dd($user->role);
+dd($cartItem);
         if ($user && $user->role == 'admin') {
             // Admin: Use regular price as the selling price
             $cartItem->selling_price = $cartItem->product->regular_price;
@@ -144,13 +143,13 @@ class CartController extends Controller
             // Non-admin: Apply the respective discount
             switch ($user->role) {
                 case 'customer':
-                    $discount = $cartItem->variant->customer_discount ?? 0;
+                    $discount = $cartItem->variant_id->customer_discount ?? 0;
                     break;
                 case 'dealer':
-                    $discount = $cartItem->variant->dealer_discount ?? 0;
+                    $discount = $cartItem->variant_id->dealer_discount ?? 0;
                     break;
                 case 'architect':
-                    $discount = $cartItem->variant->architect_discount ?? 0;
+                    $discount = $cartItem->variant_id->architect_discount ?? 0;
                     break;
                 default:
                     $discount = 0;
