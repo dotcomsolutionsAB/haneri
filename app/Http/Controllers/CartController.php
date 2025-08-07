@@ -176,10 +176,8 @@ class CartController extends Controller
 
     private function price($regularPrice, $discount)
     {
-        print_r($regularPrice);
-        echo "uuu";
-        dd($discount);
-        return $regularPrice - $discount;
+        $discountedPrice = number_format($regularPrice - ($regularPrice * ($discount / 100)), 0);
+        return $discountedPrice;
     }
 
     // Update Cart Item
