@@ -135,7 +135,7 @@ class CartController extends Controller
             $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
         echo "<pre>";
-        print_r($cartItem->product);
+        print_r($cartItem->variant->regular_price);
         dd("lll");
         // Calculate the selling price based on user role
         if ($user && $user->role == 'admin') {
@@ -159,7 +159,7 @@ class CartController extends Controller
             }
 
             // Use the price() function to calculate the final price
-            $cartItem->selling_price = $this->price($cartItem->product->regular_price, $discount);
+            $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
         }
 
         // Optionally hide fields on the cart item itself
