@@ -159,7 +159,7 @@ class CartController extends Controller
             }
         }
 
-        $cartItem->selling_price = $cartItem->variant->regular_price - $discount;
+        $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
 
         // Optionally hide fields on the cart item itself
         $cartItem->makeHidden(['created_at', 'updated_at']);
@@ -176,6 +176,9 @@ class CartController extends Controller
 
     private function price($regularPrice, $discount)
     {
+        print_r($regularPrice);
+        echo "uuu";
+        dd($discount);
         return $regularPrice - $discount;
     }
 
