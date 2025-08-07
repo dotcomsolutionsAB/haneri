@@ -140,6 +140,7 @@ class CartController extends Controller
             $cartItem->selling_price = $cartItem->product->regular_price;
         } else {
             // Non-admin: Apply the respective discount
+            print_r($user->role);
             switch ($user->role) {
                 case 'customer':
                     $discount = $cartItem->variant_id->customer_discount ?? 0;
