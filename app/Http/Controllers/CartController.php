@@ -155,11 +155,11 @@ class CartController extends Controller
                     $discount = 0;
                     break;
             }
-dd($discount);
+
             // Subtract the discount from the regular price
             $cartItem->selling_price = $cartItem->product->regular_price - $discount;
         }
-
+dd($cartItem);
         // Optionally hide fields on the cart item itself
         $cartItem->makeHidden(['created_at', 'updated_at']);
 
