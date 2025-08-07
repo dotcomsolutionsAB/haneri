@@ -135,29 +135,36 @@ class CartController extends Controller
             $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
 
-        // Calculate the selling price based on user role
-        if ($user && $user->role == 'admin') {
-            // Admin: Use regular price as the selling price
-            $cartItem->selling_price = $cartItem->product->regular_price;
-        } else {
-            // Non-admin: Apply the respective discount
-            switch ($user->role) {
+        // Check if the user has a discount in UsersDiscountModel first
+        $discount = UsersDiscountModel::where('user_id', $user->id)
+            ->where('product_variant_id', $cartItem->variant->id)
+            ->value('discount');
+
+        if ($discount === null) {
+            // If no discount found, fall back to variant-based discount
+            switch ($userRole) {
                 case 'customer':
-                    $discount = $cartItem->variant->customer_discount ?? 0;
+                    $discount = $cartItem->variant->customer_discount;
                     break;
                 case 'dealer':
-                    $discount = $cartItem->variant->dealer_discount ?? 0;
+                    $discount = $cartItem->variant->dealer_discount;
                     break;
                 case 'architect':
-                    $discount = $cartItem->variant->architect_discount ?? 0;
+                    $discount = $cartItem->variant->architect_discount;
                     break;
                 default:
                     $discount = 0;
                     break;
             }
+        }
 
-            // Use the price() function to calculate the final price
-            $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
+        // Calculate the selling price based on user role and the discount found
+        if ($user && $user->role == 'admin') {
+            // Admin: Use regular price as the selling price
+            $cartItem->selling_price = $cartItem->product->regular_price;
+        } else {
+            // Non-admin: Apply the respective discount
+            $cartItem->selling_price = $cartItem->product->regular_price - $discount;
         }
 
         // Optionally hide fields on the cart item itself
