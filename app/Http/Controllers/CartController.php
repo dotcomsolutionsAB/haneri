@@ -137,8 +137,8 @@ class CartController extends Controller
             $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
 
-        // Get variant_type from ProductVariantModel
-        $variantType = $cartItem->variant->variant_type;
+        // Get variant_value from ProductVariantModel
+        $variantType = $cartItem->variant->variant_value;
 
         // Check if the user has a discount in UsersDiscountModel first
         $discount = UsersDiscountModel::where('user_id', $user->id)
