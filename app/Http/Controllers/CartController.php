@@ -155,7 +155,7 @@ class CartController extends Controller
                     $discount = 0;
                     break;
             }
-
+dd($cartItem->product->regular_price);
             // Subtract the discount from the regular price
             $cartItem->selling_price = $cartItem->product->regular_price - $discount;
         }
