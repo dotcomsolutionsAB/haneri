@@ -9,7 +9,7 @@ class QuotationModel extends Model
     //
     protected $table = 't_quotations';
 
-    protected $fillable = ['user_id', 'total_amount', 'status', 'payment_status', 'shipping_address', 'razorpay_order_id'];
+    protected $fillable = ['user_id', 'total_amount', 'q_user', 'q_email', 'q_mobile', 'q_address'];
 
     /**
      * Relation to the User table

@@ -19,23 +19,24 @@ class QuotationController extends Controller
     {
         // Validate request data
         $request->validate([
-            'status' => 'required|in:pending,completed,cancelled,refunded',
-            'payment_status' => 'required|in:pending,paid,failed',
-            'shipping_address' => 'required|string',
+            'q_user' => 'required|string',
+            'q_email' => 'required|string',
+            'q_mobile' => 'nullable|string',
+            'q_address' => 'required|string',
         ]);
 
         $user = Auth::user(); // Get the user object
         $user_id = $user->id; // Extract the user ID
 
-        // Fetch user details from User model
-        $quotationUser = User::find($user_id);
-        if (!$quotationUser) {
-            return response()->json(['message' => 'User not found.'], 404);
-        }
+        // // Fetch user details from User model
+        // $quotationUser = User::find($user_id);
+        // if (!$quotationUser) {
+        //     return response()->json(['message' => 'User not found.'], 404);
+        // }
 
-        $user_name = $quotationUser->name;  // Fetch name
-        $user_email = $quotationUser->email;  // Fetch email
-        $user_phone = $quotationUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
+        // $user_name = $quotationUser->name;  // Fetch name
+        // $user_email = $quotationUser->email;  // Fetch email
+        // $user_phone = $quotationUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
 
         // Start a transaction to ensure all operations are atomic
         DB::beginTransaction();
@@ -59,28 +60,32 @@ class QuotationController extends Controller
 
 
             // Call Razorpay quotation API Before Saving quotation in DB**
-            $razorpayController = new RazorpayController(); 
-            $razorpayRequest = new Request([
-                'amount' => $totalAmount,
-                'currency' => 'INR'
-            ]);
-            $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
+            // $razorpayController = new RazorpayController(); 
+            // $razorpayRequest = new Request([
+            //     'amount' => $totalAmount,
+            //     'currency' => 'INR'
+            // ]);
+            // $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
 
-            // Decode Razorpay response
-            $razorpayData = json_decode($razorpayResponse->getContent(), true);
-            if (!$razorpayData['success']) {
-                DB::rollBack();
-                return response()->json(['message' => 'Failed to create Razorpay quotation.'], 500);
-            }
+            // // Decode Razorpay response
+            // $razorpayData = json_decode($razorpayResponse->getContent(), true);
+            // if (!$razorpayData['success']) {
+            //     DB::rollBack();
+            //     return response()->json(['message' => 'Failed to create Razorpay quotation.'], 500);
+            // }
 
             // Create the quotation record
             $quotation = QuotationModel::create([
                 'user_id' => $user_id,
                 'total_amount' => $totalAmount,
-                'status' => $request->input('status', 'pending'),
-                'payment_status' => $request->input('payment_status', 'pending'),
-                'shipping_address' => $request->input('shipping_address'),
-                'razorpay_order_id' => $razorpayData['order']['id'],
+                // 'status' => $request->input('status', 'pending'),
+                // 'payment_status' => $request->input('payment_status', 'pending'),
+                // 'shipping_address' => $request->input('shipping_address'),
+                // 'razorpay_order_id' => $razorpayData['order']['id'],
+                'q_user' => $request->input('q_user'),
+                'q_email' => $request->input('q_email'),
+                'q_mobile' => $request->input('q_mobile'),
+                'q_address' => $request->input('q_address'),
             ]);
 
             // Iterate through each cart item to add it to the order items table
@@ -112,9 +117,10 @@ class QuotationController extends Controller
                     'payment_status' => $quotation->payment_status,
                     'shipping_address' => $quotation->shipping_address,
                     'razorpay_order_id' => $quotation->razorpay_quotation_id,
-                    'name' => $user_name,
-                    'email' => $user_email, 
-                    'phone' => $user_phone, 
+                    'name' => $quotation->q_user,
+                    'email' => $quotation->q_email, 
+                    'phone' => $quotation->q_mobile, 
+                    'phone' => $quotation->q_mobile, 
                 ]
             ];
 
@@ -142,14 +148,21 @@ class QuotationController extends Controller
         $product = \App\Models\ProductModel::find($product_id);
 
         if ($variant_id) {
-            // Assuming you have a method for variant price, like `getVariantPrice()`
-            $variant = \App\Models\ProductVariantModel::find($variant_id);
-            // return $variant ? $variant->price : $product->price;  // Fallback to product price if variant not found
+            // // Assuming you have a method for variant price, like `getVariantPrice()`
+            // $variant = \App\Models\ProductVariantModel::find($variant_id);
+            // // return $variant ? $variant->price : $product->price;  // Fallback to product price if variant not found
 
-            return $variant ? $variant->selling_price : 0;  // Fallback to product price if variant not found
+            // return $variant ? $variant->selling_price : 0;  // Fallback to product price if variant not found
+
+            // Calculate final selling price with discount for the variant
+            $discountedPrice = $variant->regular_price - ($variant->customer_discount ?? 0); // Default to 0 if no discount
+            return max(0, $discountedPrice); // Ensure the price doesn't go below 0
         }
 
-        return $product->price;  // Return product price if no variant
+        // return $product->price;  // Return product price if no variant
+        // If no variant is provided or the variant is not found, calculate the final price based on the product
+        $discountedPrice = $product->regular_price - ($product->customer_discount ?? 0); // Default to 0 if no discount
+        return max(0, $discountedPrice); // Ensure the price doesn't go below 0
     }
 
     // View all quotations for a user
