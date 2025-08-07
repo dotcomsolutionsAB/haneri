@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\CartModel;
 use App\Models\UsersDiscountModel;
+use App\Models\UploadModel;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
 use Str;
@@ -136,6 +137,9 @@ class CartController extends Controller
             $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
 
+        // Get variant_type from ProductVariantModel
+        $variantType = $cartItem->variant->variant_type;
+
         // Check if the user has a discount in UsersDiscountModel first
         $discount = UsersDiscountModel::where('user_id', $user->id)
             ->where('product_variant_id', $cartItem->variant->id)
@@ -160,6 +164,10 @@ class CartController extends Controller
         }
 
         $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
+
+        // Get the file URLs from the UploadModel for photo_ids
+        $photoIds = explode(',', $cartItem->variant->photo_id); // Split comma-separated IDs
+        $fileUrls = UploadModel::whereIn('id', $photoIds)->pluck('file_url')->toArray();
 
             // Optionally hide fields on the cart item itself
             $cartItem->makeHidden(['created_at', 'updated_at']);
