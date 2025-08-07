@@ -143,7 +143,7 @@ class CartController extends Controller
 
         if ($discount === null) {
             // If no discount found, fall back to variant-based discount
-            switch ($userRole) {
+            switch ($user->role) {
                 case 'customer':
                     $discount = $cartItem->variant->customer_discount;
                     break;
@@ -157,15 +157,6 @@ class CartController extends Controller
                     $discount = 0;
                     break;
             }
-        }
-
-        // Calculate the selling price based on user role and the discount found
-        if ($user && $user->role == 'admin') {
-            // Admin: Use regular price as the selling price
-            $cartItem->selling_price = $cartItem->product->regular_price;
-        } else {
-            // Non-admin: Apply the respective discount
-            $cartItem->selling_price = $cartItem->product->regular_price - $discount;
         }
 
         // Optionally hide fields on the cart item itself
