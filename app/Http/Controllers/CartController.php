@@ -168,6 +168,7 @@ class CartController extends Controller
                 'id' => $cartItem->id,
                 'user_name' => $cartItem->user->name,
                 'product_name' => $cartItem->product->name,
+                'variant_value' => $cartItem->variant_value,
                 'selling_price' => $cartItem->selling_price,
                 'quantity' => $cartItem->quantity,
             ];
