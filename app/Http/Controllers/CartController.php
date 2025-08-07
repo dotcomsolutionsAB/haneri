@@ -135,6 +135,7 @@ class CartController extends Controller
             $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
         print_r($cartItem->product);
+        dd("lll");
         // Calculate the selling price based on user role
         if ($user && $user->role == 'admin') {
             // Admin: Use regular price as the selling price
