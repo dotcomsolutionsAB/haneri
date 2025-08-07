@@ -364,7 +364,7 @@ class ProductController extends Controller
                             ->values()
                             ->all();
                     }
-                    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
+                    unset($data['photo_id']);
                     $data['file_urls'] = $fileUrls;
 
                     return $data;
