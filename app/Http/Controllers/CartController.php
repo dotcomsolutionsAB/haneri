@@ -140,6 +140,8 @@ class CartController extends Controller
         // Get variant_value from ProductVariantModel
         $variantType = $cartItem->variant->variant_value;
 
+        $variant_ids = $cartItem->variant->id;
+
         // Check if the user has a discount in UsersDiscountModel first
         $discount = UsersDiscountModel::where('user_id', $user->id)
             ->where('product_variant_id', $cartItem->variant->id)
@@ -183,6 +185,7 @@ class CartController extends Controller
                 'id' => $cartItem->id,
                 'user_name' => $cartItem->user->name,
                 'product_name' => $cartItem->product->name,
+                'variant_id' => $variantId,
                 'variant_value' => $variantType,
                 'selling_price' => $cartItem->selling_price,
                 'quantity' => $cartItem->quantity,
