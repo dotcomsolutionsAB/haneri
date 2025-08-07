@@ -102,8 +102,7 @@ class QuotationController extends Controller
             }
 
             // After successfully adding order items, delete the cart items
-            $abc = CartModel::where('user_id', (string)$user_id)->delete();
-            dd($abc);
+            CartModel::where('user_id', (string)$user_id)->delete();
 
             // Commit the transaction
             DB::commit();
