@@ -17,6 +17,7 @@ class QuotationController extends Controller
     // Store a new quotation
     public function store(Request $request)
     {
+        dd("kkk");
         // Validate request data
         $request->validate([
             'q_user' => 'required|string',
@@ -168,6 +169,7 @@ class QuotationController extends Controller
     // View all quotations for a user
     public function index(Request $request)
     {
+        dd("xxx");
         $user = Auth::user(); 
 
         // If the user is an admin, validate user_id in the request
@@ -205,6 +207,7 @@ class QuotationController extends Controller
     // View details of a single quotation
     public function show($id)
     {
+        dd("aaa");
         $user = Auth::user();
 
         // Fetch the quotation by ID for the user
