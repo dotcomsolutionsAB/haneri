@@ -144,25 +144,26 @@ class QuotationController extends Controller
     // Helper function to get the final price for a product and its variant
     private function getFinalPrice($product_id, $variant_id = null)
     {
-        // Assuming we have a method to fetch the product price and variant price
+        // Fetch product details
         $product = \App\Models\ProductModel::find($product_id);
 
         if ($variant_id) {
-            // // Assuming you have a method for variant price, like `getVariantPrice()`
-            // $variant = \App\Models\ProductVariantModel::find($variant_id);
-            // // return $variant ? $variant->price : $product->price;  // Fallback to product price if variant not found
+            // Fetch variant details
+            $variant = \App\Models\ProductVariantModel::find($variant_id);
+            
+            if ($variant) {
+                // Calculate discounted price for the variant based on percentage discount
+                $regularPrice = $variant->regular_price;
+                $discount = $variant->customer_discount ?? 0; // Default to 0 if no discount is set
 
-            // return $variant ? $variant->selling_price : 0;  // Fallback to product price if variant not found
-
-            // Calculate final selling price with discount for the variant
-            $discountedPrice = $variant->regular_price - ($variant->customer_discount ?? 0); // Default to 0 if no discount
-            return max(0, $discountedPrice); // Ensure the price doesn't go below 0
+                // Apply the discount (calculate price after discount)
+                $discountedPrice = number_format($regularPrice - ($regularPrice * ($discount / 100)), 0);
+                return max(0, floatval($discountedPrice)); // Ensure price doesn't go below 0
+            }
+            return 0; // Return 0 if variant not found
         }
 
-        // return $product->price;  // Return product price if no variant
-        // If no variant is provided or the variant is not found, calculate the final price based on the product
-        $discountedPrice = $product->regular_price - ($product->customer_discount ?? 0); // Default to 0 if no discount
-        return max(0, $discountedPrice); // Ensure the price doesn't go below 0
+        return 0; // Return 0 if variant_id is not provided
     }
 
     // View all quotations for a user
