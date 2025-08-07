@@ -161,10 +161,14 @@ class CartController extends Controller
 
         $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
 
-        // Optionally hide fields on the cart item itself
-        $cartItem->makeHidden(['created_at', 'updated_at']);
+            // Optionally hide fields on the cart item itself
+            $cartItem->makeHidden(['created_at', 'updated_at']);
 
-        return $cartItem;
+         return [
+                'user_name' => $cartItem->user->name,
+                'product_name' => $cartItem->product->name,
+                'selling_price' => $cartItem->selling_price,
+            ];
         });
 
         return $cartItems->isNotEmpty()
