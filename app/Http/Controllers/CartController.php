@@ -134,6 +134,7 @@ class CartController extends Controller
         if ($cartItem->variant) {
             $cartItem->variant->makeHidden(['created_at', 'updated_at']);
         }
+        echo "<pre>";
         print_r($cartItem->product);
         dd("lll");
         // Calculate the selling price based on user role
