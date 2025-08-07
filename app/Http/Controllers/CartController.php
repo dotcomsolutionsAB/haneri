@@ -159,6 +159,8 @@ class CartController extends Controller
             }
         }
 
+        $cartItem->selling_price = $cartItem->product->regular_price - $discount;
+
         // Optionally hide fields on the cart item itself
         $cartItem->makeHidden(['created_at', 'updated_at']);
 
