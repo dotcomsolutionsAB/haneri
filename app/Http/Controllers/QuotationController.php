@@ -167,9 +167,8 @@ class QuotationController extends Controller
     }
 
     // View all quotations for a user
-    public function index(Request $request)
+    public function index()
     {
-        dd("xxx");
         $user = Auth::user(); 
 
         // If the user is an admin, validate user_id in the request

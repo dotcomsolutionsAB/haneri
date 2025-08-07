@@ -88,7 +88,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         
         // Quotation Routes
         Route::prefix('quotation')->group(function () {
-            Route::get('/', [QuotationController::class, 'index']);            // List all orders for a user
+            Route::get('/fetch', [QuotationController::class, 'index']);            // List all orders for a user
             Route::get('/{id}', [QuotationController::class, 'show']);         // Get details of a single order
             Route::post('/', [QuotationController::class, 'store']);           // Create a new order
             Route::delete('/{id}', [QuotationController::class, 'delete']);           // Create a new quotation
@@ -100,7 +100,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         
         // Quotation Routes
         Route::prefix('quotation')->group(function () {
-            Route::get('/', [QuotationController::class, 'index']);            // List all orders for a user
+            Route::get('/fetch', [QuotationController::class, 'index']);            // List all orders for a user
             Route::get('/{id}', [QuotationController::class, 'show']);         // Get details of a single order
             Route::post('/', [QuotationController::class, 'store']);           // Create a new order
             Route::delete('/{id}', [QuotationController::class, 'delete']);           // Create a new quotation
