@@ -155,10 +155,9 @@ class CartController extends Controller
                     $discount = 0;
                     break;
             }
-// price($cartItem->product->regular_price);
-dd("lll");
-            // Subtract the discount from the regular price
-            $cartItem->selling_price = $cartItem->product->regular_price - $discount;
+
+            // Use the price() function to calculate the final price
+            $cartItem->selling_price = $this->price($cartItem->product->regular_price, $discount);
         }
 
         // Optionally hide fields on the cart item itself
@@ -170,6 +169,13 @@ dd("lll");
         return $cartItems->isNotEmpty()
             ? response()->json(['message' => 'Cart items fetched successfully!', 'data' => $cartItems, 'count' => count($cartItems)], 200)
             : response()->json(['message' => 'Your cart is empty.'], 400);
+    }
+
+    // Inside the CartController class
+
+    private function price($regularPrice, $discount)
+    {
+        return $regularPrice - $discount;
     }
 
     // Update Cart Item
