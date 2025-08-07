@@ -184,6 +184,7 @@ class CartController extends Controller
          return [
                 'id' => $cartItem->id,
                 'user_name' => $cartItem->user->name,
+                'product_id' => $cartItem->product->id,
                 'product_name' => $cartItem->product->name,
                 'variant_id' => $variant_id,
                 'variant_value' => $variantType,
