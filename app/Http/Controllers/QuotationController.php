@@ -100,7 +100,7 @@ class QuotationController extends Controller
                     'price' => $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id), // Final price per item
                 ]);
             }
-dd($user_id);
+// dd($user_id);
             // After successfully adding order items, delete the cart items
             $abc = CartModel::where('user_id', $user_id)->delete();
             dd($abc);
