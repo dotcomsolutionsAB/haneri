@@ -323,7 +323,7 @@ class ProductController extends Controller
                     'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
                 ])->findOrFail($id);
 
-                // $user = auth()->user();
+                $user = auth()->user();
 
                 /* --- main images --- */
                 $uploadIds = $product->image ? explode(',', $product->image) : [];
@@ -331,22 +331,22 @@ class ProductController extends Controller
                 $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
 
                 /* --- variants: compute selling_price & file_urls --- */
-                $product->variants = $product->variants->map(function ($variant) use ($userId, $userRole) {
+                $product->variants = $product->variants->map(function ($variant) use ($user) {
 
                     /* 1. discount */
                     $discount = 0;
-                    // if ($user) {
-                        $userDiscount = UsersDiscountModel::where('user_id', $userId)
+                    if ($user) {
+                        $userDiscount = UsersDiscountModel::where('user_id', $user->id)
                             ->where('product_variant_id', $variant->id)
                             ->first();
                         $discount = $userDiscount?->discount
-                            ?? match ($userRole) {
+                            ?? match ($user->role) {
                                 'customer'  => $variant->customer_discount,
                                 'dealer'    => $variant->dealer_discount,
                                 'architect' => $variant->architect_discount,
                                 default     => 0,
                             };
-                    // }
+                    }
 
                     /* 2. selling price */
                     $regularPrice = $variant->regular_price;
@@ -427,23 +427,22 @@ class ProductController extends Controller
             $uploads     = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
 
             /* --- transform products --- */
-            $products = $products->map(function ($prod) use ($uploads, $userId, $userRole) {
+            $products = $products->map(function ($prod) use ($uploads) {
                 $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
-                // $variants = $prod->variants->map(function ($variant) {
-                $variants = $prod->variants->map(function ($variant) use ($userId, $userRole) {
-                    //$user = auth()->user();
+                $variants = $prod->variants->map(function ($variant) {
+                    $user = auth()->user();
                     $discount = 0;
-                    // if ($user) {
-                        $discount = UsersDiscountModel::where('user_id', $userId)
+                    if ($user) {
+                        $discount = UsersDiscountModel::where('user_id', $user->id)
                             ->where('product_variant_id', $variant->id)
                             ->value('discount')
-                            ?? match ($userRole) {
+                            ?? match ($user->role) {
                                 'customer' => $variant->customer_discount,
                                 'dealer' => $variant->dealer_discount,
                                 'architect' => $variant->architect_discount,
                                 default => 0,
                             };
-                    // }
+                    }
                     // Calculate selling price
                     $regularPrice = $variant->regular_price;
                     $data = $variant->toArray();
