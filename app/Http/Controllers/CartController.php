@@ -167,7 +167,7 @@ class CartController extends Controller
 
         // Get the file URLs from the UploadModel for photo_ids
         $photoIds = explode(',', $cartItem->variant->photo_id); // Split comma-separated IDs
-        $fileUrls = UploadModel::whereIn('id', $photoIds)->pluck('file_url')->toArray();
+        $fileUrls = UploadModel::whereIn('id', $photoIds)->pluck('file_path')->toArray();
 
             // Optionally hide fields on the cart item itself
             $cartItem->makeHidden(['created_at', 'updated_at']);
