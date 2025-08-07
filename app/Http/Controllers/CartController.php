@@ -165,9 +165,11 @@ class CartController extends Controller
             $cartItem->makeHidden(['created_at', 'updated_at']);
 
          return [
+                'id' => $cartItem->id,
                 'user_name' => $cartItem->user->name,
                 'product_name' => $cartItem->product->name,
                 'selling_price' => $cartItem->selling_price,
+                'quantity' => $cartItem->quantity,
             ];
         });
 
