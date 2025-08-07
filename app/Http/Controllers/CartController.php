@@ -175,7 +175,9 @@ class CartController extends Controller
 
     private function price($regularPrice, $discount)
     {
-        dd($regularPrice);
+        print_r($regularPrice);
+        print_r("lll");
+        print($discount);
         return $regularPrice - $discount;
     }
 
