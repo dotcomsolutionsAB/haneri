@@ -143,13 +143,13 @@ class CartController extends Controller
             print_r($user->role);
             switch ($user->role) {
                 case 'customer':
-                    $discount = $cartItem->variant_id->customer_discount ?? 0;
+                    $discount = $cartItem->variant->customer_discount ?? 0;
                     break;
                 case 'dealer':
-                    $discount = $cartItem->variant_id->dealer_discount ?? 0;
+                    $discount = $cartItem->variant->dealer_discount ?? 0;
                     break;
                 case 'architect':
-                    $discount = $cartItem->variant_id->architect_discount ?? 0;
+                    $discount = $cartItem->variant->architect_discount ?? 0;
                     break;
                 default:
                     $discount = 0;
