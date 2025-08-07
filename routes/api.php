@@ -116,7 +116,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
             Route::get('/pull_images', [ProductController::class, 'mapVariantImagesToPhotoId']);
-            Route::get('/get_admin/{id?}', [ProductController::class, 'index_admin']);
+            Route::post('/get_admin/{id?}', [ProductController::class, 'index_admin']);
         });
 
         // for all orders
