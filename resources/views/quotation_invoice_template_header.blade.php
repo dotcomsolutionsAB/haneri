@@ -56,7 +56,6 @@
     </thead>
     <tbody>
         <!-- Loop through order items -->
-         dd($q_items);
         @foreach($q_items as $index => $item)
         <tr>
             <td class="center-align">{{ $index + 1 }}</td>

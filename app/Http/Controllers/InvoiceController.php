@@ -57,6 +57,7 @@ class InvoiceController extends Controller
 
         // Render the order items in chunks of 10 per page
         foreach ($q_items->chunk(10) as $chunk) {
+            print_r($chunk);
             foreach ($chunk as $index => $item) {
                 $mpdf->WriteHTML(view('quotation_invoice_template_items', compact('item', 'index'))->render());
             }
