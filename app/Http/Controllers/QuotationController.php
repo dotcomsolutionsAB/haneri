@@ -84,7 +84,7 @@ class QuotationController extends Controller
             DB::commit();
 
             // Now generate the invoice and store the file path
-            $generate_quotation_order = new InvoiceControllerZP();
+            $generate_quotation_order = new InvoiceController();
             $invoiceUrl = $generate_quotation_order->generateQuotationInvoice($quotation);
 
             // Store the invoice URL in the QuotationModel
