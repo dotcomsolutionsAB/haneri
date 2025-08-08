@@ -22,7 +22,7 @@
 <div class="header">
     <div class="title">Quotation Invoice</div>
     <div class="details">
-        <p><strong>User:</strong> {{ $q_user }}</p>
+        <p><strong>User:</strong> {{ $q_name }}</p>
         <p><strong>Email:</strong> {{ $q_email }}</p>
         <p><strong>Phone:</strong> {{ $q_mobile }}</p>
         <p><strong>Address:</strong> {{ $q_address }}</p>
