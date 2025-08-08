@@ -181,26 +181,14 @@
 </head>
 <body>
 
-    <!-- {{-- Background image --}} -->
-    <!-- @php
-        $bgPath = public_path('logos/flower-removebg-preview.png');
-        $bgType = pathinfo($bgPath, PATHINFO_EXTENSION);
-        $bgData = file_get_contents($bgPath);
-        $bgBase64 = 'data:image/' . $bgType . ';base64,' . base64_encode($bgData);
-    @endphp -->
-    <!-- <img src="{{ $bgBase64 }}" class="bg-image" /> -->
+   
 
     <!-- {{-- Header --}} -->
     <div class="header">
         <table width="100%">
             <tr>
                 <td class="w-50">
-                    <!-- @php
-                        $logoPath = public_path('https://haneri.com/images/Haneri%20Logo.png');
-                        $logoType = pathinfo($logoPath, PATHINFO_EXTENSION);
-                        $logoData = file_get_contents($logoPath);
-                        $logoBase64 = 'data:image/' . $logoType . ';base64,' . base64_encode($logoData);
-                    @endphp -->
+                    
                     <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Logo" class="logo">
                 </td>
                 <td class="w-50 text-right">
@@ -243,12 +231,7 @@
 
                 <!-- Right Box -->
                 <td style="width: 50%; vertical-align: top; padding-left: 10px;">
-                    <!-- <div style="border: 0px solid #ccc; padding: 10px; line-height: 1.4; float: right; min-width: 220px;">
-                        <strong>ORDER:</strong> #{{ $order->order_code }}<br>
-                        <strong>ORDER DATE:</strong> {{ $order->created_at->format('M d, Y, h:i A') }}<br>
-                        <strong>Shipping:</strong> {{ $order->shipping_type ?? 'Home' }}<br>
-                        <strong>Payment:</strong> {{ $order->payment_status ?? 'N/A' }}
-                    </div> -->
+                    
                 </td>
             </tr>
         </table>
@@ -267,17 +250,7 @@
             </thead>
             <tbody>
                 @foreach($q_items as $item)
-                <!-- @php
-                    $base64Image = null;
-                    if (!empty($item->image_link)) {
-                        $imagePath = public_path('https://haneri.com/images/Haneri%20Logo.png');
-                        if (file_exists($imagePath)) {
-                            $type = pathinfo($imagePath, PATHINFO_EXTENSION);
-                            $data = file_get_contents($imagePath);
-                            $base64Image = 'data:image/' . $type . ';base64,' . base64_encode($data);
-                        }
-                    }
-                @endphp -->
+                
                 <tr>
                     <!-- <td>{{ $loop->iteration }}</td> -->
                     <td>
@@ -307,30 +280,11 @@
             </tbody>
         </table>
 
-        <!-- {{-- Summary --}} -->
-        <!-- <div class="summary">
-            @php
-                $subtotal = $order->grand_total - $order->tax_price - $order->shipping_charge;
-            @endphp
-            <h4>SUBTOTAL: ₹{{ number_format($subtotal, 2) }}</h4>
-            <h4>TAX: ₹{{ number_format($order->tax_price, 2) }}</h4>
-            <h4>SHIPPING & HANDLING: ₹{{ number_format($order->shipping_charge, 2) }}</h4>
-            <h4>DISCOUNT: ₹ 0.00</h4>
-            <h4 class="grand-total">GRAND TOTAL: ₹{{ number_format($order->grand_total, 2) }}</h4>
-        </div> -->
+        
     </div>
-<!-- 
-    {{-- Signature Section --}} -->
-    <!-- @php
-        $invoiceUrl = $order->invoice_link;
-    @endphp -->
+
     <table width="100%" style="margin-top: 40px; padding: 20px 40px;">
-        <!-- @php
-            $signLogoPath = public_path('https://haneri.com/images/Haneri%20Logo.png'); // same logo or a small variant
-            $signLogoType = pathinfo($signLogoPath, PATHINFO_EXTENSION);
-            $signLogoData = file_get_contents($signLogoPath);
-            $signLogoBase64 = 'data:image/' . $signLogoType . ';base64,' . base64_encode($signLogoData);
-        @endphp -->
+
         <tr>
             
             <td style="width: 50%; text-align: left;">
