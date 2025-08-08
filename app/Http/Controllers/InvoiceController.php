@@ -24,14 +24,13 @@ class InvoiceController extends Controller
         // $q_items = QuotationItemModel::where('quotation_id', $quotation->id)->get();
 
         $q_items = QuotationItemModel::with([
-                'product:id,name,product_code',
-                'variant:id,product_id,variant_value,regular_price,discount_price'
+                'product:id,name',
+                'variant:id,product_id,variant_value'
             ])
             ->where('quotation_id', $quotation->id)
             ->get()
             ->map(function ($item) {
                 $item->product_name = $item->product->name ?? '';
-                $item->product_code = $item->product->product_code ?? '';
                 $item->variant_value = $item->variant->variant_value ?? '';
                 $item->rate = $item->price;
                 $item->total = $item->price * $item->quantity;
