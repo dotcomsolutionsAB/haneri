@@ -71,7 +71,7 @@ class InvoiceController extends Controller
                 // Skip processing if the chunk is empty
                 return;
             }
-
+dd($chunk);
             foreach ($chunk as $item) {
                 $mpdf->WriteHTML(view('quotation_invoice_template_items', compact('item'))->render());
             }
