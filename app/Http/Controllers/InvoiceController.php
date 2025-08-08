@@ -79,6 +79,7 @@ class InvoiceController extends Controller
         //     flush();
         // }
 
+        dd($q_items);
         // Render the order items in chunks of 10 per page
         $q_items->chunk(10)->each(function ($chunk) use ($mpdf) {
             if ($chunk->isEmpty()) {
