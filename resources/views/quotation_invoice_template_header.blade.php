@@ -26,29 +26,28 @@
     <img src="{{ asset('storage/uploads/s1.jpg') }}" alt="Logo">
 </div>
 
-
-
+<!-- Customer Info -->
 <table class="customer-info">
     <tr>
-        <td>Client:</td><td>{{ $q_name }}</td>
-        <td>Client:</td><td>{{ $q_email }}</td>
-        <td>Order ID:</td><td>{{ $order->order_id }}</td>
+        <td>Client:</td><td>{{ $q_user }}</td>  <!-- Use $q_user for the customer's name -->
+        <td>Client Email:</td><td>{{ $q_email }}</td>  <!-- Use $q_email for the customer's email -->
+        <td>Order ID:</td><td>{{ $quotation->order_id }}</td>  <!-- Use $quotation for the order -->
     </tr>
     <tr>
-        <td>Address:</td><td>{{ $q_address }}</td>
-        <td>Order Date:</td><td>{{ \Carbon\Carbon::parse($order->order_date)->format('d-m-Y') }}</td>
+        <td>Address:</td><td>{{ $q_address }}</td>  <!-- Use $q_address for the customer's address -->
+        <td>Order Date:</td><td>{{ \Carbon\Carbon::parse($quotation->order_date)->format('d-m-Y') }}</td>  <!-- Use $quotation for the order date -->
     </tr>
     <tr>
-        <td>Mobile:</td><td>{{ $q_mobile }}</td>
-        <td>Type:</td><td>{{ strtoupper($order->type) }}</td>
+        <td>Mobile:</td><td>{{ $q_mobile }}</td>  <!-- Use $q_mobile for the customer's mobile number -->
+        <td>Order Type:</td><td>{{ strtoupper($quotation->type) }}</td>  <!-- Use $quotation for order type -->
     </tr>
 </table>
 
+<!-- Order Summary Table -->
 <table class="order-summary">
     <thead>
         <tr>
             <th class="center-align">SN</th>
-            <th>Photo</th>
             <th>Product Name</th>
             <th class="center-align">Qty</th>
             <th class="right-align">Unit Price (Rs.)</th>
@@ -56,3 +55,18 @@
         </tr>
     </thead>
     <tbody>
+        <!-- Loop through order items -->
+        @foreach($q_items as $index => $item)
+        <tr>
+            <td class="center-align">{{ $index + 1 }}</td>
+            <td>{{ $item->product_name }}</td>
+            <td class="center-align">{{ $item->quantity }}</td>
+            <td class="right-align">₹ {{ number_format($item->rate, 2) }}</td>
+            <td class="right-align">₹ {{ number_format($item->total, 2) }}</td>
+        </tr>
+        @endforeach
+    </tbody>
+</table>
+
+</body>
+</html>
