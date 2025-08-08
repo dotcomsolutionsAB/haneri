@@ -42,7 +42,7 @@ class InvoiceController extends Controller
         $sanitizedOrderId = trim($sanitizedOrderId, '-');
 
         // Define file path for storing the PDF
-        $publicPath = 'uploads/invoice_quotations/';
+        $publicPath = 'upload/invoice_quotations/';
         $fileName = 'invoice_' . $sanitizedOrderId . '.pdf';
         $filePath = storage_path('app/public/' . $publicPath . $fileName);
 
