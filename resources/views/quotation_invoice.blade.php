@@ -56,7 +56,6 @@
 {{-- Footer --}}
 <div class="footer">
     <p>Thank you for doing business with us!</p>
-    <p>If you have any questions, please contact us.</p>
 </div>
 
 </body>
