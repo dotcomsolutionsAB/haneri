@@ -257,9 +257,8 @@
                         <table width="100%">
                             <tr>
                                 <td style="width: 40px;">
-                                    <!-- @if ($base64Image) -->
                                         <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" class="product-image">
-                                    <!-- @endif -->
+                                    
                                 </td>
                                 <td class="product-info" style="text-align: left;">
                                     <strong>{{ $item->product_name }}</strong>
