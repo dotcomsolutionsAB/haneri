@@ -83,7 +83,7 @@ class QuotationController extends Controller
             DB::commit();
 
             // Now generate the invoice and store the file path
-            $invoiceUrl = $this->generateInvoice($quotation);
+            $invoiceUrl = $invoiceController->generateQuotationInvoice($quotation);
 
             // Store the invoice URL in the QuotationModel
             $quotation->update(['invoice_quotation' => $invoiceUrl]);
