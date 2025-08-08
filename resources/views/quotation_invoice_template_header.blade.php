@@ -57,6 +57,7 @@
     <tbody>
         <!-- Loop through order items -->
         @foreach($q_items as $index => $item)
+        dd($item);
         <tr>
             <td class="center-align">{{ $index + 1 }}</td>
             <td>{{ $item->product_name }}</td>
