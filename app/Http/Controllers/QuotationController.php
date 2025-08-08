@@ -18,7 +18,7 @@ class QuotationController extends Controller
 {
     //
     // Store a new quotation
-    public function store(Request $request)
+    public function store(Request $request, InvoiceController $invoiceController)
     {
         // Validate request data
         $request->validate([
