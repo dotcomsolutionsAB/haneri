@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 use App\Models\QuotationModel;
 use App\Models\QuotationItemModel;
+use Illuminate\Support\Facades\File;
+use Mpdf\Mpdf;
 use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
@@ -41,7 +43,7 @@ class InvoiceController extends Controller
         }
 
         // Generate the PDF using mPDF
-        $mpdf = new \Mpdf\Mpdf();
+        $mpdf = new Mpdf();
 
         // Render the header
         $mpdf->WriteHTML(view('quotation_invoice_template_header', ['customer_name' => $q_name, 'customer_email' => $q_email, 'customer_number' => $q_number, 'customer_address' => $q_address, 'quotation' => $quotation])->render());
