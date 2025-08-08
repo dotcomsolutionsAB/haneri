@@ -24,7 +24,7 @@ class InvoiceController extends Controller
         // $q_items = QuotationItemModel::where('quotation_id', $quotation->id)->get();
 
         $q_items = QuotationItemModel::with(['product' => function ($q) {
-            $q->select('id', 'name as product_name', 'product_code');
+            $q->select('id', 'name as product_name');
         }])
         ->where('quotation_id', $quotation->id)
         ->get()
