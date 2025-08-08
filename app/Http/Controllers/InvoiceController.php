@@ -21,7 +21,23 @@ class InvoiceController extends Controller
         $q_mobile = $quotation->q_mobile;
         $q_address = $quotation->q_address;
 
-        $q_items = QuotationItemModel::where('quotation_id', $quotation->id)->get();
+        // $q_items = QuotationItemModel::where('quotation_id', $quotation->id)->get();
+
+        $q_items = QuotationItemModel::with(['product' => function ($q) {
+            $q->select('id', 'name as product_name', 'product_code');
+        }])
+        ->where('quotation_id', $quotation->id)
+        ->get()
+        ->map(function ($item) {
+            // add the virtual fields your template expects
+            $item->product_name = $item->product->product_name ?? '';
+            $item->rate         = $item->price;
+            $item->total        = $item->price * $item->quantity;
+            // size & remarks – if they live on the product, load them here
+            $item->size         = $item->product->size ?? '';
+            $item->remarks      = $item->product->remarks ?? '';
+            return $item;
+        });
 
         // Sanitize the order ID for the file name
         $sanitizedOrderId = preg_replace('/[^A-Za-z0-9]+/', '-', trim($quotation->order_id));
