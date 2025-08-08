@@ -2,6 +2,7 @@
     <td class="center-align">{{ $index + 1 }}</td>
     <td><img src="{{ Storage::url('uploads/products_pdf/' . $item->product_code . '.jpg') }}" alt="Product Image" style="height: 60px; width: 60px;"></td>
     <td>
+        dd($item);
     {{ $item->product_name }}<br>
     Part No: {{ $item->product->product_code }}<br>
 
