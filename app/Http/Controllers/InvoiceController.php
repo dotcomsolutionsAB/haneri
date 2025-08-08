@@ -75,7 +75,7 @@ print_r($chunk);
             foreach ($chunk as $item) {
                 echo "<pre>";
                 print_r($item);
-                $mpdf->WriteHTML(view('quotation_invoice_template_items', compact('item'))->render());
+                $mpdf->WriteHTML(view('quotation_invoice_template_items', compact('item', 'index'))->render());
             }
             flush();
         });
