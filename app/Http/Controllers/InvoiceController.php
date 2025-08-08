@@ -72,7 +72,7 @@ class InvoiceController extends Controller
                 return;
             }
 print_r($chunk);
-            foreach ($chunk as $item) {
+            foreach ($chunk as $index => $item) {
                 echo "<pre>";
                 print_r($item);
                 $mpdf->WriteHTML(view('quotation_invoice_template_items', compact('item', 'index'))->render());
