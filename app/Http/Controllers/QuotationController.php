@@ -56,7 +56,7 @@ class QuotationController extends Controller
             // Create the quotation record
             $quotation = QuotationModel::create([
                 'user_id' => $user_id,
-                'total_amount' => $totalAmount,
+                'total_amount' => (float)$totalAmount,
                 'q_user' => $request->input('q_user'),
                 'q_email' => $request->input('q_email'),
                 'q_mobile' => $request->input('q_mobile'),
