@@ -22,4 +22,10 @@ class ProductVariantModel extends Model
     {
         return $this->belongsTo(ProductModel::class, 'product_id', 'id'); // product_id references id in Product table
     }
+
+    /* optional: all quotation items that picked this variant */
+    public function quotationItems()
+    {
+        return $this->hasMany(QuotationItemModel::class, 'variant_id');
+    }
 }

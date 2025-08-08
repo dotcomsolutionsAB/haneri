@@ -18,4 +18,10 @@ class QuotationItemModel extends Model
     {
         return $this->belongsTo(ProductModel::class, 'product_id');
     }
+
+    /* chosen variant */
+    public function variant()
+    {
+        return $this->belongsTo(ProductVariantModel::class, 'variant_id');
+    }
 }

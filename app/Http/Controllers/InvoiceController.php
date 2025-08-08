@@ -23,21 +23,20 @@ class InvoiceController extends Controller
 
         // $q_items = QuotationItemModel::where('quotation_id', $quotation->id)->get();
 
-        $q_items = QuotationItemModel::with(['product' => function ($q) {
-            $q->select('id', 'name as product_name');
-        }])
-        ->where('quotation_id', $quotation->id)
-        ->get()
-        ->map(function ($item) {
-            // add the virtual fields your template expects
-            $item->product_name = $item->product->product_name ?? '';
-            $item->rate         = $item->price;
-            $item->total        = $item->price * $item->quantity;
-            // size & remarks – if they live on the product, load them here
-            $item->size         = $item->product->size ?? '';
-            $item->remarks      = $item->product->remarks ?? '';
-            return $item;
-        });
+        $q_items = QuotationItemModel::with([
+                'product:id,name,product_code',
+                'variant:id,product_id,variant_value,regular_price,discount_price'
+            ])
+            ->where('quotation_id', $quotation->id)
+            ->get()
+            ->map(function ($item) {
+                $item->product_name = $item->product->name ?? '';
+                $item->product_code = $item->product->product_code ?? '';
+                $item->variant_value = $item->variant->variant_value ?? '';
+                $item->rate = $item->price;
+                $item->total = $item->price * $item->quantity;
+                return $item;
+            });
 
         // Sanitize the order ID for the file name
         $sanitizedOrderId = preg_replace('/[^A-Za-z0-9]+/', '-', trim($quotation->order_id));
