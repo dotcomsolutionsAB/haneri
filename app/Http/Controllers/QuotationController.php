@@ -52,7 +52,6 @@ class QuotationController extends Controller
 
             // Round the total amount to 2 decimal places for currency
             $totalAmount = round($totalAmount, 2);
-            dd($totalAmount);
 
             // Create the quotation record
             $quotation = QuotationModel::create([
