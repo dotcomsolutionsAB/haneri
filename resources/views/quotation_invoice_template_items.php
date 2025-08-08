@@ -1,7 +1,6 @@
 <tr>
     <tr>
     <td>{{ $index + 1 }}</td>
-    <td>{{ $item->product_name }} ({{ $item->product_code }})</td>
     <td>{{ $item->variant_value }}</td>
     <td>{{ $item->quantity }}</td>
     <td>₹ {{ number_format($item->rate, 2) }}</td>

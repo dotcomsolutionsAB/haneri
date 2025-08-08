@@ -85,7 +85,7 @@ class InvoiceController extends Controller
                 // Skip processing if the chunk is empty
                 return;
             }
-print_r($chunk);
+        print_r($chunk);
             foreach ($chunk as $index => $item) {
                 echo "<pre>";
                 print_r($index);
