@@ -195,13 +195,13 @@
         <table width="100%">
             <tr>
                 <td class="w-50">
-                    @php
+                    <!-- @php
                         $logoPath = public_path('https://haneri.com/images/Haneri%20Logo.png');
                         $logoType = pathinfo($logoPath, PATHINFO_EXTENSION);
                         $logoData = file_get_contents($logoPath);
                         $logoBase64 = 'data:image/' . $logoType . ';base64,' . base64_encode($logoData);
-                    @endphp
-                    <img src="{{ $logoBase64 }}" alt="Logo" class="logo">
+                    @endphp -->
+                    <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Logo" class="logo">
                 </td>
                 <td class="w-50 text-right">
                     <strong>QUOTATION NUMBER:</strong> #HAN-20250001<br>
@@ -267,7 +267,7 @@
             </thead>
             <tbody>
                 @foreach($q_items as $item)
-                @php
+                <!-- @php
                     $base64Image = null;
                     if (!empty($item->image_link)) {
                         $imagePath = public_path('https://haneri.com/images/Haneri%20Logo.png');
@@ -277,16 +277,16 @@
                             $base64Image = 'data:image/' . $type . ';base64,' . base64_encode($data);
                         }
                     }
-                @endphp
+                @endphp -->
                 <tr>
-                    <td>{{ $loop->iteration }}</td>
+                    <!-- <td>{{ $loop->iteration }}</td> -->
                     <td>
                         <table width="100%">
                             <tr>
                                 <td style="width: 40px;">
-                                    @if ($base64Image)
-                                        <img src="{{ $base64Image }}" class="product-image">
-                                    @endif
+                                    <!-- @if ($base64Image) -->
+                                        <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" class="product-image">
+                                    <!-- @endif -->
                                 </td>
                                 <td class="product-info" style="text-align: left;">
                                     <strong>{{ $item->product_name }}</strong>
@@ -325,12 +325,12 @@
         $invoiceUrl = $order->invoice_link;
     @endphp -->
     <table width="100%" style="margin-top: 40px; padding: 20px 40px;">
-        @php
+        <!-- @php
             $signLogoPath = public_path('https://haneri.com/images/Haneri%20Logo.png'); // same logo or a small variant
             $signLogoType = pathinfo($signLogoPath, PATHINFO_EXTENSION);
             $signLogoData = file_get_contents($signLogoPath);
             $signLogoBase64 = 'data:image/' . $signLogoType . ';base64,' . base64_encode($signLogoData);
-        @endphp
+        @endphp -->
         <tr>
             
             <td style="width: 50%; text-align: left;">
@@ -340,7 +340,7 @@
             <td style="width: 50%; text-align: right; vertical-align: bottom;">
                 <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
                 <div style="margin-bottom: 10px; font-size: 12px;">Authorized Signatory</div>
-                <img src="{{ $signLogoBase64 }}" alt="Signature Logo" style="height: 40px;"><br>
+                <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Signature Logo" style="height: 40px;"><br>
                 <div style="font-size: 11px; margin-top: 2px;"><strong>HANERI ELECTRICALS LLP</strong></div>
             </td>
         </tr>
