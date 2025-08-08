@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\QuotationModel;
 use App\Models\QuotationItemModel;
 use App\Models\CartModel;
+use App\Models\ProductVariantModel;
 use App\Models\User;
 use DB;
 use App\Http\Controllers\RazorpayController;
@@ -28,16 +29,6 @@ class QuotationController extends Controller
         $user = Auth::user(); // Get the user object
         $user_id = $user->id; // Extract the user ID
 
-        // // Fetch user details from User model
-        // $quotationUser = User::find($user_id);
-        // if (!$quotationUser) {
-        //     return response()->json(['message' => 'User not found.'], 404);
-        // }
-
-        // $user_name = $quotationUser->name;  // Fetch name
-        // $user_email = $quotationUser->email;  // Fetch email
-        // $user_phone = $quotationUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
-
         // Start a transaction to ensure all operations are atomic
         DB::beginTransaction();
 
@@ -58,30 +49,13 @@ class QuotationController extends Controller
                 $totalAmount += $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) *$cartItem->quantity;
             }
 
-
-            // Call Razorpay quotation API Before Saving quotation in DB**
-            // $razorpayController = new RazorpayController(); 
-            // $razorpayRequest = new Request([
-            //     'amount' => $totalAmount,
-            //     'currency' => 'INR'
-            // ]);
-            // $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
-
-            // // Decode Razorpay response
-            // $razorpayData = json_decode($razorpayResponse->getContent(), true);
-            // if (!$razorpayData['success']) {
-            //     DB::rollBack();
-            //     return response()->json(['message' => 'Failed to create Razorpay quotation.'], 500);
-            // }
+             // Round the total amount to 2 decimal places for currency
+            $totalAmount = round($totalAmount, 2);
 
             // Create the quotation record
             $quotation = QuotationModel::create([
                 'user_id' => $user_id,
                 'total_amount' => $totalAmount,
-                // 'status' => $request->input('status', 'pending'),
-                // 'payment_status' => $request->input('payment_status', 'pending'),
-                // 'shipping_address' => $request->input('shipping_address'),
-                // 'razorpay_order_id' => $razorpayData['order']['id'],
                 'q_user' => $request->input('q_user'),
                 'q_email' => $request->input('q_email'),
                 'q_mobile' => $request->input('q_mobile'),
@@ -91,7 +65,7 @@ class QuotationController extends Controller
             // Iterate through each cart item to add it to the order items table
             foreach($cartItems as $cartItem)
             {
-                // Create the order item record
+                // Create the quotation record
                 QuotationItemModel::create([
                     'quotation_id' => $quotation->id, // Link to the created order
                     'product_id' => $cartItem->product_id,
@@ -113,10 +87,6 @@ class QuotationController extends Controller
                 'data' => [
                     'quotation' => $quotation->id,
                     'total_amount' => $quotation->total_amount,
-                    // 'status' => $quotation->status,
-                    // 'payment_status' => $quotation->payment_status,
-                    // 'shipping_address' => $quotation->shipping_address,
-                    // 'razorpay_order_id' => $quotation->razorpay_quotation_id,
                     'name' => $quotation->q_user,
                     'email' => $quotation->q_email, 
                     'phone' => $quotation->q_mobile, 
@@ -145,11 +115,11 @@ class QuotationController extends Controller
     private function getFinalPrice($product_id, $variant_id = null)
     {
         // Fetch product details
-        $product = \App\Models\ProductModel::find($product_id);
+        $product = ProductModel::find($product_id);
 
         if ($variant_id) {
             // Fetch variant details
-            $variant = \App\Models\ProductVariantModel::find($variant_id);
+            $variant = ProductVariantModel::find($variant_id);
             
             if ($variant) {
                 // Calculate discounted price for the variant based on percentage discount
@@ -158,8 +128,6 @@ class QuotationController extends Controller
 
                 // Apply the discount (calculate price after discount)
                 $discountedPrice = $regularPrice - ($regularPrice * ($discount / 100));
-
-                // dd($discountedPrice);
 
                 // Return the discounted price as a float, ensuring it doesn't go below 0
                 return max(0, (float)$discountedPrice); // Ensure price doesn't go below 0
@@ -210,7 +178,6 @@ class QuotationController extends Controller
     // View details of a single quotation
     public function show($id)
     {
-        dd("aaa");
         $user = Auth::user();
 
         // Fetch the quotation by ID for the user
