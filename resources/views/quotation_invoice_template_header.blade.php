@@ -30,20 +30,17 @@
 
 <table class="customer-info">
     <tr>
-        <td>Client:</td><td>{{ $user->name }}</td>
-        <td>Client:</td><td>{{ $user->email }}</td>
+        <td>Client:</td><td>{{ $q_name }}</td>
+        <td>Client:</td><td>{{ $q_email }}</td>
         <td>Order ID:</td><td>{{ $order->order_id }}</td>
     </tr>
     <tr>
-        <td>Address:</td><td>{{ $user->address_line_1 }} {{ $user->address_line_2 }}</td>
+        <td>Address:</td><td>{{ $q_address }}</td>
         <td>Order Date:</td><td>{{ \Carbon\Carbon::parse($order->order_date)->format('d-m-Y') }}</td>
     </tr>
     <tr>
-        <td>Mobile:</td><td>{{ $user->mobile }}</td>
+        <td>Mobile:</td><td>{{ $q_mobile }}</td>
         <td>Type:</td><td>{{ strtoupper($order->type) }}</td>
-    </tr>
-    <tr>
-        <td colspan="4" class="value" style="background: {{ $order->remarks ? 'yellow' : 'white' }};"><strong>Remarks:</strong> {{ $order->remarks }}</td>
     </tr>
 </table>
 
