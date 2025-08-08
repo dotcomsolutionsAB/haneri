@@ -47,7 +47,7 @@ class InvoiceController extends Controller
 
         // Render the header
         $mpdf->WriteHTML(view('quotation_invoice_template_header', [
-            'q_user' => $q_user,
+            'q_user' => $q_name,
             'q_email' => $q_email,
             'q_mobile' => $q_mobile,
             'q_address' => $q_address,
