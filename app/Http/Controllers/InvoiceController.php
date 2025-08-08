@@ -51,7 +51,8 @@ class InvoiceController extends Controller
             'q_email' => $q_email,
             'q_mobile' => $q_mobile,
             'q_address' => $q_address,
-            'quotation' => $quotation
+            'quotation' => $quotation,
+            'q_items' => $q_items
         ])->render());
 
         // Render the order items in chunks of 10 per page
