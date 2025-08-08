@@ -161,13 +161,10 @@ class QuotationController extends Controller
                 $regularPrice = $variant->regular_price;
                 $discount = $variant->customer_discount ?? 0; // Default to 0 if no discount is set
 
-                // print_r($regularPrice);
-                // print_r($discount);
-
                 // Apply the discount (calculate price after discount)
                 $discountedPrice = number_format($regularPrice - ($regularPrice * ($discount / 100)), 0);
-                dd(floatval($discountedPrice));
-                return max(0, floatval($discountedPrice)); // Ensure price doesn't go below 0
+                
+                return max(0, (float)($discountedPrice)); // Ensure price doesn't go below 0
             }
             return 0; // Return 0 if variant not found
         }
