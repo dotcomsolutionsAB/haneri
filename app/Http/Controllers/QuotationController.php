@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\QuotationModel;
 use App\Models\QuotationItemModel;
 use App\Models\CartModel;
+use App\Models\ProductModel;
 use App\Models\ProductVariantModel;
 use App\Models\User;
 use DB;
