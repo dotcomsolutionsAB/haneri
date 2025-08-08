@@ -55,6 +55,10 @@ class QuotationController extends Controller
 
             foreach($cartItems as $cartItem)
             {
+                print_r($cartItem->quantity);
+                echo "<pre>";
+                print_r($this->getFinalPrice($cartItem->product_id, $cartItem->variant_id));
+                echo "<pre>";
                 dd($this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) *$cartItem->quantity);
                 $totalAmount += $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) *$cartItem->quantity;
             }
