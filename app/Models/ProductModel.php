@@ -72,4 +72,12 @@ class ProductModel extends Model
     {
         return $this->hasMany(OrderItemModel::class, 'product_id', 'id');
     }
+
+    /**
+     * One product can appear in many quotation items.
+     */
+    public function quotationItems()
+    {
+        return $this->hasMany(QuotationItemModel::class, 'product_id');
+    }
 }
