@@ -24,6 +24,7 @@ class InvoiceController extends Controller
         $q_items = QuotationItemModel::where('quotation_id', $quotation->id)->get();
         echo "<pre>";
         print_r($q_items);
+        dd("lll");
 
         // Sanitize the order ID for the file name
         $sanitizedOrderId = preg_replace('/[^A-Za-z0-9]+/', '-', trim($quotation->order_id));
