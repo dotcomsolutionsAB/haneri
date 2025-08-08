@@ -16,7 +16,7 @@ class InvoiceController extends Controller
         $quotation = QuotationModel::where('id', $quotation->id)->first();
 
         // Extract the required fields from the quotation
-        $q_user = $quotation->q_user;
+        $q_name = $quotation->q_user;
         $q_email = $quotation->q_email;
         $q_mobile = $quotation->q_mobile;
         $q_address = $quotation->q_address;
