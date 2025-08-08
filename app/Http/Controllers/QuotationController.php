@@ -18,7 +18,7 @@ class QuotationController extends Controller
 {
     //
     // Store a new quotation
-    public function store(Request $request, InvoiceController $invoiceController)
+    public function store(Request $request)
     {
         // Validate request data
         $request->validate([
@@ -84,7 +84,8 @@ class QuotationController extends Controller
             DB::commit();
 
             // Now generate the invoice and store the file path
-            $invoiceUrl = $invoiceController->generateQuotationInvoice($quotation);
+            $generate_quotation_order = new InvoiceControllerZP();
+            $invoiceUrl = $generate_quotation_order->generateQuotationInvoice($quotation);
 
             // Store the invoice URL in the QuotationModel
             $quotation->update(['invoice_quotation' => $invoiceUrl]);
