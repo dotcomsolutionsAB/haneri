@@ -181,7 +181,7 @@
 </head>
 <body>
 
-    {{-- Background image --}}
+    <!-- {{-- Background image --}} -->
     <!-- @php
         $bgPath = public_path('logos/flower-removebg-preview.png');
         $bgType = pathinfo($bgPath, PATHINFO_EXTENSION);
@@ -190,7 +190,7 @@
     @endphp -->
     <!-- <img src="{{ $bgBase64 }}" class="bg-image" /> -->
 
-    {{-- Header --}}
+    <!-- {{-- Header --}} -->
     <div class="header">
         <table width="100%">
             <tr>
@@ -211,7 +211,7 @@
         </table>
     </div>
 
-    {{-- Quotation Label --}}
+    <!-- {{-- Quotation Label --}} -->
     <div class="content">
         <table class="invoice-title">
             <tr>
@@ -225,7 +225,7 @@
             </tr>
         </table>
 
-        {{-- Bill Details --}}
+        <!-- {{-- Bill Details --}} -->
         <table width="100%" style="table-layout: fixed; margin-top: 5px; font-family: 'DejaVu Sans', sans-serif; font-size: 12px;">
             <tr>
                 <!-- Left Box -->
@@ -253,7 +253,7 @@
             </tr>
         </table>
 
-        {{-- Items --}}
+        <!-- {{-- Items --}} -->
         <table class="item_table">
             <thead>
                 <tr>
@@ -307,7 +307,7 @@
             </tbody>
         </table>
 
-        {{-- Summary --}}
+        <!-- {{-- Summary --}} -->
         <!-- <div class="summary">
             @php
                 $subtotal = $order->grand_total - $order->tax_price - $order->shipping_charge;
@@ -319,8 +319,8 @@
             <h4 class="grand-total">GRAND TOTAL: ₹{{ number_format($order->grand_total, 2) }}</h4>
         </div> -->
     </div>
-
-    {{-- Signature Section --}}
+<!-- 
+    {{-- Signature Section --}} -->
     <!-- @php
         $invoiceUrl = $order->invoice_link;
     @endphp -->
@@ -346,7 +346,7 @@
         </tr>
     </table>
 
-    {{-- Footer Area --}}
+    <!-- {{-- Footer Area --}} -->
     <div class="footer" style="font-size: 11px; line-height: 1.5;">
         <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
         Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
