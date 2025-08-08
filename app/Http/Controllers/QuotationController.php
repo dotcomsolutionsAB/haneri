@@ -22,9 +22,9 @@ class QuotationController extends Controller
         // Validate request data
         $request->validate([
             'q_user' => 'required|string',
-            'q_email' => 'required|string',
+            'q_email' => 'nullable|email',
             'q_mobile' => 'nullable|string',
-            'q_address' => 'required|string',
+            'q_address' => 'nullable|string',
         ]);
 
         $user = Auth::user(); // Get the user object
@@ -82,6 +82,12 @@ class QuotationController extends Controller
             // Commit the transaction
             DB::commit();
 
+            // Now generate the invoice and store the file path
+            $invoiceUrl = $this->generateInvoice($quotation);
+
+            // Store the invoice URL in the QuotationModel
+            $quotation->update(['invoice_quotation' => $invoiceUrl]);
+
             // Prepare response
             $response = [
                 'message' => 'Quotation created successfully!',
@@ -92,6 +98,7 @@ class QuotationController extends Controller
                     'email' => $quotation->q_email, 
                     'phone' => $quotation->q_mobile, 
                     'phone' => $quotation->q_mobile, 
+                    'invoice_quotation' => $invoiceUrl,
                 ]
             ];
 
