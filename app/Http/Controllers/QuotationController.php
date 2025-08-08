@@ -12,6 +12,7 @@ use App\Models\User;
 use DB;
 use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\InvoiceController;
 
 class QuotationController extends Controller
 {
