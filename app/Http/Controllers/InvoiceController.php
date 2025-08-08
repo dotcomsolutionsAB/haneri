@@ -46,7 +46,7 @@ class InvoiceController extends Controller
         $mpdf = new Mpdf();
 
         // Render the header
-        $mpdf->WriteHTML(view('quotation_invoice_template_header', ['customer_name' => $q_name, 'customer_email' => $q_email, 'customer_number' => $q_number, 'customer_address' => $q_address, 'quotation' => $quotation])->render());
+        $mpdf->WriteHTML(view('quotation_invoice_template_header', ['customer_name' => $q_name, 'customer_email' => $q_email, 'customer_number' => $q_mobile, 'customer_address' => $q_address, 'quotation' => $quotation])->render());
 
         // Render the order items in chunks of 10 per page
         foreach ($q_items->chunk(10) as $chunk) {
