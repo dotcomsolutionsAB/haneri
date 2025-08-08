@@ -164,7 +164,7 @@ class QuotationController extends Controller
                 // Apply the discount (calculate price after discount)
                 $discountedPrice = $regularPrice - ($regularPrice * ($discount / 100));
 
-                dd($discountedPrice);
+                // dd($discountedPrice);
 
                 // Return the discounted price as a float, ensuring it doesn't go below 0
                 return max(0, (float)$discountedPrice); // Ensure price doesn't go below 0
