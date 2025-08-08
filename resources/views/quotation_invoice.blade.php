@@ -240,7 +240,7 @@
         <table class="item_table">
             <thead>
                 <tr>
-                    <th>##</th>
+                    <!-- <th>##</th> -->
                     <th>ITEM</th>
                     <th>VARIATION</th>
                     <th>RATE</th>
