@@ -222,10 +222,10 @@
                         <strong>Billed To:</strong><br>
                         <strong>{{ $q_name }}</strong><br>
                         {{ $q_email }}<br>
-                        Tel: {{ $q_mobile }}<br>
+                        Tel: {{ $q_mobile ?? '+91 xxxxx-xxxxx' }}<br>
 
                         <strong>Ship To:</strong><br>
-                        {{ q_address }} <br>
+                        {{ $q_address }} , INDIA<br>
                     </div>
                 </td>
 
