@@ -68,5 +68,4 @@ class InvoiceController extends Controller
         // Return the file URL
         return $fileUrl;
     }
-
 }

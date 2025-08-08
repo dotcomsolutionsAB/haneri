@@ -12,6 +12,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
         "league/csv": "^9.18",
+        "mpdf/mpdf": "^8.2",
         "razorpay/razorpay": "^2.9"
     },
     "require-dev": {
