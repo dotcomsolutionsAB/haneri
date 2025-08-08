@@ -66,6 +66,7 @@ class InvoiceController extends Controller
         // }
 
         $q_items->chunk(10)->each(function ($chunk) use ($mpdf) {
+            dd($chunk);
             foreach ($chunk as $item) {
                 $mpdf->WriteHTML(view('quotation_invoice_template_items', compact('item'))->render());
             }
