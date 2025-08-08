@@ -65,13 +65,19 @@ class InvoiceController extends Controller
         //     flush();
         // }
 
+        // Render the order items in chunks of 10 per page
         $q_items->chunk(10)->each(function ($chunk) use ($mpdf) {
-            dd($chunk);
+            if ($chunk->isEmpty()) {
+                // Skip processing if the chunk is empty
+                return;
+            }
+
             foreach ($chunk as $item) {
                 $mpdf->WriteHTML(view('quotation_invoice_template_items', compact('item'))->render());
             }
             flush();
         });
+
 
         // Render the footer
         $mpdf->WriteHTML(view('quotation_invoice_template_footer', ['quotation' => $quotation])->render());
