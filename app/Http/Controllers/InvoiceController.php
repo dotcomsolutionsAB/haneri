@@ -1,7 +1,8 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Models\QuotationModel;
+use App\Models\QuotationItemModel;
 use Illuminate\Http\Request;
 
 class InvoiceController extends Controller
