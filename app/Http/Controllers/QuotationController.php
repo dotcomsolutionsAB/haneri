@@ -13,6 +13,7 @@ use DB;
 use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\InvoiceController;
+use Illuminate\Support\Facades\Storage;
 
 class QuotationController extends Controller
 {
@@ -232,6 +233,15 @@ class QuotationController extends Controller
                     'success' => false,
                     'message' => 'Quotation not found!',
                 ], 404);
+            }
+
+            // --- delete the PDF file ---
+            if ($quotation->invoice_quotation) {
+                // convert public URL -> relative storage path
+                // e.g.  https://api.haneri.com/storage/upload/invoice_quotations/invoice_Q-123.pdf
+                //  ->  upload/invoice_quotations/invoice_Q-123.pdf
+                $relativePath = Str::after($quotation->invoice_quotation, '/storage/');
+                Storage::disk('public')->delete($relativePath);
             }
 
             // Delete related order items
