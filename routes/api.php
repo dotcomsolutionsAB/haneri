@@ -83,20 +83,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/update', [UserController::class, 'update']);     // Update user details
     });
     
-    // for architect
-    // Route::middleware('role:architect')->group(function () {
-        
-    //     // Quotation Routes
-    //     Route::prefix('quotation')->group(function () {
-    //         Route::get('/fetch', [QuotationController::class, 'index']);            // List all orders for a user
-    //         Route::get('/{id}', [QuotationController::class, 'show']);         // Get details of a single order
-    //         Route::post('/', [QuotationController::class, 'store']);           // Create a new order
-    //         Route::delete('/{id}', [QuotationController::class, 'delete']);           // Create a new quotation
-    //     });
-    // });
-
-    // for dealer
-    // Route::middleware('role:dealer')->group(function () {
+    // for architect and dealer
     Route::middleware('role:architect,dealer')->group(function () {    
         // Quotation Routes
         Route::prefix('quotation')->group(function () {
