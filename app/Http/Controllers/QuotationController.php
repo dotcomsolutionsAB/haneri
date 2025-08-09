@@ -14,6 +14,7 @@ use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\InvoiceController;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class QuotationController extends Controller
 {
