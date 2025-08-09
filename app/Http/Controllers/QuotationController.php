@@ -256,7 +256,7 @@ class QuotationController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Quotation and corresponding items deleted successfully!',
+                'message' => 'Quotation, items and PDF file deleted successfully!',
             ], 200);
         } catch (\Exception $e) {
             // Rollback transaction in case of failure
