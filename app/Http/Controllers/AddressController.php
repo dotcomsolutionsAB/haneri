@@ -10,26 +10,50 @@ class AddressController extends Controller
 {
     //
     // List all addresses for a user
+    // public function index(Request $request)
+    // {
+    //     $user = Auth::user(); 
+
+    //     // If the user is an admin, validate user_id in the request
+    //     if ($user->role == 'admin') {
+    //         $request->validate([
+    //             'user_id' => 'required|integer|exists:users,id',
+    //         ]);
+    //         $user_id =  $request->input('user_id');
+    //     } else {
+    //         $user_id =  $user->id;
+    //     }
+
+    //     $addresses = AddressModel::where('user_id', $user_id)->get();
+
+    //     return $addresses->isNotEmpty()
+    //     ? response()->json(['message' => 'Addresses retrieved successfully!', 'data' => $addresses->makeHidden(['created_at', 'updated_at']), 'count' => count($addresses)], 200)
+    //     : response()->json(['message' => 'No address found.'], 400);
+
+    // }
+
     public function index(Request $request)
     {
-        $user = Auth::user(); 
+        try {
+            $user = Auth::user(); 
 
-        // If the user is an admin, validate user_id in the request
-        if ($user->role == 'admin') {
-            $request->validate([
-                'user_id' => 'required|integer|exists:users,id',
-            ]);
-            $user_id =  $request->input('user_id');
-        } else {
-            $user_id =  $user->id;
+            // If the user is an admin, validate user_id in the request
+            if ($user->role == 'admin') {
+                $request->validate([
+                    'user_id' => 'required|integer|exists:users,id',
+                ]);
+                $user_id =  $request->input('user_id');
+            } else {
+                $user_id =  $user->id;
+            }
+
+            $addresses = AddressModel::where('user_id', $user_id)->get();
+
+            return response()->json(['message' => 'Addresses retrieved successfully!', 'data' => $addresses->makeHidden(['created_at', 'updated_at']), 'count' => count($addresses)], 200);
+
+        } catch (\Throwable $e) {
+            return response()->json(['message' => 'Unable to retrieve addresses.', 'data' => [], 'count' => 0], 500);
         }
-
-        $addresses = AddressModel::where('user_id', $user_id)->get();
-
-        return $addresses->isNotEmpty()
-        ? response()->json(['message' => 'Addresses retrieved successfully!', 'data' => $addresses->makeHidden(['created_at', 'updated_at']), 'count' => count($addresses)], 200)
-        : response()->json(['message' => 'No address found.'], 400);
-
     }
 
     // Add a new address
