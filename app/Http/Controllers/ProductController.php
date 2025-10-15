@@ -98,26 +98,29 @@ class ProductController extends Controller
     // }
     public function uploadBanner(Request $request, int $variant)
     {
-        // Accept either multiple `banners[]` or single `banner`
+        // ✅ Accept banners[], banner[] (array), or banner (single)
         $request->validate([
-            'banners'   => 'nullable|array',
-            'banners.*' => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
-            'banner'    => 'nullable|file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+            'banners'    => 'nullable|array',
+            'banners.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+
+            'banner'     => 'nullable', // can be array or single file
+            'banner.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
         ]);
 
         $variant = ProductVariantModel::findOrFail($variant);
 
-        // normalize to array of UploadedFile
+        // ✅ Normalize files to an array
         $files = [];
         if ($request->hasFile('banners')) {
-            $files = $request->file('banners');
+            $files = $request->file('banners');              // banners[]
         } elseif ($request->hasFile('banner')) {
-            $files[] = $request->file('banner');
+            $b = $request->file('banner');                   // banner[] or banner
+            $files = is_array($b) ? $b : [$b];
         }
 
         if (empty($files)) {
             return response()->json([
-                'message' => 'No files received. Use "banners[]" for multiple or "banner" for single.',
+                'message' => 'No files received. Use "banners[]", "banner[]", or "banner".',
             ], 422);
         }
 
@@ -126,23 +129,22 @@ class ProductController extends Controller
             $newIds = [];
 
             foreach ($files as $file) {
-                $ext       = strtolower($file->getClientOriginalExtension());
-                $origName  = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                $base      = Str::slug($origName) ?: 'banner';
-                $filename  = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
+                $ext      = strtolower($file->getClientOriginalExtension());
+                $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                $base     = Str::slug($origName) ?: 'banner';
+                $filename = $base.'_'.now()->format('Ymd_His').'_'.Str::random(6).'.'.$ext;
 
-                // Save under public disk
-                $path = $file->storeAs('product_banners', $filename, 'public');
-                $url  = Storage::disk('public')->url($path); // needs: php artisan storage:link
+                // ✅ Save where you asked: storage/app/public/upload/product_banner/{filename}
+                $path = $file->storeAs('upload/product_banner', $filename, 'public');
+                $url  = Storage::disk('public')->url($path); // -> /storage/upload/product_banner/{filename}
 
-                // Create uploads row (t_uploads)
+                // t_uploads insert — adjust columns as per your schema
                 $upload = UploadModel::create([
                     'file_name' => $filename,
                     'file_path' => $path,
                     'file_url'  => $url,
                     'mime_type' => $file->getClientMimeType(),
                     'size_kb'   => (int) round($file->getSize() / 1024),
-                    // add other required columns if any (e.g., created_by, product_id, variant_id)
                 ]);
 
                 $newIds[] = (int) $upload->id;
@@ -158,11 +160,12 @@ class ProductController extends Controller
             DB::commit();
 
             return response()->json([
-                'message'          => 'Variant banners uploaded successfully.',
-                'variant_id'       => $variant->id,
-                'new_upload_ids'   => $newIds,
-                'all_banner_ids'   => $all,
-                'new_banners'      => UploadModel::whereIn('id', $newIds)->get(['id','file_name','file_url','mime_type','size_kb']),
+                'message'         => 'Variant banners uploaded successfully.',
+                'variant_id'      => $variant->id,
+                'new_upload_ids'  => $newIds,
+                'all_banner_ids'  => $all,
+                'new_banners'     => UploadModel::whereIn('id', $newIds)
+                                    ->get(['id','file_name','file_url','mime_type','size_kb']),
             ], 201);
 
         } catch (\Throwable $e) {
