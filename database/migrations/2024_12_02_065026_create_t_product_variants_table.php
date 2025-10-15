@@ -16,6 +16,7 @@ return new class extends Migration
             // $table->foreignId('product_id')->constrained('t_products');
             $table->integer('product_id');
             $table->string('photo_id')->nullable(); 
+            $table->string('banner_id')->nullable();
             $table->integer('min_qty')->default(1); // Minimum quantity to order
             $table->boolean('is_cod')->default(true); // Supports cash on delivery
             $table->decimal('weight', 8, 2)->nullable(); // Product weight in kg
