@@ -152,8 +152,8 @@ class ProductController extends Controller
             }
 
             // Merge into CSV field on the VARIANT
-            // $existing = array_filter(array_map('intval', explode(',', (string) $variant->banner_id)));
-            // $all      = array_values(array_unique(array_merge($existing, $newIds)));
+            $existing = array_filter(array_map('intval', explode(',', (string) $variant->banner_id)));
+            $all      = array_values(array_unique(array_merge($existing, $newIds)));
 
             $variant->banner_id = implode(',', $all);
             $variant->save();
@@ -164,7 +164,7 @@ class ProductController extends Controller
                 'message'        => 'Variant banners uploaded successfully.',
                 'variant_id'     => $variant->id,
                 'new_upload_ids' => $newIds,
-                // 'all_banner_ids' => $all,
+                'all_banner_ids' => $all,
                 // Return only columns that actually exist
                 'new_banners'    => UploadModel::whereIn('id', $newIds)
                                     ->get(['id', 'file_path', 'type', 'size', 'alt_text']),
