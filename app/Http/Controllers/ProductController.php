@@ -20,84 +20,6 @@ use Auth;
 class ProductController extends Controller
 {
     //upload product banner
-    // public function uploadBanner(Request $request, int $product)
-    // {
-    //     // Accept either `banners[]` (multiple) or a single `banner`
-    //     $request->validate([
-    //         'banners'   => 'nullable|array',
-    //         'banners.*' => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
-    //         'banner'    => 'nullable|file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
-    //     ]);
-
-    //     $product = ProductModel::findOrFail($product);
-
-    //     // normalize to an array of UploadedFile
-    //     $files = [];
-    //     if ($request->hasFile('banners')) {
-    //         $files = $request->file('banners');
-    //     } elseif ($request->hasFile('banner')) {
-    //         $files = [$request->file('banner')];
-    //     }
-
-    //     if (empty($files)) {
-    //         return response()->json([
-    //             'message' => 'No files received. Use "banners[]" for multiple or "banner" for single.',
-    //         ], 422);
-    //     }
-
-    //     DB::beginTransaction();
-    //     try {
-    //         $newIds = [];
-
-    //         foreach ($files as $file) {
-    //             $ext       = strtolower($file->getClientOriginalExtension());
-    //             $origName  = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-    //             $base      = Str::slug($origName) ?: 'banner';
-    //             $filename  = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
-
-    //             // store the file in the public disk
-    //             $path = $file->storeAs('product_banners', $filename, 'public');
-    //             $url  = Storage::disk('public')->url($path); // requires: php artisan storage:link
-
-    //             // insert into uploads table (adjust columns to your schema)
-    //             $upload = UploadModel::create([
-    //                 'file_name' => $filename,
-    //                 'file_path' => $path,   // e.g. product_banners/abc_20251015_203012_ab12cd.jpg
-    //                 'file_url'  => $url,    // e.g. /storage/product_banners/...
-    //                 'mime_type' => $file->getClientMimeType(),
-    //                 'size_kb'   => (int) round($file->getSize() / 1024),
-    //                 // add any other required fields (e.g., created_by)
-    //             ]);
-
-    //             $newIds[] = (int) $upload->id;
-    //         }
-
-    //         // merge into CSV field
-    //         $existing = array_filter(array_map('intval', explode(',', (string) $product->banner_id)));
-    //         $all      = array_values(array_unique(array_merge($existing, $newIds)));
-
-    //         $product->banner_id = implode(',', $all);
-    //         $product->save();
-
-    //         DB::commit();
-
-    //         return response()->json([
-    //             'message'         => 'Banners uploaded successfully.',
-    //             'product_id'      => $product->id,
-    //             'new_upload_ids'  => $newIds,
-    //             'all_banner_ids'  => $all,
-    //             'new_banners'     => UploadModel::whereIn('id', $newIds)->get(['id','file_name','file_url','mime_type','size_kb']),
-    //         ], 201);
-
-    //     } catch (\Throwable $e) {
-    //         DB::rollBack();
-    //         return response()->json([
-    //             'message' => 'Failed to upload banners.',
-    //             'error'   => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
-
     public function uploadBanner(Request $request, int $variant)
     {
         // Accept banners[], banner[] (array), or banner (single)
@@ -293,7 +215,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
                 ])->findOrFail($id);
 
                 // $user = auth()->user();
@@ -340,6 +262,23 @@ class ProductController extends Controller
                     unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
                     $data['file_urls'] = $fileUrls;
 
+                    /* 4. banners (from banner_id CSV) */
+                    $bannerUrls = [];
+                    if (!empty($data['banner_id'])) {
+                        $bids = array_filter(explode(',', $data['banner_id']));
+                        $brows = UploadModel::whereIn('id', $bids)->get();
+                        $bannerUrls = $brows
+                            ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+                            ->filter()
+                            ->values()
+                            ->all();
+                    }
+                    unset($data['banner_id']);                // hide raw CSV like you did for photo_id
+                    $data['banner_urls'] = $bannerUrls;       // ✅ expose banner URLs
+
+                    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
+                    $data['file_urls'] = $fileUrls;
+
                     return $data;
                 });
 
@@ -371,7 +310,7 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
             ]);
 
             /* --- filters --- */
@@ -433,7 +372,25 @@ class ProductController extends Controller
                             ->all();
                     }
                     unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
+                    $data['file_urls'] = $fileUrls;                    
+
+                    // Banners
+                    $bannerUrls = [];
+                    if (!empty($data['banner_id'])) {
+                        $bids = array_filter(explode(',', $data['banner_id']));
+                        $brows = UploadModel::whereIn('id', $bids)->get();
+                        $bannerUrls = $brows
+                            ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+                            ->filter()
+                            ->values()
+                            ->all();
+                    }
+                    unset($data['banner_id']);
+                    $data['banner_urls'] = $bannerUrls;
+
+                    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
                     $data['file_urls'] = $fileUrls;
+                    
                     return $data;
                 });
                 $brand = $prod->brand?->name;
