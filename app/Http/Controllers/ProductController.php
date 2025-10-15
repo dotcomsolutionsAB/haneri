@@ -141,11 +141,13 @@ class ProductController extends Controller
 
                 // t_uploads insert — adjust columns as per your schema
                 $upload = UploadModel::create([
-                    'file_name' => $filename,
-                    'file_path' => $path,
-                    'file_url'  => $url,
-                    'mime_type' => $file->getClientMimeType(),
-                    'size_kb'   => (int) round($file->getSize() / 1024),
+                    'type'       => 'image',  // ✅ required field
+                    'file_name'  => $filename,
+                    'file_path'  => $path,
+                    'file_url'   => $url,
+                    'size'       => (int) round($file->getSize() / 1024),  // assuming column name is `size` not size_kb
+                    'mime_type'  => $file->getClientMimeType(),
+                    'alt_text'   => $filename, // ✅ use filename as alt text
                 ]);
 
                 $newIds[] = (int) $upload->id;
