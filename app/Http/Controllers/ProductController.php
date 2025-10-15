@@ -97,25 +97,25 @@ class ProductController extends Controller
     //         ], 500);
     //     }
     // }
+
     public function uploadBanner(Request $request, int $variant)
     {
-        // ✅ Accept banners[], banner[] (array), or banner (single)
+        // Accept banners[], banner[] (array), or banner (single)
         $request->validate([
             'banners'    => 'nullable|array',
             'banners.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
-
             'banner'     => 'nullable', // can be array or single file
             'banner.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
         ]);
 
         $variant = ProductVariantModel::findOrFail($variant);
 
-        // ✅ Normalize files to an array
+        // Normalize to an array of files
         $files = [];
         if ($request->hasFile('banners')) {
-            $files = $request->file('banners');              // banners[]
+            $files = $request->file('banners');          // banners[]
         } elseif ($request->hasFile('banner')) {
-            $b = $request->file('banner');                   // banner[] or banner
+            $b = $request->file('banner');               // banner[] or banner
             $files = is_array($b) ? $b : [$b];
         }
 
@@ -133,21 +133,19 @@ class ProductController extends Controller
                 $ext      = strtolower($file->getClientOriginalExtension());
                 $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
                 $base     = Str::slug($origName) ?: 'banner';
-                $filename = $base.'_'.now()->format('Ymd_His').'_'.Str::random(6).'.'.$ext;
+                $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
 
-                // ✅ Save where you asked: storage/app/public/upload/product_banner/{filename}
+                // Save to: storage/app/public/upload/product_banner/{filename}
                 $path = $file->storeAs('upload/product_banner', $filename, 'public');
-                $url  = Storage::disk('public')->url($path); // -> /storage/upload/product_banner/{filename}
+                // If you need a public URL at runtime, compute it with:
+                // $url = Storage::disk('public')->url($path);
 
-                // t_uploads insert — adjust columns as per your schema
+                // 🔧 EXACT INSERT YOU ASKED FOR (matches your schema)
                 $upload = UploadModel::create([
-                    'type'       => 'image',  // ✅ required field
-                    // 'file_name'  => $filename,
-                    'file_path'  => $path,
-                    // 'file_url'   => $url,
-                    'size'       => (int) round($file->getSize() / 1024),  // assuming column name is `size` not size_kb
-                    // 'mime_type'  => $file->getClientMimeType(),
-                    'alt_text'   => $filename, // ✅ use filename as alt text
+                    'type'      => 'image',
+                    'file_path' => $path,
+                    'size'      => (int) round($file->getSize() / 1024), // KB
+                    'alt_text'  => $filename,
                 ]);
 
                 $newIds[] = (int) $upload->id;
@@ -163,12 +161,13 @@ class ProductController extends Controller
             DB::commit();
 
             return response()->json([
-                'message'         => 'Variant banners uploaded successfully.',
-                'variant_id'      => $variant->id,
-                'new_upload_ids'  => $newIds,
-                'all_banner_ids'  => $all,
-                'new_banners'     => UploadModel::whereIn('id', $newIds)
-                                    ->get(['id','file_name','file_url','mime_type','size_kb']),
+                'message'        => 'Variant banners uploaded successfully.',
+                'variant_id'     => $variant->id,
+                'new_upload_ids' => $newIds,
+                'all_banner_ids' => $all,
+                // Return only columns that actually exist
+                'new_banners'    => UploadModel::whereIn('id', $newIds)
+                                    ->get(['id', 'file_path', 'type', 'size', 'alt_text']),
             ], 201);
 
         } catch (\Throwable $e) {
@@ -179,6 +178,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
 
     // Created
     public function store(Request $request)
