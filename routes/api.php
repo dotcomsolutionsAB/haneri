@@ -100,6 +100,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('products')->group(function () {
             Route::post('/register', [ProductController::class, 'store']);         // Add a new product (Admin only)
             Route::post('/{variant_id}/banners', [ProductController::class, 'uploadBanner']);
+            Route::post('/{variant}/photos', [ProductController::class, 'uploadPhotos']);
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
