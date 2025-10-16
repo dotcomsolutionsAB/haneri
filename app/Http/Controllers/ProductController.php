@@ -388,8 +388,11 @@ class ProductController extends Controller
                             'ProductPage_Color'  => 4
                         ];
 
+                        // Convert collection to array for sorting
+                        $browsArray = $brows->toArray();
+
                         // Sort banners based on the desired order
-                        usort($brows->toArray(), function($a, $b) use ($bannerOrder) {
+                        usort($browsArray, function($a, $b) use ($bannerOrder) {
                             // Extract the product page type from the file path
                             $aType = $this->getBannerType($a['file_path']);
                             $bType = $this->getBannerType($b['file_path']);
@@ -399,11 +402,12 @@ class ProductController extends Controller
                         });
 
                         // Map the sorted file paths to URLs
-                        foreach ($brows as $banner) {
-                            $bannerUrls[] = Storage::disk('public')->url($banner->file_path);
+                        foreach ($browsArray as $banner) {
+                            $bannerUrls[] = Storage::disk('public')->url($banner['file_path']);
                         }
                     }
                     $data['banner_urls'] = $bannerUrls;
+
 
                     /* 5. hide raw CSV & discount cols (do this ONCE) */
                     unset(
