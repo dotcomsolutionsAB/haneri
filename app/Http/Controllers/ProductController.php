@@ -242,7 +242,7 @@ class ProductController extends Controller
         // Add product variants
         if ($request->has('variants') && is_array($request->input('variants'))) {
             foreach ($request->input('variants') as $variant) {
-                ProductVariantModel::create([
+                $createdVariant = ProductVariantModel::create([
                     'product_id' => $product->id,
                     'photo_id' => $variant['photo_id'] ?? null,
                     'min_qty' => $variant['min_qty'] ?? 1,
