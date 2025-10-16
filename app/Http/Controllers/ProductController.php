@@ -342,33 +342,45 @@ class ProductController extends Controller
                     /* 3. images */
                     $fileUrls = [];
                     if (!empty($data['photo_id'])) {
-                        $ids = array_filter(explode(',', $data['photo_id']));
-                        $rows = UploadModel::whereIn('id', $ids)->get();
-                        $fileUrls = $rows
-                            ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-                            ->filter()
-                            ->values()
-                            ->all();
+                        $ids  = array_values(array_filter(array_map('intval', explode(',', $data['photo_id']))));
+                        $rows = UploadModel::whereIn('id', $ids)
+                            ->get(['id','file_path'])
+                            ->keyBy('id');
+
+                        // build URLs in the same order as $ids
+                        foreach ($ids as $imgId) {
+                            if (isset($rows[$imgId])) {
+                                $fileUrls[] = Storage::disk('public')->url($rows[$imgId]->file_path);
+                            }
+                        }
                     }
-                    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
                     $data['file_urls'] = $fileUrls;
 
-                    /* 4. banners (from banner_id CSV) */
+                    /* 4. banners (ordered by banner_id CSV) */
                     $bannerUrls = [];
                     if (!empty($data['banner_id'])) {
-                        $bids = array_filter(explode(',', $data['banner_id']));
-                        $brows = UploadModel::whereIn('id', $bids)->get();
-                        $bannerUrls = $brows
-                            ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-                            ->filter()
-                            ->values()
-                            ->all();
-                    }
-                    unset($data['banner_id']);                // hide raw CSV like you did for photo_id
-                    $data['banner_urls'] = $bannerUrls;       // ✅ expose banner URLs
+                        $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
+                        $brows = UploadModel::whereIn('id', $bids)
+                            ->get(['id','file_path'])
+                            ->keyBy('id');
 
-                    unset($data['photo_id'], $data['customer_discount'], $data['dealer_discount'], $data['architect_discount']);
-                    $data['file_urls'] = $fileUrls;
+                        foreach ($bids as $bid) {
+                            if (isset($brows[$bid])) {
+                                $bannerUrls[] = Storage::disk('public')->url($brows[$bid]->file_path);
+                            }
+                        }
+                    }
+                    $data['banner_urls'] = $bannerUrls;
+
+                    /* 5. hide raw CSV & discount cols (do this ONCE) */
+                    unset(
+                        $data['photo_id'],
+                        $data['banner_id'],
+                        $data['customer_discount'],
+                        $data['dealer_discount'],
+                        $data['architect_discount']
+                    );
+
 
                     return $data;
                 });
