@@ -373,6 +373,7 @@ class ProductController extends Controller
                     // $data['banner_urls'] = $bannerUrls;
 
                     /* 4. banners (ordered by banner types like 'ProductPage_Main', 'ProductPage_BLDC', etc.) */
+
                     $bannerUrls = [];
                     if (!empty($data['banner_id'])) {
                         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
@@ -385,7 +386,8 @@ class ProductController extends Controller
                             'ProductPage_Main'   => 1,
                             'ProductPage_BLDC'   => 2,
                             'ProductPage_Scan'   => 3,
-                            'ProductPage_Color'  => 4
+                            'ProductPage_Color'  => 4,
+                            'Unknown'            => 5 // 'Unknown' goes to the last
                         ];
 
                         // Convert collection to array for sorting
@@ -407,7 +409,6 @@ class ProductController extends Controller
                         }
                     }
                     $data['banner_urls'] = $bannerUrls;
-
 
                     /* 5. hide raw CSV & discount cols (do this ONCE) */
                     unset(
@@ -595,8 +596,9 @@ class ProductController extends Controller
             return 'ProductPage_Color';
         }
 
-        return 'ProductPage_Main'; // Default type if not matched
+        return 'Unknown'; // Return 'Unknown' for anything that doesn't match
     }
+
 
     public function index_admin(Request $request, $id = null)
     {
