@@ -261,8 +261,19 @@ class ProductController extends Controller
                     'video_url' => $variant['video_url'],
                     'product_pdf' => $variant['product_pdf'],
                 ]);
+
+                // Collect the variants to return in the response
+                $variants[] = [
+                    'id' => $createdVariant->id,
+                    'variant_type' => $createdVariant->variant_type,
+                    'variant_value' => $createdVariant->variant_value,
+                    'hsn' => $createdVariant->hsn,
+                ];
             }
         }
+
+        // Prepare product response
+        $product->variants = $variants;
 
         unset($product['id'], $product['created_at'], $product['updated_at']);
 
