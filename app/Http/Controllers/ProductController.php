@@ -357,17 +357,50 @@ class ProductController extends Controller
                     $data['file_urls'] = $fileUrls;
 
                     /* 4. banners (ordered by banner_id CSV) */
+                    // $bannerUrls = [];
+                    // if (!empty($data['banner_id'])) {
+                    //     $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
+                    //     $brows = UploadModel::whereIn('id', $bids)
+                    //         ->get(['id','file_path'])
+                    //         ->keyBy('id');
+
+                    //     foreach ($bids as $bid) {
+                    //         if (isset($brows[$bid])) {
+                    //             $bannerUrls[] = Storage::disk('public')->url($brows[$bid]->file_path);
+                    //         }
+                    //     }
+                    // }
+                    // $data['banner_urls'] = $bannerUrls;
+
+                    /* 4. banners (ordered by banner types like 'ProductPage_Main', 'ProductPage_BLDC', etc.) */
                     $bannerUrls = [];
                     if (!empty($data['banner_id'])) {
                         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
                         $brows = UploadModel::whereIn('id', $bids)
                             ->get(['id','file_path'])
                             ->keyBy('id');
+                        
+                        // Define the order you want the banners to appear in
+                        $bannerOrder = [
+                            'ProductPage_Main'   => 1,
+                            'ProductPage_BLDC'   => 2,
+                            'ProductPage_Scan'   => 3,
+                            'ProductPage_Color'  => 4
+                        ];
 
-                        foreach ($bids as $bid) {
-                            if (isset($brows[$bid])) {
-                                $bannerUrls[] = Storage::disk('public')->url($brows[$bid]->file_path);
-                            }
+                        // Sort banners based on the desired order
+                        usort($brows->toArray(), function($a, $b) use ($bannerOrder) {
+                            // Extract the product page type from the file path
+                            $aType = $this->getBannerType($a['file_path']);
+                            $bType = $this->getBannerType($b['file_path']);
+                            
+                            // Compare their order value based on predefined $bannerOrder
+                            return $bannerOrder[$aType] <=> $bannerOrder[$bType];
+                        });
+
+                        // Map the sorted file paths to URLs
+                        foreach ($brows as $banner) {
+                            $bannerUrls[] = Storage::disk('public')->url($banner->file_path);
                         }
                     }
                     $data['banner_urls'] = $bannerUrls;
@@ -543,6 +576,22 @@ class ProductController extends Controller
                 'message' => 'Something went wrong: ' . $e->getMessage(),
             ], 500);
         }
+    }
+    /* Helper function to extract product page type (e.g., 'ProductPage_Main') from file path */
+    private function getBannerType($filePath)
+    {
+        // Extract the type from the filename (assuming it follows the pattern as per your example)
+        if (strpos($filePath, 'productpage-main') !== false) {
+            return 'ProductPage_Main';
+        } elseif (strpos($filePath, 'productpage-bldc') !== false) {
+            return 'ProductPage_BLDC';
+        } elseif (strpos($filePath, 'productpage-scan') !== false) {
+            return 'ProductPage_Scan';
+        } elseif (strpos($filePath, 'productpage-colors') !== false) {
+            return 'ProductPage_Color';
+        }
+
+        return 'ProductPage_Main'; // Default type if not matched
     }
 
     public function index_admin(Request $request, $id = null)
