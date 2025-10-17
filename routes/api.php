@@ -18,6 +18,7 @@ use App\Http\Controllers\RazorpayController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\UsersDiscountController;
 use App\Http\Controllers\DelhiveryServiceController;
+use App\Http\Controllers\UploadController;
 
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
@@ -99,8 +100,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Product Routes
         Route::prefix('products')->group(function () {
             Route::post('/register', [ProductController::class, 'store']);         // Add a new product (Admin only)
-            Route::post('/{variant_id}/banners', [ProductController::class, 'uploadBanner']);
-            Route::post('/{variant}/photos', [ProductController::class, 'uploadPhotos']);
+            Route::post('/{variant_id}/banners', [ProductController::class, 'uploadBanner']); // upload banner by variant id
+            Route::post('/{variant}/photos', [ProductController::class, 'uploadPhotos']); // upload banner by variant id
+            Route::delete('/variants/{variant}/photos/{upload}',  [UploadController::class, 'deleteVariantPhoto']);
+            Route::delete('/variants/{variant}/banners/{upload}', [UploadController::class, 'deleteVariantBanner']);
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
