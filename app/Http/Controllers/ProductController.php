@@ -356,24 +356,6 @@ class ProductController extends Controller
                     }
                     $data['file_urls'] = $fileUrls;
 
-                    /* 4. banners (ordered by banner_id CSV) */
-                    // $bannerUrls = [];
-                    // if (!empty($data['banner_id'])) {
-                    //     $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
-                    //     $brows = UploadModel::whereIn('id', $bids)
-                    //         ->get(['id','file_path'])
-                    //         ->keyBy('id');
-
-                    //     foreach ($bids as $bid) {
-                    //         if (isset($brows[$bid])) {
-                    //             $bannerUrls[] = Storage::disk('public')->url($brows[$bid]->file_path);
-                    //         }
-                    //     }
-                    // }
-                    // $data['banner_urls'] = $bannerUrls;
-
-                    /* 4. banners (ordered by banner types like 'ProductPage_Main', 'ProductPage_BLDC', etc.) */
-
                     $bannerUrls = [];
                     if (!empty($data['banner_id'])) {
                         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
@@ -418,7 +400,6 @@ class ProductController extends Controller
                         $data['dealer_discount'],
                         $data['architect_discount']
                     );
-
 
                     return $data;
                 });
@@ -599,6 +580,191 @@ class ProductController extends Controller
         return 'Unknown'; // Return 'Unknown' for anything that doesn't match
     }
 
+    // public function index_admin(Request $request, $id = null)
+    // {
+    //     try {
+    //         /* ----------  SINGLE PRODUCT  ---------- */
+    //         if ($id) {
+    //             $product = ProductModel::with([
+    //                 'brand:id,name',
+    //                 'category:id,name',
+    //                 'features:id,product_id,feature_name,feature_value,is_filterable',
+    //                 'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+    //             ])->findOrFail($id);
+
+    //             $user = auth()->user();
+
+    //             /* --- main images --- */
+    //             $uploadIds = $product->image ? explode(',', $product->image) : [];
+    //             $uploads   = UploadModel::whereIn('id', $uploadIds)->pluck('file_path', 'id');
+    //             $product->image = array_map(fn($uid) => $uploads[$uid] ?? null, $uploadIds);
+
+    //             /* --- variants: compute selling_price & file_urls --- */
+    //             $product->variants = $product->variants->map(function ($variant) use ($user) {
+
+    //                 /* 1. discount */
+    //                 $discount = 0;
+    //                 if ($user) {
+    //                     $userDiscount = UsersDiscountModel::where('user_id', $user->id)
+    //                         ->where('product_variant_id', $variant->id)
+    //                         ->first();
+    //                     $discount = $userDiscount?->discount
+    //                         ?? match ($user->role) {
+    //                             'customer'  => $variant->customer_discount,
+    //                             'dealer'    => $variant->dealer_discount,
+    //                             'architect' => $variant->architect_discount,
+    //                             default     => 0,
+    //                         };
+    //                 }
+
+    //                 /* 2. selling price */
+    //                 $regularPrice = $variant->regular_price;
+    //                 $data = $variant->toArray();
+    //                 $data['selling_price'] = round($regularPrice - ($regularPrice * ($discount / 100)), 0);
+
+    //                 /* 3. images */
+    //                 $fileUrls = [];
+    //                 if (!empty($data['photo_id'])) {
+    //                     $ids = array_filter(explode(',', $data['photo_id']));
+    //                     $rows = UploadModel::whereIn('id', $ids)->get();
+    //                     $fileUrls = $rows
+    //                         ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+    //                         ->filter()
+    //                         ->values()
+    //                         ->all();
+    //                 }
+    //                 unset($data['photo_id']);
+    //                 $data['file_urls'] = $fileUrls;
+
+    //                 return $data;
+    //             });
+
+    //             $response = [
+    //                 'brand'    => $product->brand?->name,
+    //                 'category' => $product->category?->name,
+    //                 'features' => $product->features,
+    //                 'variants' => $product->variants,
+    //             ] + $product->toArray();
+
+    //             return response()->json([
+    //                 'success' => true,
+    //                 'message' => 'Product details fetched successfully!',
+    //                 'data'    => collect($response)
+    //                     ->except(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']),
+    //             ], 200);
+    //         }
+
+    //         /* ---------- MULTIPLE PRODUCTS ---------- */
+    //         $searchProduct  = $request->input('search_product');
+    //         $searchBrand    = $request->input('search_brand');
+    //         $searchCategory = $request->input('search_category');
+    //         $isActive       = $request->input('is_active');
+    //         $limit          = $request->input('limit', 10);
+    //         $offset         = $request->input('offset', 0);
+    //         $variantType    = $request->input('variant_type');
+
+    //         $query = ProductModel::with([
+    //             'brand:id,name',
+    //             'category:id,name',
+    //             'features:id,product_id,feature_name,feature_value,is_filterable',
+    //             'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+    //         ]);
+
+    //         /* --- filters --- */
+    //         if ($searchProduct) {
+    //             $names = explode(',', $searchProduct);
+    //             $query->where(fn($q) => collect($names)->each(fn($n) => $q->orWhere('name', 'LIKE', '%' . trim($n) . '%')));
+    //         }
+    //         if ($searchBrand) {
+    //             $brands = explode(',', $searchBrand);
+    //             $query->whereHas('brand', fn($q) => collect($brands)->each(fn($b) => $q->orWhere('name', 'LIKE', '%' . trim($b) . '%')));
+    //         }
+    //         if ($searchCategory) {
+    //             $cats = array_filter(array_map('trim', explode(',', $searchCategory)));
+    //             $query->whereHas('category', fn($q) => $q->where(function ($q2) use ($cats) {
+    //                 foreach ($cats as $c) $q2->orWhere('name', 'LIKE', "%{$c}%");
+    //             }));
+    //         }
+    //         if (!is_null($isActive)) $query->where('is_active', $isActive);
+    //         if ($variantType) $query->whereHas('variants', fn($q) => $q->where('variant_type', $variantType));
+
+    //         $totalRecords = $query->count();
+    //         $products     = $query->offset($offset)->limit($limit)->get();
+
+    //         /* --- image helper --- */
+    //         $allImageIds = $products->flatMap(fn($p) => explode(',', $p->image ?? ''))->unique()->filter();
+    //         $uploads     = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
+
+    //         /* --- transform products --- */
+    //         $products = $products->map(function ($prod) use ($uploads) {
+    //             $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
+    //             $variants = $prod->variants->map(function ($variant) {
+    //                 $user = auth()->user();
+    //                 $discount = 0;
+    //                 if ($user) {
+    //                     $discount = UsersDiscountModel::where('user_id', $user->id)
+    //                         ->where('product_variant_id', $variant->id)
+    //                         ->value('discount')
+    //                         ?? match ($user->role) {
+    //                             'customer' => $variant->customer_discount,
+    //                             'dealer' => $variant->dealer_discount,
+    //                             'architect' => $variant->architect_discount,
+    //                             default => 0,
+    //                         };
+    //                 }
+    //                 // Calculate selling price
+    //                 $regularPrice = $variant->regular_price;
+    //                 $data = $variant->toArray();
+    //                 $data['selling_price'] = number_format($regularPrice - ($regularPrice * ($discount / 100)), 0);
+    //                 // Process images
+    //                 $fileUrls = [];
+    //                 if (!empty($data['photo_id'])) {
+    //                     $ids = array_filter(explode(',', $data['photo_id']));
+    //                     $rows = UploadModel::whereIn('id', $ids)->get();
+    //                     $fileUrls = $rows
+    //                         ->map(fn($u) => Storage::disk('public')->url($u->file_path))
+    //                         ->filter()
+    //                         ->values()
+    //                         ->all();
+    //                 }
+    //                 $data['file_urls'] = $fileUrls;
+    //                 return $data;
+    //             });
+    //             $brand = $prod->brand?->name;
+    //             $category = $prod->category?->name;
+    //             $features = $prod->features instanceof \Illuminate\Support\Collection
+    //                 ? $prod->features->toArray()
+    //                 : $prod->features;
+
+    //             return [
+    //                 'id' => $prod->id,
+    //                 'slug' => $prod->slug,
+    //                 'name' => $prod->name,
+    //                 'description' => $prod->description,
+    //                 'type' => $prod->type,
+    //                 'is_active' => $prod->is_active,
+    //                 'image' => $image,
+    //                 'variants' => $variants,
+    //                 'brand' => $brand,
+    //                 'category' => $category,
+    //                 'features' => $features,
+    //             ];
+    //         });
+
+    //         return response()->json([
+    //             'success'       => true,
+    //             'message'       => 'Products fetched successfully!',
+    //             'data'          => $products,
+    //             'total_records' => $totalRecords,
+    //         ], 200);
+
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Something went wrong: ' . $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     public function index_admin(Request $request, $id = null)
     {
@@ -609,7 +775,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
                 ])->findOrFail($id);
 
                 $user = auth()->user();
@@ -643,7 +809,7 @@ class ProductController extends Controller
                     $data['selling_price'] = round($regularPrice - ($regularPrice * ($discount / 100)), 0);
 
                     /* 3. images */
-                    $fileUrls = [];
+                    <!-- $fileUrls = [];
                     if (!empty($data['photo_id'])) {
                         $ids = array_filter(explode(',', $data['photo_id']));
                         $rows = UploadModel::whereIn('id', $ids)->get();
@@ -656,6 +822,103 @@ class ProductController extends Controller
                     unset($data['photo_id']);
                     $data['file_urls'] = $fileUrls;
 
+                    $bannerUrls = [];
+                    if (!empty($data['banner_id'])) {
+                        $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
+                        $brows = UploadModel::whereIn('id', $bids)
+                            ->get(['id','file_path'])
+                            ->keyBy('id');
+                        
+                        // Define the order you want the banners to appear in
+                        $bannerOrder = [
+                            'ProductPage_Main'   => 1,
+                            'ProductPage_BLDC'   => 2,
+                            'ProductPage_Scan'   => 3,
+                            'ProductPage_Color'  => 4,
+                            'Unknown'            => 5 // 'Unknown' goes to the last
+                        ];
+
+                        // Convert collection to array for sorting
+                        $browsArray = $brows->toArray();
+
+                        // Sort banners based on the desired order
+                        usort($browsArray, function($a, $b) use ($bannerOrder) {
+                            // Extract the product page type from the file path
+                            $aType = $this->getBannerType($a['file_path']);
+                            $bType = $this->getBannerType($b['file_path']);
+                            
+                            // Compare their order value based on predefined $bannerOrder
+                            return $bannerOrder[$aType] <=> $bannerOrder[$bType];
+                        });
+
+                        // Map the sorted file paths to URLs
+                        foreach ($browsArray as $banner) {
+                            $bannerUrls[] = Storage::disk('public')->url($banner['file_path']);
+                        }
+                    }
+                    $data['banner_urls'] = $bannerUrls; -->
+
+                    $fileUrls = [];
+                    if (!empty($data['photo_id'])) {
+                        $ids  = array_values(array_filter(array_map('intval', explode(',', $data['photo_id']))));
+                        $rows = UploadModel::whereIn('id', $ids)
+                            ->get(['id','file_path'])
+                            ->keyBy('id');
+
+                        // build URLs in the same order as $ids
+                        foreach ($ids as $imgId) {
+                            if (isset($rows[$imgId])) {
+                                $fileUrls[] = Storage::disk('public')->url($rows[$imgId]->file_path);
+                            }
+                        }
+                    }
+                    $data['file_urls'] = $fileUrls;
+
+                    $bannerUrls = [];
+                    if (!empty($data['banner_id'])) {
+                        $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
+                        $brows = UploadModel::whereIn('id', $bids)
+                            ->get(['id','file_path'])
+                            ->keyBy('id');
+                        
+                        // Define the order you want the banners to appear in
+                        $bannerOrder = [
+                            'ProductPage_Main'   => 1,
+                            'ProductPage_BLDC'   => 2,
+                            'ProductPage_Scan'   => 3,
+                            'ProductPage_Color'  => 4,
+                            'Unknown'            => 5 // 'Unknown' goes to the last
+                        ];
+
+                        // Convert collection to array for sorting
+                        $browsArray = $brows->toArray();
+
+                        // Sort banners based on the desired order
+                        usort($browsArray, function($a, $b) use ($bannerOrder) {
+                            // Extract the product page type from the file path
+                            $aType = $this->getBannerType($a['file_path']);
+                            $bType = $this->getBannerType($b['file_path']);
+                            
+                            // Compare their order value based on predefined $bannerOrder
+                            return $bannerOrder[$aType] <=> $bannerOrder[$bType];
+                        });
+
+                        // Map the sorted file paths to URLs
+                        foreach ($browsArray as $banner) {
+                            $bannerUrls[] = Storage::disk('public')->url($banner['file_path']);
+                        }
+                    }
+                    $data['banner_urls'] = $bannerUrls;
+
+                    /* 5. hide raw CSV & discount cols (do this ONCE) */
+                    <!-- unset(
+                        $data['photo_id'],
+                        $data['banner_id'],
+                        $data['customer_discount'],
+                        $data['dealer_discount'],
+                        $data['architect_discount']
+                    ); -->
+                    
                     return $data;
                 });
 
@@ -785,7 +1048,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
-    
+
     // View Single
     public function show($slug)
     {
