@@ -808,117 +808,78 @@ class ProductController extends Controller
                     $data = $variant->toArray();
                     $data['selling_price'] = round($regularPrice - ($regularPrice * ($discount / 100)), 0);
 
-                    /* 3. images */
-                //    $fileUrls = [];
-                //     if (!empty($data['photo_id'])) {
-                //         $ids = array_filter(explode(',', $data['photo_id']));
-                //         $rows = UploadModel::whereIn('id', $ids)->get();
-                //         $fileUrls = $rows
-                //             ->map(fn($u) => Storage::disk('public')->url($u->file_path))
-                //             ->filter()
-                //             ->values()
-                //             ->all();
-                //     }
-                //     unset($data['photo_id']);
-                //     $data['file_urls'] = $fileUrls;
-
-                //     $bannerUrls = [];
-                //     if (!empty($data['banner_id'])) {
-                //         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
-                //         $brows = UploadModel::whereIn('id', $bids)
-                //             ->get(['id','file_path'])
-                //             ->keyBy('id');
-                        
-                //         // Define the order you want the banners to appear in
-                //         $bannerOrder = [
-                //             'ProductPage_Main'   => 1,
-                //             'ProductPage_BLDC'   => 2,
-                //             'ProductPage_Scan'   => 3,
-                //             'ProductPage_Color'  => 4,
-                //             'Unknown'            => 5 // 'Unknown' goes to the last
-                //         ];
-
-                //         // Convert collection to array for sorting
-                //         $browsArray = $brows->toArray();
-
-                //         // Sort banners based on the desired order
-                //         usort($browsArray, function($a, $b) use ($bannerOrder) {
-                //             // Extract the product page type from the file path
-                //             $aType = $this->getBannerType($a['file_path']);
-                //             $bType = $this->getBannerType($b['file_path']);
-                            
-                //             // Compare their order value based on predefined $bannerOrder
-                //             return $bannerOrder[$aType] <=> $bannerOrder[$bType];
-                //         });
-
-                //         // Map the sorted file paths to URLs
-                //         foreach ($browsArray as $banner) {
-                //             $bannerUrls[] = Storage::disk('public')->url($banner['file_path']);
-                //         }
-                //     }
-                //     $data['banner_urls'] = $bannerUrls;
-
-                    $fileUrls = [];
+                    /* 3) images -> [{id, url}] in the SAME order as photo_id CSV */
+                    $fileObjs = [];
                     if (!empty($data['photo_id'])) {
                         $ids  = array_values(array_filter(array_map('intval', explode(',', $data['photo_id']))));
                         $rows = UploadModel::whereIn('id', $ids)
                             ->get(['id','file_path'])
                             ->keyBy('id');
 
-                        // build URLs in the same order as $ids
                         foreach ($ids as $imgId) {
                             if (isset($rows[$imgId])) {
-                                $fileUrls[] = Storage::disk('public')->url($rows[$imgId]->file_path);
+                                $fileObjs[] = [
+                                    'id'  => $imgId,
+                                    'url' => Storage::disk('public')->url($rows[$imgId]->file_path),
+                                ];
                             }
                         }
                     }
-                    $data['file_urls'] = $fileUrls;
+                    $data['file_urls'] = $fileObjs;
 
-                    $bannerUrls = [];
+                    /* 4) banners -> [{id, url}] in custom order:
+                        Main (1st), BLDC (2nd), Scan (3rd), Color (4th), Unknown (last) */
+                    $bannerObjs = [];
                     if (!empty($data['banner_id'])) {
                         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
                         $brows = UploadModel::whereIn('id', $bids)
                             ->get(['id','file_path'])
                             ->keyBy('id');
-                        
-                        // Define the order you want the banners to appear in
+
                         $bannerOrder = [
-                            'ProductPage_Main'   => 1,
-                            'ProductPage_BLDC'   => 2,
-                            'ProductPage_Scan'   => 3,
-                            'ProductPage_Color'  => 4,
-                            'Unknown'            => 5 // 'Unknown' goes to the last
+                            'ProductPage_Main'  => 1,
+                            'ProductPage_BLDC'  => 2,
+                            'ProductPage_Scan'  => 3,
+                            'ProductPage_Color' => 4,
+                            'Unknown'           => 99, // push unknowns to the end
                         ];
 
-                        // Convert collection to array for sorting
-                        $browsArray = $brows->toArray();
+                        // Build a plain array that includes id + path for sorting
+                        $browsArray = [];
+                        foreach ($bids as $bid) {
+                            if (isset($brows[$bid])) {
+                                $filePath = $brows[$bid]->file_path;
+                                $type     = $this->getBannerType($filePath);  // your private helper
+                                $browsArray[] = [
+                                    'id'       => $bid,
+                                    'file_path'=> $filePath,
+                                    'sort_key' => $bannerOrder[$type] ?? $bannerOrder['Unknown'],
+                                ];
+                            }
+                        }
 
-                        // Sort banners based on the desired order
-                        usort($browsArray, function($a, $b) use ($bannerOrder) {
-                            // Extract the product page type from the file path
-                            $aType = $this->getBannerType($a['file_path']);
-                            $bType = $this->getBannerType($b['file_path']);
-                            
-                            // Compare their order value based on predefined $bannerOrder
-                            return $bannerOrder[$aType] <=> $bannerOrder[$bType];
-                        });
+                        // Sort by our defined order, unknowns last
+                        usort($browsArray, fn($a, $b) => $a['sort_key'] <=> $b['sort_key']);
 
-                        // Map the sorted file paths to URLs
-                        foreach ($browsArray as $banner) {
-                            $bannerUrls[] = Storage::disk('public')->url($banner['file_path']);
+                        // Map to [{id,url}]
+                        foreach ($browsArray as $b) {
+                            $bannerObjs[] = [
+                                'id'  => $b['id'],
+                                'url' => Storage::disk('public')->url($b['file_path']),
+                            ];
                         }
                     }
-                    $data['banner_urls'] = $bannerUrls;
+                    $data['banner_urls'] = $bannerObjs;
 
-                    /* 5. hide raw CSV & discount cols (do this ONCE) */
-                    // unset(
-                    //     $data['photo_id'],
-                    //     $data['banner_id'],
-                    //     $data['customer_discount'],
-                    //     $data['dealer_discount'],
-                    //     $data['architect_discount']
-                    // ); 
-                    
+                    /* 5) hide raw CSV & discount cols */
+                    unset(
+                        $data['photo_id'],
+                        $data['banner_id'],
+                        $data['customer_discount'],
+                        $data['dealer_discount'],
+                        $data['architect_discount']
+                    );
+
                     return $data;
                 });
 
