@@ -112,99 +112,7 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
     //upload product photos
-    // public function uploadPhotos(Request $request, int $variant)
-    // {
-    //     // Accept photos[], photo[] (array), or photo (single)
-    //     $request->validate([
-    //         'photos'    => 'nullable|array',
-    //         'photos.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
-
-    //         'photo'     => 'nullable',  // can be array or single
-    //         'photo.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
-    //     ]);
-
-    //     $variant = ProductVariantModel::findOrFail($variant);
-
-    //     // Normalize files
-    //     $files = [];
-    //     if ($request->hasFile('photos')) {
-    //         $files = $request->file('photos');              // photos[]
-    //     } elseif ($request->hasFile('photo')) {
-    //         $p = $request->file('photo');                   // photo[] or photo
-    //         $files = is_array($p) ? $p : [$p];
-    //     }
-
-    //     if (empty($files)) {
-    //         return response()->json([
-    //             'message' => 'No files received. Use "photos[]", "photo[]", or "photo".',
-    //         ], 422);
-    //     }
-
-    //     DB::beginTransaction();
-    //     try {
-    //         $newIds = [];
-
-    //         foreach ($files as $file) {
-    //             $ext      = strtolower($file->getClientOriginalExtension());
-    //             $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-    //             $base     = Str::slug($origName) ?: 'photo';
-    //             $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
-
-    //             // Save to: storage/app/public/upload/products/{filename}
-    //             $path = $file->storeAs('upload/products', $filename, 'public');
-
-    //             // Insert into t_uploads (exact columns you wanted)
-    //             $upload = UploadModel::create([
-    //                 'type'      => 'image',
-    //                 'file_path' => $path,
-    //                 'size'      => (int) round($file->getSize() / 1024), // KB
-    //                 'alt_text'  => $filename,
-    //             ]);
-
-    //             $newIds[] = (int) $upload->id;
-    //         }
-
-    //         // Merge into CSV field on VARIANT (photo_id)
-    //         $existing = array_filter(array_map('intval', explode(',', (string) $variant->photo_id)));
-    //         $all      = array_values(array_unique(array_merge($existing, $newIds)));
-
-    //         $variant->photo_id = implode(',', $all);
-    //         $variant->save();
-
-    //         DB::commit();
-
-    //         // Get full URL for each uploaded photo and all existing photos
-    //         $allPhotos = UploadModel::whereIn('id', $all)
-    //             ->get(['id', 'file_path', 'type', 'size', 'alt_text'])
-    //             ->map(function ($upload) {
-    //                 $fullUrl = Storage::disk('public')->url($upload->file_path);
-    //                 return [
-    //                     'id'        => $upload->id,
-    //                     'file_path' => $fullUrl,
-    //                     'type'      => $upload->type,
-    //                     'size'      => $upload->size,
-    //                     'alt_text'  => $upload->alt_text,
-    //                 ];
-    //             });
-
-    //         return response()->json([
-    //             'message'        => 'Variant photos uploaded successfully.',
-    //             'variant_id'     => $variant->id,
-    //             'new_upload_ids' => $newIds,
-    //             'all_photo_ids'  => $allPhotos,  // All photos data
-    //             // 'new_photos'     => $allPhotos->whereIn('id', $newIds),  // Only new photos
-    //         ], 201);
-
-    //     } catch (\Throwable $e) {
-    //         DB::rollBack();
-    //         return response()->json([
-    //             'message' => 'Failed to upload variant photos.',
-    //             'error'   => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
     public function uploadPhotos(Request $request, int $variant)
     {
         // Accept photos[], photo[] (array), or photo (single)
@@ -324,7 +232,6 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
 
     // Created
     public function store(Request $request)
@@ -1573,6 +1480,56 @@ class ProductController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error mapping images to product variants.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function deleteVariant(Request $request, int $variantId)
+    {
+        DB::beginTransaction();
+        try {
+            // Find the variant
+            $variant = ProductVariantModel::findOrFail($variantId);
+
+            // Get all associated photo IDs from the 'photo_id' field (CSV format)
+            $photoIds = explode(',', (string) $variant->photo_id);
+
+            // Check if the variant has any photos
+            if (!empty($photoIds)) {
+                // Delete the associated files from the storage and database
+                $uploads = UploadModel::whereIn('id', $photoIds)->get();
+
+                // Delete each file from storage and database
+                foreach ($uploads as $upload) {
+                    // Remove the file from storage
+                    if (Storage::disk('public')->exists($upload->file_path)) {
+                        Storage::disk('public')->delete($upload->file_path);
+                    }
+
+                    // Delete the entry from the upload table
+                    $upload->delete();
+                }
+            }
+
+            // Remove the photos reference from the variant (clear photo_id)
+            $variant->photo_id = null;
+            $variant->save();
+
+            // Delete the variant itself
+            $variant->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Variant and associated photos deleted successfully.',
+                'variant_id' => $variantId,
+            ], 200);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to delete variant and associated photos.',
                 'error' => $e->getMessage(),
             ], 500);
         }
