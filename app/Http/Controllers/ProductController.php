@@ -298,29 +298,22 @@ class ProductController extends Controller
                 return PHP_INT_MAX;
             })->values();
 
-            $allUrls  = $sortedAll->map(fn($u) => Storage::disk('public')->url($u->file_path))->all();
-            $allPaths = $sortedAll->map(fn($u) => $u->file_path)->all();
-
-            // New-only URLs/paths (already in order of creation)
-            $newUrls = array_map(fn($p) => Storage::disk('public')->url($p), $newPaths);
+            // Format response data
+            $allPhotosData = $sortedAll->map(function ($upload) {
+                $fullUrl = Storage::disk('public')->url($upload->file_path);
+                return [
+                    'id'        => $upload->id,
+                    'file_path' => $fullUrl,
+                    'type'      => $upload->type,
+                    'size'      => $upload->size,
+                ];
+            });
 
             return response()->json([
-                'message'          => 'Variant photos uploaded successfully.',
-                'variant_id'       => $variantId,
-
-                // New uploads
-                'new_upload_ids'   => $newIds,
-                // 'new_paths'        => $newPaths,               // e.g., upload/products/2-1.jpg
-                // 'new_urls'         => $newUrls,                // e.g., https://api.haneri.com/storage/upload/products/2-1.jpg
-
-                // All photos for this variant (sorted by trailing number)
-                'all_photo_ids'    => $allIds,
-                'all_paths'        => $allPaths,
-                'all_urls'         => $allUrls,
-
-                // Convenience CSVs (if you want to directly store/display)
-                'all_paths_csv'    => implode(', ', $allPaths),
-                'all_urls_csv'     => implode(', ', $allUrls),
+                'message'        => 'Variant photos uploaded successfully.',
+                'variant_id'     => $variantId,
+                'new_upload_ids' => $newIds,
+                'all_photos_ids' => $allPhotosData, // All photos data in the format you requested
             ], 201);
 
         } catch (\Throwable $e) {
@@ -331,7 +324,6 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
 
 
     // Created
