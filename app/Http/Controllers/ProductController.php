@@ -1485,51 +1485,117 @@ class ProductController extends Controller
         }
     }
 
+    // public function deleteVariant(Request $request, int $variantId)
+    // {
+    //     DB::beginTransaction();
+    //     try {
+    //         // Find the variant
+    //         $variant = ProductVariantModel::findOrFail($variantId);
+
+    //         // Get all associated photo IDs from the 'photo_id' field (CSV format)
+    //         $photoIds = explode(',', (string) $variant->photo_id);
+
+    //         // Check if the variant has any photos
+    //         if (!empty($photoIds)) {
+    //             // Delete the associated files from the storage and database
+    //             $uploads = UploadModel::whereIn('id', $photoIds)->get();
+
+    //             // Delete each file from storage and database
+    //             foreach ($uploads as $upload) {
+    //                 // Remove the file from storage
+    //                 if (Storage::disk('public')->exists($upload->file_path)) {
+    //                     Storage::disk('public')->delete($upload->file_path);
+    //                 }
+
+    //                 // Delete the entry from the upload table
+    //                 $upload->delete();
+    //             }
+    //         }
+
+    //         // Remove the photos reference from the variant (clear photo_id)
+    //         $variant->photo_id = null;
+    //         $variant->save();
+
+    //         // Delete the variant itself
+    //         $variant->delete();
+
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'message' => 'Variant and associated photos deleted successfully.',
+    //             'variant_id' => $variantId,
+    //         ], 200);
+
+    //     } catch (\Throwable $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'message' => 'Failed to delete variant and associated photos.',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
     public function deleteVariant(Request $request, int $variantId)
     {
         DB::beginTransaction();
+
         try {
-            // Find the variant
+            // Fetch the variant by variant_id
             $variant = ProductVariantModel::findOrFail($variantId);
 
-            // Get all associated photo IDs from the 'photo_id' field (CSV format)
-            $photoIds = explode(',', (string) $variant->photo_id);
+            // Get photo_id and banner_id (comma-separated IDs)
+            $photoIds = explode(',', $variant->photo_id); // Array of photo IDs
+            $bannerIds = explode(',', $variant->banner_id); // Array of banner IDs
 
-            // Check if the variant has any photos
-            if (!empty($photoIds)) {
-                // Delete the associated files from the storage and database
-                $uploads = UploadModel::whereIn('id', $photoIds)->get();
+            // Delete photos
+            foreach ($photoIds as $photoId) {
+                $upload = UploadModel::find($photoId);
 
-                // Delete each file from storage and database
-                foreach ($uploads as $upload) {
-                    // Remove the file from storage
-                    if (Storage::disk('public')->exists($upload->file_path)) {
-                        Storage::disk('public')->delete($upload->file_path);
+                if ($upload) {
+                    // Construct the file path for photos
+                    $filePath = $upload->file_path;
+
+                    // Check if the file exists and delete from storage
+                    if (Storage::disk('public')->exists($filePath)) {
+                        Storage::disk('public')->delete($filePath);
                     }
 
-                    // Delete the entry from the upload table
+                    // Now delete the row from the uploads table
                     $upload->delete();
                 }
             }
 
-            // Remove the photos reference from the variant (clear photo_id)
-            $variant->photo_id = null;
-            $variant->save();
+            // Delete banners
+            foreach ($bannerIds as $bannerId) {
+                $upload = UploadModel::find($bannerId);
 
-            // Delete the variant itself
+                if ($upload) {
+                    // Construct the file path for banners
+                    $filePath = $upload->file_path;
+
+                    // Check if the file exists and delete from storage
+                    if (Storage::disk('public')->exists($filePath)) {
+                        Storage::disk('public')->delete($filePath);
+                    }
+
+                    // Now delete the row from the uploads table
+                    $upload->delete();
+                }
+            }
+
+            // Finally, delete the variant itself
             $variant->delete();
 
             DB::commit();
 
             return response()->json([
-                'message' => 'Variant and associated photos deleted successfully.',
+                'message' => 'Variant and associated images have been successfully deleted.',
                 'variant_id' => $variantId,
             ], 200);
 
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json([
-                'message' => 'Failed to delete variant and associated photos.',
+                'message' => 'Failed to delete variant and images.',
                 'error' => $e->getMessage(),
             ], 500);
         }
