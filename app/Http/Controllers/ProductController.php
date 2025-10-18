@@ -25,9 +25,9 @@ class ProductController extends Controller
         // Accept banners[], banner[] (array), or banner (single)
         $request->validate([
             'banners'    => 'nullable|array',
-            'banners.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+            'banners.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
             'banner'     => 'nullable', // can be array or single file
-            'banner.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+            'banner.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
         ]);
 
         $variant = ProductVariantModel::findOrFail($variant);
@@ -119,10 +119,10 @@ class ProductController extends Controller
         // Accept photos[], photo[] (array), or photo (single)
         $request->validate([
             'photos'    => 'nullable|array',
-            'photos.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+            'photos.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
 
             'photo'     => 'nullable',  // can be array or single
-            'photo.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+            'photo.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
         ]);
 
         $variant = ProductVariantModel::findOrFail($variant);
