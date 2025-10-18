@@ -261,7 +261,7 @@ class ProductController extends Controller
                 'variant_id'     => $variant->id,
                 'new_upload_ids' => $newIds,
                 'all_photo_ids'  => $allPhotos,  // All photos data
-                'new_photos'     => $allPhotos->whereIn('id', $newIds),  // Only new photos
+                // 'new_photos'     => $allPhotos->whereIn('id', $newIds),  // Only new photos
             ], 201);
 
         } catch (\Throwable $e) {
