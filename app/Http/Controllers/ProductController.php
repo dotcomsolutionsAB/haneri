@@ -102,6 +102,85 @@ class ProductController extends Controller
     }
 
     //upload product photos
+    // public function uploadPhotos(Request $request, int $variant)
+    // {
+    //     // Accept photos[], photo[] (array), or photo (single)
+    //     $request->validate([
+    //         'photos'    => 'nullable|array',
+    //         'photos.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+
+    //         'photo'     => 'nullable',  // can be array or single
+    //         'photo.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
+    //     ]);
+
+    //     $variant = ProductVariantModel::findOrFail($variant);
+
+    //     // Normalize files
+    //     $files = [];
+    //     if ($request->hasFile('photos')) {
+    //         $files = $request->file('photos');              // photos[]
+    //     } elseif ($request->hasFile('photo')) {
+    //         $p = $request->file('photo');                   // photo[] or photo
+    //         $files = is_array($p) ? $p : [$p];
+    //     }
+
+    //     if (empty($files)) {
+    //         return response()->json([
+    //             'message' => 'No files received. Use "photos[]", "photo[]", or "photo".',
+    //         ], 422);
+    //     }
+
+    //     DB::beginTransaction();
+    //     try {
+    //         $newIds = [];
+
+    //         foreach ($files as $file) {
+    //             $ext      = strtolower($file->getClientOriginalExtension());
+    //             $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+    //             $base     = Str::slug($origName) ?: 'photo';
+    //             $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
+
+    //             // Save to: storage/app/public/upload/products/{filename}
+    //             $path = $file->storeAs('upload/products', $filename, 'public');
+    //             // If/when needed: $url = Storage::disk('public')->url($path);
+
+    //             // Insert into t_uploads (exact columns you wanted)
+    //             $upload = UploadModel::create([
+    //                 'type'      => 'image',
+    //                 'file_path' => $path,
+    //                 'size'      => (int) round($file->getSize() / 1024), // KB
+    //                 'alt_text'  => $filename,
+    //             ]);
+
+    //             $newIds[] = (int) $upload->id;
+    //         }
+
+    //         // Merge into CSV field on VARIANT (photo_id)
+    //         $existing = array_filter(array_map('intval', explode(',', (string) $variant->photo_id)));
+    //         $all      = array_values(array_unique(array_merge($existing, $newIds)));
+
+    //         $variant->photo_id = implode(',', $all);
+    //         $variant->save();
+
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'message'        => 'Variant photos uploaded successfully.',
+    //             'variant_id'     => $variant->id,
+    //             'new_upload_ids' => $newIds,
+    //             'all_photo_ids'  => $all,
+    //             'new_photos'     => UploadModel::whereIn('id', $newIds)
+    //                                   ->get(['id','file_path','type','size','alt_text']),
+    //         ], 201);
+
+    //     } catch (\Throwable $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'message' => 'Failed to upload variant photos.',
+    //             'error'   => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
     public function uploadPhotos(Request $request, int $variant)
     {
         // Accept photos[], photo[] (array), or photo (single)
@@ -142,7 +221,6 @@ class ProductController extends Controller
 
                 // Save to: storage/app/public/upload/products/{filename}
                 $path = $file->storeAs('upload/products', $filename, 'public');
-                // If/when needed: $url = Storage::disk('public')->url($path);
 
                 // Insert into t_uploads (exact columns you wanted)
                 $upload = UploadModel::create([
@@ -164,13 +242,26 @@ class ProductController extends Controller
 
             DB::commit();
 
+            // Get full URL for each uploaded photo and all existing photos
+            $allPhotos = UploadModel::whereIn('id', $all)
+                ->get(['id', 'file_path', 'type', 'size', 'alt_text'])
+                ->map(function ($upload) {
+                    $fullUrl = Storage::disk('public')->url($upload->file_path);
+                    return [
+                        'id'        => $upload->id,
+                        'file_path' => $fullUrl,
+                        'type'      => $upload->type,
+                        'size'      => $upload->size,
+                        'alt_text'  => $upload->alt_text,
+                    ];
+                });
+
             return response()->json([
                 'message'        => 'Variant photos uploaded successfully.',
                 'variant_id'     => $variant->id,
                 'new_upload_ids' => $newIds,
-                'all_photo_ids'  => $all,
-                'new_photos'     => UploadModel::whereIn('id', $newIds)
-                                      ->get(['id','file_path','type','size','alt_text']),
+                'all_photo_ids'  => $allPhotos,  // All photos data
+                'new_photos'     => $allPhotos->whereIn('id', $newIds),  // Only new photos
             ], 201);
 
         } catch (\Throwable $e) {
@@ -181,6 +272,8 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+
 
     // Created
     public function store(Request $request)
