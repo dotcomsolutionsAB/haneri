@@ -20,86 +20,6 @@ use Auth;
 class ProductController extends Controller
 {
     //upload product banner
-    // public function uploadBanner(Request $request, int $variant)
-    // {
-    //     // Accept banners[], banner[] (array), or banner (single)
-    //     $request->validate([
-    //         'banners'    => 'nullable|array',
-    //         'banners.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
-    //         'banner'     => 'nullable', // can be array or single file
-    //         'banner.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:5120',
-    //     ]);
-
-    //     $variant = ProductVariantModel::findOrFail($variant);
-
-    //     // Normalize to an array of files
-    //     $files = [];
-    //     if ($request->hasFile('banners')) {
-    //         $files = $request->file('banners');          // banners[]
-    //     } elseif ($request->hasFile('banner')) {
-    //         $b = $request->file('banner');               // banner[] or banner
-    //         $files = is_array($b) ? $b : [$b];
-    //     }
-
-    //     if (empty($files)) {
-    //         return response()->json([
-    //             'message' => 'No files received. Use "banners[]", "banner[]", or "banner".',
-    //         ], 422);
-    //     }
-
-    //     DB::beginTransaction();
-    //     try {
-    //         $newIds = [];
-
-    //         foreach ($files as $file) {
-    //             $ext      = strtolower($file->getClientOriginalExtension());
-    //             $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-    //             $base     = Str::slug($origName) ?: 'banner';
-    //             $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
-
-    //             // Save to: storage/app/public/upload/product_banner/{filename}
-    //             $path = $file->storeAs('upload/product_banner', $filename, 'public');
-    //             // If you need a public URL at runtime, compute it with:
-    //             // $url = Storage::disk('public')->url($path);
-
-    //             // 🔧 EXACT INSERT YOU ASKED FOR (matches your schema)
-    //             $upload = UploadModel::create([
-    //                 'type'      => 'image',
-    //                 'file_path' => $path,
-    //                 'size'      => (int) round($file->getSize() / 1024), // KB
-    //                 'alt_text'  => $filename,
-    //             ]);
-
-    //             $newIds[] = (int) $upload->id;
-    //         }
-
-    //         // Merge into CSV field on the VARIANT
-    //         $existing = array_filter(array_map('intval', explode(',', (string) $variant->banner_id)));
-    //         $all      = array_values(array_unique(array_merge($existing, $newIds)));
-
-    //         $variant->banner_id = implode(',', $all);
-    //         $variant->save();
-
-    //         DB::commit();
-
-    //         return response()->json([
-    //             'message'        => 'Variant banners uploaded successfully.',
-    //             'variant_id'     => $variant->id,
-    //             'new_upload_ids' => $newIds,
-    //             'all_banner_ids' => $all,
-    //             // Return only columns that actually exist
-    //             'new_banners'    => UploadModel::whereIn('id', $newIds)
-    //                                 ->get(['id', 'file_path', 'type', 'size', 'alt_text']),
-    //         ], 201);
-
-    //     } catch (\Throwable $e) {
-    //         DB::rollBack();
-    //         return response()->json([
-    //             'message' => 'Failed to upload variant banners.',
-    //             'error'   => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
     public function uploadBanner(Request $request, int $variant)
     {
         // Accept banners[], banner[] (array), or banner (single)
@@ -181,7 +101,7 @@ class ProductController extends Controller
                 'variant_id'     => $variant->id,
                 'new_upload_ids' => $newIds,
                 'all_banner_ids' => $allBanners,  // Return all banner data
-                'new_banners'    => $allBanners->whereIn('id', $newIds),  // Only new banners
+                // 'new_banners'    => $allBanners->whereIn('id', $newIds),  // Only new banners
             ], 201);
 
         } catch (\Throwable $e) {
