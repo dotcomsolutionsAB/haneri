@@ -114,6 +114,97 @@ class ProductController extends Controller
     }
 
     //upload product photos
+    // public function uploadPhotos(Request $request, int $variant)
+    // {
+    //     // Accept photos[], photo[] (array), or photo (single)
+    //     $request->validate([
+    //         'photos'    => 'nullable|array',
+    //         'photos.*'  => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
+
+    //         'photo'     => 'nullable',  // can be array or single
+    //         'photo.*'   => 'file|mimes:jpg,jpeg,png,webp,avif,gif|max:61440',
+    //     ]);
+
+    //     $variant = ProductVariantModel::findOrFail($variant);
+
+    //     // Normalize files
+    //     $files = [];
+    //     if ($request->hasFile('photos')) {
+    //         $files = $request->file('photos');              // photos[]
+    //     } elseif ($request->hasFile('photo')) {
+    //         $p = $request->file('photo');                   // photo[] or photo
+    //         $files = is_array($p) ? $p : [$p];
+    //     }
+
+    //     if (empty($files)) {
+    //         return response()->json([
+    //             'message' => 'No files received. Use "photos[]", "photo[]", or "photo".',
+    //         ], 422);
+    //     }
+
+    //     DB::beginTransaction();
+    //     try {
+    //         $newIds = [];
+
+    //         foreach ($files as $file) {
+    //             $ext      = strtolower($file->getClientOriginalExtension());
+    //             $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+    //             $base     = Str::slug($origName) ?: 'photo';
+    //             $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
+
+    //             // Save to: storage/app/public/upload/products/{filename}
+    //             $path = $file->storeAs('upload/products', $filename, 'public');
+
+    //             // Insert into t_uploads (exact columns you wanted)
+    //             $upload = UploadModel::create([
+    //                 'type'      => 'image',
+    //                 'file_path' => $path,
+    //                 'size'      => (int) round($file->getSize() / 1024), // KB
+    //                 'alt_text'  => $filename,
+    //             ]);
+
+    //             $newIds[] = (int) $upload->id;
+    //         }
+
+    //         // Merge into CSV field on VARIANT (photo_id)
+    //         $existing = array_filter(array_map('intval', explode(',', (string) $variant->photo_id)));
+    //         $all      = array_values(array_unique(array_merge($existing, $newIds)));
+
+    //         $variant->photo_id = implode(',', $all);
+    //         $variant->save();
+
+    //         DB::commit();
+
+    //         // Get full URL for each uploaded photo and all existing photos
+    //         $allPhotos = UploadModel::whereIn('id', $all)
+    //             ->get(['id', 'file_path', 'type', 'size', 'alt_text'])
+    //             ->map(function ($upload) {
+    //                 $fullUrl = Storage::disk('public')->url($upload->file_path);
+    //                 return [
+    //                     'id'        => $upload->id,
+    //                     'file_path' => $fullUrl,
+    //                     'type'      => $upload->type,
+    //                     'size'      => $upload->size,
+    //                     'alt_text'  => $upload->alt_text,
+    //                 ];
+    //             });
+
+    //         return response()->json([
+    //             'message'        => 'Variant photos uploaded successfully.',
+    //             'variant_id'     => $variant->id,
+    //             'new_upload_ids' => $newIds,
+    //             'all_photo_ids'  => $allPhotos,  // All photos data
+    //             // 'new_photos'     => $allPhotos->whereIn('id', $newIds),  // Only new photos
+    //         ], 201);
+
+    //     } catch (\Throwable $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'message' => 'Failed to upload variant photos.',
+    //             'error'   => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
     public function uploadPhotos(Request $request, int $variant)
     {
         // Accept photos[], photo[] (array), or photo (single)
@@ -144,57 +235,92 @@ class ProductController extends Controller
 
         DB::beginTransaction();
         try {
-            $newIds = [];
+            $variantId = (int) $variant->id;
 
-            foreach ($files as $file) {
-                $ext      = strtolower($file->getClientOriginalExtension());
-                $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                $base     = Str::slug($origName) ?: 'photo';
-                $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
+            // Find current max sequence for this variant based on file_path like "upload/products/{variantId}-<n>.<ext>"
+            $existingPaths = UploadModel::where('file_path', 'like', "upload/products/{$variantId}-%")->pluck('file_path')->all();
 
-                // Save to: storage/app/public/upload/products/{filename}
-                $path = $file->storeAs('upload/products', $filename, 'public');
-
-                // Insert into t_uploads (exact columns you wanted)
-                $upload = UploadModel::create([
-                    'type'      => 'image',
-                    'file_path' => $path,
-                    'size'      => (int) round($file->getSize() / 1024), // KB
-                    'alt_text'  => $filename,
-                ]);
-
-                $newIds[] = (int) $upload->id;
+            $maxSeq = 0;
+            foreach ($existingPaths as $p) {
+                if (preg_match("#^upload/products/{$variantId}-(\d+)\.[A-Za-z0-9]+$#i", $p, $m)) {
+                    $num = (int) $m[1];
+                    if ($num > $maxSeq) $maxSeq = $num;
+                }
             }
 
-            // Merge into CSV field on VARIANT (photo_id)
-            $existing = array_filter(array_map('intval', explode(',', (string) $variant->photo_id)));
-            $all      = array_values(array_unique(array_merge($existing, $newIds)));
+            $newIds   = [];
+            $newPaths = [];
+            $seq      = $maxSeq;
 
-            $variant->photo_id = implode(',', $all);
+            foreach ($files as $file) {
+                // Normalize extension
+                $ext = strtolower($file->getClientOriginalExtension());
+                if ($ext === 'jpeg') $ext = 'jpg';
+
+                // Increment sequence and ensure uniqueness in storage
+                do {
+                    $seq++;
+                    $filename = "{$variantId}-{$seq}.{$ext}";
+                    $relativePath = "upload/products/{$filename}";
+                } while (Storage::disk('public')->exists($relativePath));
+
+                // Save to storage/app/public/upload/products/{variantId}-{seq}.{ext}
+                $stored = $file->storeAs('upload/products', "{$variantId}-{$seq}.{$ext}", 'public');
+
+                // Persist upload row
+                $upload = UploadModel::create([
+                    'type'      => 'image',
+                    'file_path' => $stored,                        // e.g., upload/products/2-3.jpg
+                    'size'      => (int) round($file->getSize() / 1024), // KB
+                    'alt_text'  => "{$variantId}-{$seq}.{$ext}",
+                ]);
+
+                $newIds[]   = (int) $upload->id;
+                $newPaths[] = $stored; // save the exact DB path requested (upload/products/2-1.jpg)
+            }
+
+            // Merge upload IDs into variant->photo_id (CSV of IDs)
+            $existingIds = array_filter(array_map('intval', explode(',', (string) $variant->photo_id)));
+            $allIds = array_values(array_unique(array_merge($existingIds, $newIds)));
+            $variant->photo_id = implode(',', $allIds);
             $variant->save();
 
             DB::commit();
 
-            // Get full URL for each uploaded photo and all existing photos
-            $allPhotos = UploadModel::whereIn('id', $all)
-                ->get(['id', 'file_path', 'type', 'size', 'alt_text'])
-                ->map(function ($upload) {
-                    $fullUrl = Storage::disk('public')->url($upload->file_path);
-                    return [
-                        'id'        => $upload->id,
-                        'file_path' => $fullUrl,
-                        'type'      => $upload->type,
-                        'size'      => $upload->size,
-                        'alt_text'  => $upload->alt_text,
-                    ];
-                });
+            // Build ALL photo URLs for this variant (sorted by numeric sequence after "-")
+            $allUploads = UploadModel::whereIn('id', $allIds)->get(['id', 'file_path', 'type', 'size', 'alt_text']);
+
+            // Sort by the number after "{variantId}-"
+            $sortedAll = $allUploads->sortBy(function ($u) use ($variantId) {
+                if (preg_match("#^upload/products/{$variantId}-(\d+)\.#i", $u->file_path, $m)) {
+                    return (int) $m[1];
+                }
+                return PHP_INT_MAX;
+            })->values();
+
+            $allUrls  = $sortedAll->map(fn($u) => Storage::disk('public')->url($u->file_path))->all();
+            $allPaths = $sortedAll->map(fn($u) => $u->file_path)->all();
+
+            // New-only URLs/paths (already in order of creation)
+            $newUrls = array_map(fn($p) => Storage::disk('public')->url($p), $newPaths);
 
             return response()->json([
-                'message'        => 'Variant photos uploaded successfully.',
-                'variant_id'     => $variant->id,
-                'new_upload_ids' => $newIds,
-                'all_photo_ids'  => $allPhotos,  // All photos data
-                // 'new_photos'     => $allPhotos->whereIn('id', $newIds),  // Only new photos
+                'message'          => 'Variant photos uploaded successfully.',
+                'variant_id'       => $variantId,
+
+                // New uploads
+                'new_upload_ids'   => $newIds,
+                'new_paths'        => $newPaths,               // e.g., upload/products/2-1.jpg
+                'new_urls'         => $newUrls,                // e.g., https://api.haneri.com/storage/upload/products/2-1.jpg
+
+                // All photos for this variant (sorted by trailing number)
+                'all_photo_ids'    => $allIds,
+                'all_paths'        => $allPaths,
+                'all_urls'         => $allUrls,
+
+                // Convenience CSVs (if you want to directly store/display)
+                'all_paths_csv'    => implode(', ', $allPaths),
+                'all_urls_csv'     => implode(', ', $allUrls),
             ], 201);
 
         } catch (\Throwable $e) {
