@@ -310,8 +310,8 @@ class ProductController extends Controller
 
                 // New uploads
                 'new_upload_ids'   => $newIds,
-                'new_paths'        => $newPaths,               // e.g., upload/products/2-1.jpg
-                'new_urls'         => $newUrls,                // e.g., https://api.haneri.com/storage/upload/products/2-1.jpg
+                // 'new_paths'        => $newPaths,               // e.g., upload/products/2-1.jpg
+                // 'new_urls'         => $newUrls,                // e.g., https://api.haneri.com/storage/upload/products/2-1.jpg
 
                 // All photos for this variant (sorted by trailing number)
                 'all_photo_ids'    => $allIds,
