@@ -310,7 +310,7 @@ class UserController extends Controller
         $user->save();
 
         try {
-            // Mail::to($user->email)->send(new PasswordResetMail($user, $newPassword));
+            Mail::to($user->email)->send(new PasswordResetMail($user, $newPassword));
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
