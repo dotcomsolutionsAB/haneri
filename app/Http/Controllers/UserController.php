@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use App\Mail\UserRegisteredMail;
+use App\Mail\WelcomeUserMail;
 use App\Mail\PasswordResetMail;
 use Illuminate\Support\Facades\Mail;
 use App\Models\CartModel;
@@ -14,6 +15,7 @@ use App\Models\OrderModel;
 use App\Models\BrandModel;
 use App\Models\CategoryModel;
 use App\Models\ProductModel;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 //use Illuminate\Support\Facades\Cookie;
@@ -22,32 +24,78 @@ class UserController extends Controller
 {
     //
     // Register a new user
+    // public function register(Request $request)
+    // {
+    //     $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         'email' => 'required|email|unique:users,email',
+    //         'password' => 'required|string|min:8',
+    //         'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
+    //         // 'role' => 'required|in:admin,customer,architect,dealer',
+    //         'selected_type' => 'nullable|string',
+    //     ]);
+
+    //     $user = User::create([
+    //         'name' => $request->input('name'),
+    //         'email' => $request->input('email'),
+    //         'password' => Hash::make($request->input('password')),
+    //         'mobile' => $request->input('mobile'),
+    //         'role' => "customer",
+    //         'selected_type' => $request->input('selected_type')
+    //     ]);
+
+    //     // Automatically log in the user
+    //     $token = $user->createToken('authToken')->plainTextToken;
+
+    //     unset($user['id'], $user['created_at'], $user['updated_at']);
+
+    //     return response()->json(['message' => 'User registered successfully!', 'data' => $user, 'token' => $token], 201);
+    // }
+
     public function register(Request $request)
     {
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'password' => 'required|string|min:8',
-            'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
-            // 'role' => 'required|in:admin,customer,architect,dealer',
+            'name'          => 'required|string|max:255',
+            'email'         => 'required|email|unique:users,email',
+            'password'      => 'required|string|min:8',
+            'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
             'selected_type' => 'nullable|string',
         ]);
 
-        $user = User::create([
-            'name' => $request->input('name'),
-            'email' => $request->input('email'),
-            'password' => Hash::make($request->input('password')),
-            'mobile' => $request->input('mobile'),
-            'role' => "customer",
-            'selected_type' => $request->input('selected_type')
-        ]);
+        // Wrap in transaction so we can "afterCommit" the email safely
+        $user = DB::transaction(function () use ($request) {
+            $u = User::create([
+                'name'          => $request->input('name'),
+                'email'         => $request->input('email'),
+                'password'      => Hash::make($request->input('password')),
+                'mobile'        => $request->input('mobile'),
+                'role'          => 'customer',
+                'selected_type' => $request->input('selected_type'),
+            ]);
 
-        // Automatically log in the user
+            // Schedule email to send after DB commit
+            DB::afterCommit(function () use ($u) {
+                try {
+                    Mail::to($u->email)->send(new WelcomeUserMail($u, 'Haneri'));
+                } catch (\Throwable $e) {
+                    Log::error('Welcome email failed for user '.$u->id.': '.$e->getMessage());
+                }
+            });
+
+            return $u;
+        });
+
+        // Auth token (Sanctum)
         $token = $user->createToken('authToken')->plainTextToken;
 
-        unset($user['id'], $user['created_at'], $user['updated_at']);
+        // Hide internals for response
+        $responseUser = $user->only(['name','email','mobile','role','selected_type']);
 
-        return response()->json(['message' => 'User registered successfully!', 'data' => $user, 'token' => $token], 201);
+        return response()->json([
+            'message' => 'User registered successfully!',
+            'data'    => $responseUser,
+            'token'   => $token,
+        ], 201);
     }
 
     // Get logged-in user details
