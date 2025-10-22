@@ -30,7 +30,7 @@ class PasswordResetMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your Temporary Password',
+            subject: 'Your Reset Password',
         );
     }
 

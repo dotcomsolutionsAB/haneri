@@ -5,7 +5,7 @@
     <title>Welcome to {{ $siteName }}</title>
 </head>
 <body style="font-family: Arial, sans-serif; margin: 0; padding: 0;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #dff2f0; padding: 40px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding: 40px 0;">
         <tr>
             <td align="center">
                 <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 10px; overflow: hidden;">
