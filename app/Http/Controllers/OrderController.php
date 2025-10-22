@@ -168,7 +168,7 @@ class OrderController extends Controller
     //         return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
     //     }
     // }
-    
+
     public function store(Request $request)
     {
         // 1) Validate request data
@@ -204,14 +204,27 @@ class OrderController extends Controller
         // 3) Compute total in rupees
         $totalAmountRupees = 0.0;
         foreach ($cartItems as $cartItem) {
-            $unit = (float) $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id);
-            $qty  = (int) $cartItem->quantity;
+            $unit = (float) ($this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) ?? 0);
+            $qty  = (int)   ($cartItem->quantity ?? 0);
+
+            if ($qty <= 0) {
+                return response()->json([
+                    'message' => 'Cart has an item with non-positive quantity.',
+                    'data' => ['product_id' => $cartItem->product_id, 'variant_id' => $cartItem->variant_id, 'qty' => $qty]
+                ], 400);
+            }
+
+            if ($unit <= 0) {
+                return response()->json([
+                    'message' => 'Cart has an item with zero price.',
+                    'data' => ['product_id' => $cartItem->product_id, 'variant_id' => $cartItem->variant_id]
+                ], 400);
+            }
+
             $totalAmountRupees += ($unit * $qty);
         }
 
-        // Guard non-positive totals
         if ($totalAmountRupees <= 0) {
-            \Log::warning("Order total computed <= 0 for user {$user_id}", ['total_rupees' => $totalAmountRupees]);
             return response()->json(['message' => 'Cart total must be greater than 0.'], 400);
         }
 
