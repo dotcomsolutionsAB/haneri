@@ -20,6 +20,19 @@ use App\Http\Controllers\UsersDiscountController;
 use App\Http\Controllers\DelhiveryServiceController;
 use App\Http\Controllers\UploadController;
 
+
+// use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\WelcomeUserMail;
+use App\Models\User;
+
+Route::get('/test-mail', function () {
+    $user = User::latest()->first(); // or make a fake user model instance
+    Mail::to('gydiwywu@denipl.net')->send(new WelcomeUserMail($user, 'Haneri'));
+    return 'Mail dispatched';
+});
+
+
 // Route::get('/user', function (Request $request) {
 //     return $request->user();
 // })->middleware('auth:sanctum');

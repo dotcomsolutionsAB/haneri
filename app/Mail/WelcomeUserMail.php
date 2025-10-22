@@ -20,43 +20,33 @@ class WelcomeUserMail extends Mailable
     /**
      * Create a new message instance.
      */
+
     public function __construct(User $user, string $siteName = 'Haneri')
     {
         $this->user = $user;
         $this->siteName = $siteName;
     }
 
-    public function build()
-    {
-        return $this->subject('Welcome to ' . $this->siteName . ' 🎉')
-            ->markdown('emails.welcome_user', [
-                'user' => $this->user,
-                'siteName' => $this->siteName,
-                // If you have a frontend login page, pass it here:
-                'loginUrl' => config('app.frontend_url', url('/login')),
-                'supportEmail' => config('mail.from.address'),
-            ]);
-    }
-
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Welcome User Mail',
+            subject: 'Welcome to ' . $this->siteName . ' 🎉',
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
             markdown: 'emails.welcome_user',
+            with: [
+                'user'        => $this->user,
+                'siteName'    => $this->siteName,
+                'loginUrl'    => config('app.frontend_url', url('/login')),
+                'supportEmail'=> config('mail.from.address'),
+            ],
         );
     }
+
 
     /**
      * Get the attachments for the message.

@@ -6,10 +6,10 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use App\Mail\UserRegisteredMail;
 use App\Mail\WelcomeUserMail;
 use App\Mail\PasswordResetMail;
-use Illuminate\Support\Facades\Mail;
 use App\Models\CartModel;
 use App\Models\OrderModel;
 use App\Models\BrandModel;
@@ -117,13 +117,16 @@ class UserController extends Controller
             'selected_type' => $request->input('selected_type'),
         ]);
 
-        // SEND EMAIL RIGHT AWAY (for debugging)
+        // Send immediately (debugging). Later you can queue it.
         try {
             Log::info('Sending WelcomeUserMail to '.$user->email);
             Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
             Log::info('WelcomeUserMail sent');
         } catch (\Throwable $e) {
-            Log::error('Welcome email failed: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            Log::error('Welcome email failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
 
         $token = $user->createToken('authToken')->plainTextToken;
