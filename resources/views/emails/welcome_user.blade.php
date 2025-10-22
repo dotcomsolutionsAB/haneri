@@ -43,7 +43,7 @@
 
                             <p style="margin-top: 30px;">Best Regards,<br>
                             <strong>Team {{ $siteName }}</strong><br>
-                            <a href="{{ $frontendUrl }}" style="color: #00473e;"></a></p>
+                            <a href="{{ $frontendUrl }}" style="color: #00473e;">Haneri</a></p>
                         </td>
                     </tr>
                     <tr>
