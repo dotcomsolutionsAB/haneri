@@ -52,52 +52,6 @@ class UserController extends Controller
     //     return response()->json(['message' => 'User registered successfully!', 'data' => $user, 'token' => $token], 201);
     // }
 
-    // public function register(Request $request)
-    // {
-    //     $request->validate([
-    //         'name'          => 'required|string|max:255',
-    //         'email'         => 'required|email|unique:users,email',
-    //         'password'      => 'required|string|min:8',
-    //         'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
-    //         'selected_type' => 'nullable|string',
-    //     ]);
-
-    //     // Wrap in transaction so we can "afterCommit" the email safely
-    //     $user = DB::transaction(function () use ($request) {
-    //         $u = User::create([
-    //             'name'          => $request->input('name'),
-    //             'email'         => $request->input('email'),
-    //             'password'      => Hash::make($request->input('password')),
-    //             'mobile'        => $request->input('mobile'),
-    //             'role'          => 'customer',
-    //             'selected_type' => $request->input('selected_type'),
-    //         ]);
-
-    //         // Schedule email to send after DB commit
-    //         DB::afterCommit(function () use ($u) {
-    //             try {
-    //                 Mail::to($u->email)->send(new WelcomeUserMail($u, 'Haneri'));
-    //             } catch (\Throwable $e) {
-    //                 Log::error('Welcome email failed for user '.$u->id.': '.$e->getMessage());
-    //             }
-    //         });
-
-    //         return $u;
-    //     });
-
-    //     // Auth token (Sanctum)
-    //     $token = $user->createToken('authToken')->plainTextToken;
-
-    //     // Hide internals for response
-    //     $responseUser = $user->only(['name','email','mobile','role','selected_type']);
-
-    //     return response()->json([
-    //         'message' => 'User registered successfully!',
-    //         'data'    => $responseUser,
-    //         'token'   => $token,
-    //     ], 201);
-    // }
-
     public function register(Request $request)
     {
         $request->validate([
