@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Models\User; // ✅ important
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -16,33 +17,35 @@ class PasswordResetMail extends Mailable
     /**
      * Create a new message instance.
      */
-    public $user;
-    public $newPassword;
 
-    public function __construct($user, $newPassword)
+    public User $user;
+    public string $newPassword;
+
+    public function __construct(User $user, string $newPassword)
     {
-        //
         $this->user = $user;
         $this->newPassword = $newPassword;
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Your New Password',
+            subject: 'Your Temporary Password',
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
-            view: 'emails.password_reset',
+            view: 'emails.password_reset', // using HTML view (not markdown)
+            with: [
+                'user'             => $this->user,
+                'newPassword'      => $this->newPassword,
+                'siteName'         => config('app.name', 'Haneri'),
+                'loginUrl'         => config('app.frontend_url', env('APP_FRONTEND_URL', url('/login'))),
+                'supportEmail'     => env('MAIL_SUPPORT_EMAIL', config('mail.from.address')),
+                'techSupportEmail' => env('MAIL_TECH_SUPPORT_EMAIL', config('mail.from.address')),
+            ],
         );
     }
 
