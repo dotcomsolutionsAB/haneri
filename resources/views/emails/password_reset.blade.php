@@ -42,7 +42,7 @@
 
                             <p style="margin-top: 30px;">Regards,<br>
                             <strong>Team {{ $siteName }}</strong><br>
-                            <a href="{{ config('app.url') }}" style="color:#00473e;">{{ config('app.url') }}</a></p>
+                            <a href="{{ $frontendUrl }}" style="color:#00473e;">Haneri LLP</a></p>
                         </td>
                     </tr>
                     <tr>
