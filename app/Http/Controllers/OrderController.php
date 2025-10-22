@@ -112,6 +112,28 @@ class OrderController extends Controller
             // Commit the transaction
             DB::commit();
 
+            // Build line items for the email (with product/variant names)
+            $items = OrderItemModel::with(['product:id,name', 'variant:id,name'])
+                ->where('order_id', $order->id)
+                ->get()
+                ->map(function($it) {
+                    return [
+                        'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
+                        'variant' => optional($it->variant)->name,
+                        'qty'     => (int) $it->quantity,
+                        'price'   => (float) $it->price,
+                        'total'   => (float) $it->price * (int) $it->quantity,
+                    ];
+                })
+                ->toArray();
+
+            // Send confirmation email (do not block order if email fails)
+            try {
+                Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
+            } catch (\Throwable $e) {
+                \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
+            }
+
             // Prepare response
             $response = [
                 'message' => 'Order created successfully!',
