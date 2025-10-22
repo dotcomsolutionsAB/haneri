@@ -57,10 +57,10 @@
 
                         {{-- Totals --}}
                         <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:10px;">
-                            <tr>
+                           {{-- <tr>
                                 <td align="right" style="padding:6px 0;"><strong>Subtotal:</strong></td>
                                 <td align="right" style="padding:6px 0; width:140px;">₹ {{ number_format($subTotal, 2) }}</td>
-                            </tr>
+                            </tr> --}}
                             {{-- Add taxes/shipping here if applicable --}}
                             <tr>
                                 <td align="right" style="padding:6px 0;"><strong>Grand Total:</strong></td>
