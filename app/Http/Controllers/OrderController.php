@@ -245,7 +245,9 @@ class OrderController extends Controller
 
         try{
             // Fetch all items from the cart for the user
-            $cartItems = CartModel::where('user_id', $user_id)->get();
+            // $cartItems = CartModel::where('user_id', $user_id)->get();
+            $cartItems = CartModel::where('user_id', (string)$user_id)->get();
+
 
             // Check if the cart is empty
             if ($cartItems->isEmpty()) {
@@ -299,7 +301,8 @@ class OrderController extends Controller
             }
 
             // After successfully adding order items, delete the cart items
-            CartModel::where('user_id', $user_id)->delete();
+            // CartModel::where('user_id', $user_id)->delete();
+            CartModel::where('user_id', (string)$user_id)->delete();
 
             // Commit the transaction
             DB::commit();
