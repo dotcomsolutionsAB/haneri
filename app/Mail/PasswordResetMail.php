@@ -45,6 +45,7 @@ class PasswordResetMail extends Mailable
                 'loginUrl'         => env('APP_LOGIN_URL'),
                 'frontendUrl'      => env('APP_FRONTEND_URL'),
                 'supportEmail'     => env('MAIL_SUPPORT_EMAIL', config('mail.from.address')),
+                'officeEmail'       => env('MAIL_FROM_ADDRESS'),
                 'techSupportEmail' => env('MAIL_TECH_SUPPORT_EMAIL', config('mail.from.address')),
             ],
         );

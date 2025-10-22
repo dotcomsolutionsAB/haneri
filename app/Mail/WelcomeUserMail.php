@@ -41,11 +41,11 @@ class WelcomeUserMail extends Mailable
             with: [
                 'user'              => $this->user,
                 'siteName'          => $this->siteName,
-                'loginUrl'          => config('app.loginUrl', env('APP_LOGIN_URL')),
-                'frontendUrl'          => config('app.frontend_url', env('APP_FRONTEND_URL')),
+                'loginUrl'         => env('APP_LOGIN_URL'),
+                'frontendUrl'      => env('APP_FRONTEND_URL'),
                 'supportEmail'      => env('MAIL_SUPPORT_EMAIL', config('mail.from.address')),
                 'techSupportEmail'  => env('MAIL_TECH_SUPPORT_EMAIL', config('mail.from.address')),
-                'officeEmail'       => config('mail.from.address'),
+                'officeEmail'       => env('MAIL_FROM_ADDRESS'),
                 // 'techSupportEmail'  => env('MAIL_TECH_SUPPORT_EMAIL', config('mail.from.address')),
             ],
         );
