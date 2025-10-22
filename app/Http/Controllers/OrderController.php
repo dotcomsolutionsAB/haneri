@@ -308,38 +308,23 @@ class OrderController extends Controller
             DB::commit();
 
             // Build line items for the email (with product/variant names)
-            $items = OrderItemModel::with(['product:id,name', 'variant:id,name'])
+            $items = OrderItemModel::with(['product:id,name', 'variant:id,variant_type,variant_value'])
                 ->where('order_id', $order->id)
                 ->get()
                 ->map(function($it) {
+                    // Build a human label like "Size: Large" (fallbacks handled)
+                    $vType  = optional($it->variant)->variant_type;
+                    $vValue = optional($it->variant)->variant_value;
+                    $variantLabel = $vValue
+                        ? ($vType ? ($vType . ': ' . $vValue) : $vValue)
+                        : null;
+
                     return [
                         'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
-                        'variant' => optional($it->variant)->name,
+                        'variant' => $variantLabel,
                         'qty'     => (int) $it->quantity,
                         'price'   => (float) $it->price,
-                        'total'   => (float) $it->price * (int) $it->quantity,
-                    ];
-                })
-                ->toArray();
-
-            // Send confirmation email (do not block order if email fails)
-            try {
-                Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
-            } catch (\Throwable $e) {
-                \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
-            }
-
-            // Build line items for the email (with product/variant names)
-            $items = OrderItemModel::with(['product:id,name', 'variant:id,name'])
-                ->where('order_id', $order->id)
-                ->get()
-                ->map(function($it) {
-                    return [
-                        'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
-                        'variant' => optional($it->variant)->name,
-                        'qty'     => (int) $it->quantity,
-                        'price'   => (float) $it->price,
-                        'total'   => (float) $it->price * (int) $it->quantity,
+                        'total'   => (float) $it->price * (int)$it->quantity,
                     ];
                 })
                 ->toArray();
