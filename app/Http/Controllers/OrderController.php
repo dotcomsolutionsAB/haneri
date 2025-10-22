@@ -17,275 +17,108 @@ class OrderController extends Controller
 {
     //
     // Store a new order
-    // public function store(Request $request)
-    // {
-    //     // Validate request data
-    //     $request->validate([
-    //         'status' => 'required|in:pending,completed,cancelled,refunded',
-    //         'payment_status' => 'required|in:pending,paid,failed',
-    //         'shipping_address' => 'required|string',
-    //     ]);
-
-    //     $user = Auth::user(); 
-
-    //     if ($user->role == 'admin') {
-    //         $request->validate([
-    //             'user_id' => 'required|integer|exists:users,id',
-    //         ]);  
-    //         $user_id =  $request->input('user_id');
-    //     }
-
-    //     else {
-    //         $user_id =  $user->id;
-    //     }
-
-    //     // Fetch user details from User model
-    //     $orderUser = User::find($user_id);
-    //     if (!$orderUser) {
-    //         return response()->json(['message' => 'User not found.'], 404);
-    //     }
-
-    //     $user_name = $orderUser->name;  // Fetch name
-    //     $user_email = $orderUser->email;  // Fetch email
-    //     $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
-
-    //     // Start a transaction to ensure all operations are atomic
-    //     DB::beginTransaction();
-
-    //     try{
-    //         // Fetch all items from the cart for the user
-    //         $cartItems = CartModel::where('user_id', $user_id)->get();
-
-    //         // Check if the cart is empty
-    //         if ($cartItems->isEmpty()) {
-    //             return response()->json(['message' => 'Sorry, cart is empty.'], 400);
-    //         }
-
-    //         // Calculate the total amount by iterating through the cart items
-    //         $totalAmount  = 0 ;
-
-    //         foreach($cartItems as $cartItem)
-    //         {
-    //             $totalAmount += $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) *$cartItem->quantity;
-    //         }
-
-
-    //         // Call Razorpay Order API Before Saving Order in DB**
-    //         $razorpayController = new RazorpayController(); 
-    //         $razorpayRequest = new Request([
-    //             'amount' => $totalAmount,
-    //             'currency' => 'INR'
-    //         ]);
-    //         $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
-
-    //         // Decode Razorpay response
-    //         $razorpayData = json_decode($razorpayResponse->getContent(), true);
-    //         if (!$razorpayData['success']) {
-    //             DB::rollBack();
-    //             return response()->json(['message' => 'Failed to create Razorpay order.'], 500);
-    //         }
-
-    //         // Create the order record
-    //         $order = OrderModel::create([
-    //             'user_id' => $user_id,
-    //             'total_amount' => $totalAmount,
-    //             'status' => $request->input('status', 'pending'),
-    //             'payment_status' => $request->input('payment_status', 'pending'),
-    //             'shipping_address' => $request->input('shipping_address'),
-    //             'razorpay_order_id' => $razorpayData['order']['id'],
-    //         ]);
-
-    //         // Iterate through each cart item to add it to the order items table
-    //         foreach($cartItems as $cartItem)
-    //         {
-    //             // Create the order item record
-    //             OrderItemModel::create([
-    //                 'order_id' => $order->id, // Link to the created order
-    //                 'product_id' => $cartItem->product_id,
-    //                 'variant_id' => $cartItem->variant_id,
-    //                 'quantity' => $cartItem->quantity,
-    //                 'price' => $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id), // Final price per item
-    //             ]);
-    //         }
-
-    //         // After successfully adding order items, delete the cart items
-    //         CartModel::where('user_id', $user_id)->delete();
-
-    //         // Commit the transaction
-    //         DB::commit();
-
-    //         // Build line items for the email (with product/variant names)
-    //         $items = OrderItemModel::with(['product:id,name', 'variant:id,name'])
-    //             ->where('order_id', $order->id)
-    //             ->get()
-    //             ->map(function($it) {
-    //                 return [
-    //                     'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
-    //                     'variant' => optional($it->variant)->name,
-    //                     'qty'     => (int) $it->quantity,
-    //                     'price'   => (float) $it->price,
-    //                     'total'   => (float) $it->price * (int) $it->quantity,
-    //                 ];
-    //             })
-    //             ->toArray();
-
-    //         // Send confirmation email (do not block order if email fails)
-    //         try {
-    //             Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
-    //         } catch (\Throwable $e) {
-    //             \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
-    //         }
-
-    //         // Prepare response
-    //         $response = [
-    //             'message' => 'Order created successfully!',
-    //             'data' => [
-    //                 'order_id' => $order->id,
-    //                 'total_amount' => $order->total_amount,
-    //                 'status' => $order->status,
-    //                 'payment_status' => $order->payment_status,
-    //                 'shipping_address' => $order->shipping_address,
-    //                 'razorpay_order_id' => $order->razorpay_order_id,
-    //                 'name' => $user_name,
-    //                 'email' => $user_email, 
-    //                 'phone' => $user_phone, 
-    //             ]
-    //         ];
-
-    //         // Return success response
-    //         return response()->json(['message' => 'Order created successfully!', 'data' => $response], 201);
-    //     }
-
-    //     catch(\Exception $e)
-    //     {
-    //         // Log the exception for debugging
-    //         \Log::error('Failed to create order: ' . $e->getMessage());
-
-    //         // In case of any failure, roll back the transaction
-    //         DB::rollBack();
-
-    //         // Return error response
-    //         return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
-    //     }
-    // }
-
     public function store(Request $request)
     {
-        // 1) Validate request data
+        // Validate request data
         $request->validate([
-            'status'          => 'required|in:pending,completed,cancelled,refunded',
-            'payment_status'  => 'required|in:pending,paid,failed',
-            'shipping_address'=> 'required|string',
+            'status' => 'required|in:pending,completed,cancelled,refunded',
+            'payment_status' => 'required|in:pending,paid,failed',
+            'shipping_address' => 'required|string',
         ]);
 
-        $user = Auth::user();
+        $user = Auth::user(); 
 
-        if ($user->role === 'admin') {
+        if ($user->role == 'admin') {
             $request->validate([
                 'user_id' => 'required|integer|exists:users,id',
-            ]);
-            $user_id = (int) $request->input('user_id');
-        } else {
-            $user_id = (int) $user->id;
+            ]);  
+            $user_id =  $request->input('user_id');
         }
 
-        // Fetch user details
+        else {
+            $user_id =  $user->id;
+        }
+
+        // Fetch user details from User model
         $orderUser = User::find($user_id);
         if (!$orderUser) {
             return response()->json(['message' => 'User not found.'], 404);
         }
 
-        // 2) Get cart BEFORE starting transaction
-        $cartItems = CartModel::where('user_id', $user_id)->get();
-        if ($cartItems->isEmpty()) {
-            return response()->json(['message' => 'Sorry, cart is empty.'], 400);
-        }
+        $user_name = $orderUser->name;  // Fetch name
+        $user_email = $orderUser->email;  // Fetch email
+        $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
 
-        // 3) Compute total in rupees
-        $totalAmountRupees = 0.0;
-        foreach ($cartItems as $cartItem) {
-            $unit = (float) ($this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) ?? 0);
-            $qty  = (int)   ($cartItem->quantity ?? 0);
-
-            if ($qty <= 0) {
-                return response()->json([
-                    'message' => 'Cart has an item with non-positive quantity.',
-                    'data' => ['product_id' => $cartItem->product_id, 'variant_id' => $cartItem->variant_id, 'qty' => $qty]
-                ], 400);
-            }
-
-            if ($unit <= 0) {
-                return response()->json([
-                    'message' => 'Cart has an item with zero price.',
-                    'data' => ['product_id' => $cartItem->product_id, 'variant_id' => $cartItem->variant_id]
-                ], 400);
-            }
-
-            $totalAmountRupees += ($unit * $qty);
-        }
-
-        if ($totalAmountRupees <= 0) {
-            return response()->json(['message' => 'Cart total must be greater than 0.'], 400);
-        }
-
-        // 4) Convert to paise (INTEGER)
-        $amountPaise = (int) round($totalAmountRupees * 100);
-
-        // Extra guard: ensure >= 1 paise (or >=100 if your validator enforces ₹1 minimum)
-        if ($amountPaise < 1) {
-            \Log::warning("Amount in paise < 1 after conversion", [
-                'total_rupees' => $totalAmountRupees,
-                'amount_paise' => $amountPaise
-            ]);
-            return response()->json(['message' => 'Cart total must be at least ₹0.01.'], 400);
-        }
-
+        // Start a transaction to ensure all operations are atomic
         DB::beginTransaction();
-        try {
-            // 5) Create Razorpay order using PAISA integer
-            $razorpayController = new RazorpayController();
+
+        try{
+            // Fetch all items from the cart for the user
+            $cartItems = CartModel::where('user_id', $user_id)->get();
+
+            // Check if the cart is empty
+            if ($cartItems->isEmpty()) {
+                return response()->json(['message' => 'Sorry, cart is empty.'], 400);
+            }
+
+            // Calculate the total amount by iterating through the cart items
+            $totalAmount  = 0 ;
+
+            foreach($cartItems as $cartItem)
+            {
+                $totalAmount += $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id) *$cartItem->quantity;
+            }
+
+
+            // Call Razorpay Order API Before Saving Order in DB**
+            $razorpayController = new RazorpayController(); 
             $razorpayRequest = new Request([
-                'amount'   => $amountPaise, // <-- IMPORTANT: integer paise
-                'currency' => 'INR',
+                'amount' => $totalAmount,
+                'currency' => 'INR'
             ]);
-
             $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
-            $razorpayData = json_decode($razorpayResponse->getContent(), true);
 
-            if (!($razorpayData['success'] ?? false) || empty($razorpayData['order']['id'])) {
+            // Decode Razorpay response
+            $razorpayData = json_decode($razorpayResponse->getContent(), true);
+            if (!$razorpayData['success']) {
                 DB::rollBack();
                 return response()->json(['message' => 'Failed to create Razorpay order.'], 500);
             }
 
-            // 6) Create order in DB (store rupees for your own totals)
+            // Create the order record
             $order = OrderModel::create([
-                'user_id'          => $user_id,
-                'total_amount'     => $totalAmountRupees, // store rupees in your DB
-                'status'           => $request->input('status', 'pending'),
-                'payment_status'   => $request->input('payment_status', 'pending'),
+                'user_id' => $user_id,
+                'total_amount' => $totalAmount,
+                'status' => $request->input('status', 'pending'),
+                'payment_status' => $request->input('payment_status', 'pending'),
                 'shipping_address' => $request->input('shipping_address'),
-                'razorpay_order_id'=> $razorpayData['order']['id'],
+                'razorpay_order_id' => $razorpayData['order']['id'],
             ]);
 
-            // 7) Create order items
-            foreach ($cartItems as $cartItem) {
+            // Iterate through each cart item to add it to the order items table
+            foreach($cartItems as $cartItem)
+            {
+                // Create the order item record
                 OrderItemModel::create([
-                    'order_id'   => $order->id,
+                    'order_id' => $order->id, // Link to the created order
                     'product_id' => $cartItem->product_id,
                     'variant_id' => $cartItem->variant_id,
-                    'quantity'   => $cartItem->quantity,
-                    'price'      => (float) $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id),
+                    'quantity' => $cartItem->quantity,
+                    'price' => $this->getFinalPrice($cartItem->product_id, $cartItem->variant_id), // Final price per item
                 ]);
             }
 
-            // 8) Clear cart
+            // After successfully adding order items, delete the cart items
             CartModel::where('user_id', $user_id)->delete();
 
+            // Commit the transaction
             DB::commit();
 
-            // 9) Prep items for email (optional)
+            // Build line items for the email (with product/variant names)
             $items = OrderItemModel::with(['product:id,name', 'variant:id,name'])
-                ->where('order_id', $order->id)->get()->map(function ($it) {
+                ->where('order_id', $order->id)
+                ->get()
+                ->map(function($it) {
                     return [
                         'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
                         'variant' => optional($it->variant)->name,
@@ -293,46 +126,48 @@ class OrderController extends Controller
                         'price'   => (float) $it->price,
                         'total'   => (float) $it->price * (int) $it->quantity,
                     ];
-                })->toArray();
+                })
+                ->toArray();
 
-            // 10) Email (non-blocking)
+            // Send confirmation email (do not block order if email fails)
             try {
                 Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
             } catch (\Throwable $e) {
                 \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
             }
 
-            // 11) Response (avoid double-nesting)
-            return response()->json([
+            // Prepare response
+            $response = [
                 'message' => 'Order created successfully!',
                 'data' => [
-                    'order_id'          => $order->id,
-                    'total_amount'      => $order->total_amount,   // rupees
-                    'amount_paise'      => $amountPaise,           // for debugging
-                    'status'            => $order->status,
-                    'payment_status'    => $order->payment_status,
-                    'shipping_address'  => $order->shipping_address,
+                    'order_id' => $order->id,
+                    'total_amount' => $order->total_amount,
+                    'status' => $order->status,
+                    'payment_status' => $order->payment_status,
+                    'shipping_address' => $order->shipping_address,
                     'razorpay_order_id' => $order->razorpay_order_id,
-                    'name'              => $orderUser->name,
-                    'email'             => $orderUser->email,
-                    'phone'             => $orderUser->mobile,
+                    'name' => $user_name,
+                    'email' => $user_email, 
+                    'phone' => $user_phone, 
                 ]
-            ], 201);
+            ];
 
-        } catch (\Throwable $e) {
+            // Return success response
+            return response()->json(['message' => 'Order created successfully!', 'data' => $response], 201);
+        }
+
+        catch(\Exception $e)
+        {
+            // Log the exception for debugging
+            \Log::error('Failed to create order: ' . $e->getMessage());
+
+            // In case of any failure, roll back the transaction
             DB::rollBack();
-            \Log::error('Failed to create order: '.$e->getMessage(), [
-                'user_id' => $user_id,
-                'total_rupees' => $totalAmountRupees ?? null,
-                'amount_paise' => $amountPaise ?? null,
-            ]);
-            return response()->json([
-                'message' => 'Failed to create order. Please try again.',
-                'error'   => $e->getMessage(),
-            ], 500);
+
+            // Return error response
+            return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
         }
     }
-
 
     // Helper function to get the final price for a product and its variant
     private function getFinalPrice($product_id, $variant_id = null)
