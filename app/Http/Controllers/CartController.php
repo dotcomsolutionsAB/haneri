@@ -143,26 +143,58 @@ class CartController extends Controller
         $variant_id = $cartItem->variant->id;
 
         // Check if the user has a discount in UsersDiscountModel first
-        $discount = UsersDiscountModel::where('user_id', $user->id)
-            ->where('product_variant_id', $cartItem->variant->id)
-            ->value('discount');
+        // $discount = UsersDiscountModel::where('user_id', $user->id)
+        //     ->where('product_variant_id', $cartItem->variant->id)
+        //     ->value('discount');
 
-        if ($discount === null) {
-            // If no discount found, fall back to variant-based discount
-            switch ($user->role) {
-                case 'customer':
-                    $discount = $cartItem->variant->customer_discount;
-                    break;
-                case 'dealer':
-                    $discount = $cartItem->variant->dealer_discount;
-                    break;
-                case 'architect':
-                    $discount = $cartItem->variant->architect_discount;
-                    break;
-                default:
-                    $discount = 0;
-                    break;
+        // if ($discount === null) {
+        //     // If no discount found, fall back to variant-based discount
+        //     switch ($user->role) {
+        //         case 'customer':
+        //             $discount = $cartItem->variant->customer_discount;
+        //             break;
+        //         case 'dealer':
+        //             $discount = $cartItem->variant->dealer_discount;
+        //             break;
+        //         case 'architect':
+        //             $discount = $cartItem->variant->architect_discount;
+        //             break;
+        //         default:
+        //             $discount = 0;
+        //             break;
+        //     }
+        // }
+
+        $discount = 0; // default: no discount
+
+        if ($user && $cartItem->variant) {
+            $variantId = $cartItem->variant->id;
+
+            // Try user-specific discount first
+            $discount = UsersDiscountModel::where('user_id', $user->id)
+                ->where('product_variant_id', $variantId)
+                ->value('discount');
+
+            // Fallback to role-based discount
+            if ($discount === null) {
+                switch ($user->role) {
+                    case 'customer':
+                        $discount = $cartItem->variant->customer_discount;
+                        break;
+                    case 'dealer':
+                        $discount = $cartItem->variant->dealer_discount;
+                        break;
+                    case 'architect':
+                        $discount = $cartItem->variant->architect_discount;
+                        break;
+                    default:
+                        $discount = 0;
+                        break;
+                }
             }
+        } else {
+            // guest user — no login / no user_id
+            $discount = 0;
         }
 
         $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
