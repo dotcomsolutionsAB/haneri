@@ -772,6 +772,11 @@ class ProductController extends Controller
             $colorsArr  = array_values(array_filter(array_map('trim', explode(',', (string)$colorCsv))));
             $applyColor = !empty($colorsArr);
 
+            $sweepCsv   = $request->input('sweep_size'); // or you can standardize key to 'sweep_size'
+            $sweepSizes = array_values(array_filter(array_map('trim', explode(',', (string)$sweepCsv))));
+            $applySweep = !empty($sweepSizes);
+
+
 
             $query = ProductModel::with([
                 'brand:id,name',
@@ -798,8 +803,6 @@ class ProductController extends Controller
             if (!is_null($isActive)) $query->where('is_active', $isActive);
             if ($variantType) $query->whereHas('variants', fn($q) => $q->where('variant_type', $variantType));
 
-            /* ---------- NEW FILTERS ---------- */
-
             /** Price range filter (based on variants.regular_price)
              *  Defaults: min=0, max=“highest” (i.e., no upper cap) when not provided.
              *  Only applied if either bound is non-zero.
@@ -815,10 +818,7 @@ class ProductController extends Controller
                 });
             }
 
-            /** Color filter
-             *  Expecting: color = "Denim Blue,Baby Pink"
-             *  Matches variants where variant_type = 'color' AND variant_value IN (...)
-             */
+            /* Color filter */
             $colorCsv = $request->input('color');
             if (!empty($colorCsv)) {
                 $colors = array_filter(array_map('trim', explode(',', $colorCsv)));
@@ -828,6 +828,18 @@ class ProductController extends Controller
                         ->whereIn('variant_value', $colors);
                     });
                 }
+            }
+
+            /** Sweep Size filter
+             * Expecting: "Sweep Size": "1320mm,1200mm"
+             * Matches products that have a feature with
+             * feature_name = 'Sweep Size' AND feature_value IN (...)
+             */
+            if ($applySweep) {
+                $query->whereHas('features', function ($q) use ($sweepSizes) {
+                    $q->where('feature_name', 'Sweep Size')
+                    ->whereIn('feature_value', $sweepSizes);
+                });
             }
 
             $totalRecords = $query->count();
