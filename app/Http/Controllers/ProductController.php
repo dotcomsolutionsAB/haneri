@@ -842,7 +842,7 @@ class ProductController extends Controller
                 $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
 
                 // ---- NEW: trim variants to match filters (color/price) before mapping ----
-                $trimmedVariants = $prod->variants->filter(function ($variant) use ($applyPrice, $low, $high, $applyColor, $colorsArr) {
+                $trimmedVariants = ($prod->variants ?? collect())->filter(function ($variant) use ($applyPrice, $low, $high, $applyColor, $colorsArr) {
                     // Price check (if applied)
                     if ($applyPrice) {
                         $rp = (float) $variant->regular_price;
