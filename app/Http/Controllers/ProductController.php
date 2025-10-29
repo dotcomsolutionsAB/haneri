@@ -761,10 +761,18 @@ class ProductController extends Controller
             $limit          = $request->input('limit', 10);
             $offset         = $request->input('offset', 0);
             $variantType    = $request->input('variant_type');
+            // --- parsed filters for per-product variant trimming ---
             $minPrice = (float) $request->input('min_priceFilter', 0);
             $maxPrice = (float) $request->input('max_priceFilter', 0);
-            $color    = $request->input('color');
-            
+            $applyPrice = ($minPrice > 0 || $maxPrice > 0);
+            $low  = max(0, $minPrice);
+            $high = ($maxPrice > 0) ? $maxPrice : INF;
+
+            $colorCsv   = $request->input('color');
+            $colorsArr  = array_values(array_filter(array_map('trim', explode(',', (string)$colorCsv))));
+            $applyColor = !empty($colorsArr);
+
+
             $query = ProductModel::with([
                 'brand:id,name',
                 'category:id,name',
@@ -830,10 +838,27 @@ class ProductController extends Controller
             $uploads     = UploadModel::whereIn('id', $allImageIds)->pluck('file_path', 'id');
 
             /* --- transform products --- */
-            $products = $products->map(function ($prod) use ($uploads, $userId, $userRole) {
+            $products = $products->map(function ($prod) use ($uploads, $userId, $userRole, $applyPrice, $low, $high, $applyColor, $colorsArr) {
                 $image = array_map(fn($uid) => $uploads[$uid] ?? null, explode(',', $prod->image ?? ''));
+
+                // ---- NEW: trim variants to match filters (color/price) before mapping ----
+                $trimmedVariants = $prod->variants->filter(function ($variant) use ($applyPrice, $low, $high, $applyColor, $colorsArr) {
+                    // Price check (if applied)
+                    if ($applyPrice) {
+                        $rp = (float) $variant->regular_price;
+                        if (!($rp >= $low && $rp <= $high)) return false;
+                    }
+                    // Color check (if applied)
+                    if ($applyColor) {
+                        if (strtolower($variant->variant_type) !== 'color') return false;
+                        // Case-insensitive match on variant_value
+                        return in_array($variant->variant_value, $colorsArr, true);
+                    }
+                    return true; // no color filter; passes
+                })->values();
+
                 // $variants = $prod->variants->map(function ($variant) {
-                $variants = $prod->variants->map(function ($variant) use ($userId, $userRole) {
+                $variants = $prod->trimmedVariants ->map(function ($variant) use ($userId, $userRole) {
                     //$user = auth()->user();
                     $discount = 0;
                     // if ($user) {
