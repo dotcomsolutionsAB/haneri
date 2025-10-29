@@ -858,7 +858,7 @@ class ProductController extends Controller
                 })->values();
 
                 // $variants = $prod->variants->map(function ($variant) {
-                $variants = $prod->trimmedVariants ->map(function ($variant) use ($userId, $userRole) {
+                $variants = $trimmedVariants ->map(function ($variant) use ($userId, $userRole) {
                     //$user = auth()->user();
                     $discount = 0;
                     // if ($user) {
