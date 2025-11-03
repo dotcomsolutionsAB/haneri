@@ -27,34 +27,46 @@ class UserController extends Controller
     // public function register(Request $request)
     // {
     //     $request->validate([
-    //         'name' => 'required|string|max:255',
-    //         'email' => 'required|email|unique:users,email',
-    //         'password' => 'required|string|min:8',
-    //         'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
-    //         // 'role' => 'required|in:admin,customer,architect,dealer',
+    //         'name'          => 'required|string|max:255',
+    //         'email'         => 'required|email|unique:users,email',
+    //         'password'      => 'required|string|min:8',
+    //         'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
     //         'selected_type' => 'nullable|string',
     //     ]);
 
     //     $user = User::create([
-    //         'name' => $request->input('name'),
-    //         'email' => $request->input('email'),
-    //         'password' => Hash::make($request->input('password')),
-    //         'mobile' => $request->input('mobile'),
-    //         'role' => "customer",
-    //         'selected_type' => $request->input('selected_type')
+    //         'name'          => $request->input('name'),
+    //         'email'         => $request->input('email'),
+    //         'password'      => Hash::make($request->input('password')),
+    //         'mobile'        => $request->input('mobile'),
+    //         'role'          => 'customer',
+    //         'selected_type' => $request->input('selected_type'),
     //     ]);
 
-    //     // Automatically log in the user
+    //     // Send immediately (debugging). Later you can queue it.
+    //     try {
+    //         Log::info('Sending WelcomeUserMail to '.$user->email);
+    //         Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
+    //         Log::info('WelcomeUserMail sent');
+    //     } catch (\Throwable $e) {
+    //         Log::error('Welcome email failed', [
+    //             'error' => $e->getMessage(),
+    //             'trace' => $e->getTraceAsString(),
+    //         ]);
+    //     }
+
     //     $token = $user->createToken('authToken')->plainTextToken;
 
-    //     unset($user['id'], $user['created_at'], $user['updated_at']);
-
-    //     return response()->json(['message' => 'User registered successfully!', 'data' => $user, 'token' => $token], 201);
+    //     return response()->json([
+    //         'message' => 'User registered successfully!',
+    //         'data'    => $user->only(['name','email','mobile','role','selected_type']),
+    //         'token'   => $token,
+    //     ], 201);
     // }
 
     public function register(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'email'         => 'required|email|unique:users,email',
             'password'      => 'required|string|min:8',
@@ -62,25 +74,16 @@ class UserController extends Controller
             'selected_type' => 'nullable|string',
         ]);
 
-        $user = User::create([
-            'name'          => $request->input('name'),
-            'email'         => $request->input('email'),
-            'password'      => Hash::make($request->input('password')),
-            'mobile'        => $request->input('mobile'),
-            'role'          => 'customer',
-            'selected_type' => $request->input('selected_type'),
-        ]);
+        $user = $this->createUser($validated);
 
-        // Send immediately (debugging). Later you can queue it.
-        try {
-            Log::info('Sending WelcomeUserMail to '.$user->email);
-            Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
-            Log::info('WelcomeUserMail sent');
-        } catch (\Throwable $e) {
-            Log::error('Welcome email failed', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+        // Optional: send welcome mail (skip if caller sets a flag)
+        if (!$request->boolean('suppress_welcome_mail')) {
+            try {
+                Log::info('Sending WelcomeUserMail to '.$user->email);
+                Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
+            } catch (\Throwable $e) {
+                Log::error('Welcome email failed', ['error' => $e->getMessage()]);
+            }
         }
 
         $token = $user->createToken('authToken')->plainTextToken;
@@ -91,6 +94,70 @@ class UserController extends Controller
             'token'   => $token,
         ], 201);
     }
+
+    private function createUser(array $attrs): \App\Models\User
+    {
+        return User::create([
+            'name'          => $attrs['name'],
+            'email'         => $attrs['email'],
+            'password'      => Hash::make($attrs['password']),
+            'mobile'        => $attrs['mobile'],
+            'role'          => $attrs['role'] ?? 'customer',
+            'selected_type' => $attrs['selected_type'] ?? null,
+        ]);
+    }
+
+    public function guest_register(Request $request)
+    {
+        $cartId = $request->input('cart_id');
+        if (!$cartId) {
+            return response()->json(['message' => 'Cart ID not found.'], 400);
+        }
+
+        $validated = $request->validate([
+            'name'   => 'required|string|max:255',
+            'email'  => 'required|email|unique:users,email',
+            'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
+        ]);
+
+        // Generate random password for the guest
+        $randomPassword = $this->generateRandomPassword(12);
+
+        // All-or-nothing: user creation + cart migration
+        [$user, $updated] = DB::transaction(function () use ($validated, $randomPassword, $cartId) {
+            $user = $this->createUser([
+                'name'     => $validated['name'],
+                'email'    => $validated['email'],
+                'password' => $randomPassword, // (hashed inside createUser)
+                'mobile'   => $validated['mobile'],
+                'role'     => 'customer',
+            ]);
+
+            // IMPORTANT: confirm your column. If your temp ID is stored in `cart_id`, change where('cart_id', $cartId)
+            $updated = CartModel::where('user_id', $cartId)->update(['user_id' => $user->id]);
+
+            return [$user, $updated];
+        });
+
+        // Send credentials email to the user (don’t fail the whole flow if mail breaks)
+        try {
+            Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
+        } catch (\Throwable $e) {
+            Log::error('UserRegisteredMail failed', ['error' => $e->getMessage()]);
+        }
+
+
+        // Log the user in
+        $token = $user->createToken('authToken')->plainTextToken;
+
+        return response()->json([
+            'message'  => 'User registered successfully! Cart updated and login credentials sent to email.',
+            'password' => $randomPassword, // if you want to show it (optional)
+            'token'    => $token,
+            'user'     => $user->only(['name','email','mobile','role']),
+        ], 201);
+    }
+
 
     // Get logged-in user details
     public function profile()
@@ -132,80 +199,80 @@ class UserController extends Controller
         return response()->json(['message' => 'User updated successfully!', 'data' => $user], 200);
     }
 
-    public function guest_register(Request $request)
-    {
-        // Retrieve the cart_id from cookies
-        //$cartId = $request->cookie('cart_id');
+    // public function guest_register(Request $request)
+    // {
+    //     // Retrieve the cart_id from cookies
+    //     //$cartId = $request->cookie('cart_id');
 
-        // Replace with Normal Request Input
-        $cartId = $request->input('cart_id');
+    //     // Replace with Normal Request Input
+    //     $cartId = $request->input('cart_id');
 
-        if (!$cartId) {
-            return response()->json(['message' => 'Cart ID not found in cookies.'], 400);
-        }
+    //     if (!$cartId) {
+    //         return response()->json(['message' => 'Cart ID not found in cookies.'], 400);
+    //     }
 
-        // Validate name, email, and mobile
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
-        ]);
+    //     // Validate name, email, and mobile
+    //     $request->validate([
+    //         'name' => 'required|string|max:255',
+    //         'email' => 'required|email|unique:users,email',
+    //         'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
+    //     ]);
 
-        // Generate a random password
-        $randomPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 10);
-        $hashedPassword = Hash::make($randomPassword);
+    //     // Generate a random password
+    //     $randomPassword = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 10);
+    //     $hashedPassword = Hash::make($randomPassword);
 
-        // Prepare request data for registration
-        $registrationData = new Request([
-            'name' => $request->name,
-            'email' => $request->email,
-            'password' => $randomPassword,
-            'mobile' => $request->mobile,
-            'role' => 'customer'
-        ]);
+    //     // Prepare request data for registration
+    //     $registrationData = new Request([
+    //         'name' => $request->name,
+    //         'email' => $request->email,
+    //         'password' => $randomPassword,
+    //         'mobile' => $request->mobile,
+    //         'role' => 'customer'
+    //     ]);
 
-        // Call the register function
-        $registerResponse = $this->register($registrationData);
+    //     // Call the register function
+    //     $registerResponse = $this->register($registrationData);
 
-        // Extract data properly from `original`
-        $registerData = $registerResponse->original ?? [];
+    //     // Extract data properly from `original`
+    //     $registerData = $registerResponse->original ?? [];
 
-       // Ensure 'data' key exists in the response
-        if (!isset($registerData['data'])) {
-            return response()->json([
-                'message' => 'User registration failed',
-                'errors' => $registerData['errors'] ?? []
-            ], 400);
-        }
+    //    // Ensure 'data' key exists in the response
+    //     if (!isset($registerData['data'])) {
+    //         return response()->json([
+    //             'message' => 'User registration failed',
+    //             'errors' => $registerData['errors'] ?? []
+    //         ], 400);
+    //     }
 
-        // Retrieve the user data correctly
-        $user = $registerData['data']; // This is now an array
+    //     // Retrieve the user data correctly
+    //     $user = $registerData['data']; // This is now an array
 
-        // Extract user ID from `original`
-        $userId = $user->getOriginal('id'); // Safe way to get the original ID
+    //     // Extract user ID from `original`
+    //     $userId = $user->getOriginal('id'); // Safe way to get the original ID
 
-        // Update cart: Replace cart_id with the new user_id
-        CartModel::where('user_id', $cartId)->update(['user_id' => $userId]);
+    //     // Update cart: Replace cart_id with the new user_id
+    //     CartModel::where('user_id', $cartId)->update(['user_id' => $userId]);
 
-        // Send email using Mailable
-        Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
+    //     // Send email using Mailable
+    //     Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
 
-        // Retrieve the user
-        $get_user = User::where('mobile', $request->mobile)->first();
+    //     // Retrieve the user
+    //     $get_user = User::where('mobile', $request->mobile)->first();
 
-        // Automatically log in the user
-        $token = $get_user->createToken('authToken')->plainTextToken;
+    //     // Automatically log in the user
+    //     $token = $get_user->createToken('authToken')->plainTextToken;
 
-        // Remove the cart_id cookie after transferring the cart to the user
-        //Cookie::queue(Cookie::forget('cart_id'));
+    //     // Remove the cart_id cookie after transferring the cart to the user
+    //     //Cookie::queue(Cookie::forget('cart_id'));
 
-        return response()->json([
-            'message' => 'User registered successfully! Cart updated and login credentials sent to email.',
-            'password' => $randomPassword,
-            'token' => $token,
-            'user' => $user
-        ], 201);
-    }
+    //     return response()->json([
+    //         'message' => 'User registered successfully! Cart updated and login credentials sent to email.',
+    //         'password' => $randomPassword,
+    //         'token' => $token,
+    //         'user' => $user
+    //     ], 201);
+    // }
 
     /**
      * Fetch All Users with Search & Role Filter (Admin Only)
