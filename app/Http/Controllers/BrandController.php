@@ -120,64 +120,47 @@ public function update(Request $request, $id)
         return response()->json(['message' => 'Brand not found.'], 404);
     }
 
-    // IMPORTANT: send multipart/form-data when uploading a file
+    // Validate (allow partial updates)
     $validated = $request->validate([
-        'name'         => 'nullable|string|max:255',  // allow missing
-        'logo'         => 'nullable|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
-        'custom_sort'  => 'nullable|integer',
-        'description'  => 'nullable|string|nullable',
+        'name'         => 'sometimes|string|max:255',
+        'logo'         => 'sometimes|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
+        'custom_sort'  => 'sometimes|integer',
+        'description'  => 'sometimes|nullable|string',
     ]);
 
     DB::beginTransaction();
     try {
-        // ---- Scalars: update from request if present; otherwise keep existing ----
-        if ($request->exists('name')) {
-            $brand->name = $request->input('name', $brand->name);
+        // Update scalar fields if present
+        if ($request->has('name')) {
+            $brand->name = $validated['name'];
         }
-        if ($request->exists('custom_sort')) {
-            $brand->custom_sort = $request->input('custom_sort', $brand->custom_sort);
+        if ($request->has('custom_sort')) {
+            $brand->custom_sort = $validated['custom_sort'];
         }
-        if ($request->exists('description')) {
-            $brand->description = $request->input('description', $brand->description);
+        if ($request->has('description')) {
+            $brand->description = $validated['description'];
         }
 
-        // ---- File: replace if a new one is uploaded ----
-        if ($request->file('logo')) {
-            // delete old if we can resolve a relative path
-            if (!empty($brand->logo)) {
-                $relative = $brand->logo;
+        // If a new logo is uploaded: delete old file by filename and then store new
+        if ($request->hasFile('logo')) {
+            // Delete old by scanning directory for the filename
+            $this->deleteOldBrandLogo($brand->logo);
 
-                // If stored as full URL, strip domain and optional "storage/"
-                if (Str::startsWith($relative, ['http://', 'https://'])) {
-                    $path = parse_url($relative, PHP_URL_PATH) ?? '';
-                    $relative = ltrim($path, '/');                             // e.g. storage/upload/brands/abc.jpg
-                    $relative = ltrim(Str::after($relative, 'storage/'), '/'); // -> upload/brands/abc.jpg
-                }
-
-                // Drop any accidental "public/" prefix
-                $relative = ltrim(Str::after($relative, 'public/'), '/');
-
-                if ($relative && Str::startsWith($relative, 'upload/') && Storage::disk('public')->exists($relative)) {
-                    Storage::disk('public')->delete($relative);
-                }
-            }
-
-            // Store new file – keep ONLY relative path in DB
-            $newPath = $request->file('logo')->store('upload/brands', 'public'); // -> "upload/brands/xyz.png"
+            // Store new file (relative path only)
+            $newPath = $request->file('logo')->store('upload/brands', 'public'); // e.g. upload/brands/xyz.jpg
             $brand->logo = $newPath;
         }
 
-        $brand->saveOrFail();
+        $brand->save();
         DB::commit();
 
-        $brand->refresh();
-
+        // Build response with full URL for logo
         return response()->json([
             'message' => 'Brand updated successfully!',
             'data' => [
                 'id'          => $brand->id,
                 'name'        => $brand->name,
-                'logo'        => $brand->logo ? asset('storage/' . $brand->logo) : null, // full URL in response
+                'logo'        => $brand->logo ? asset('storage/' . ltrim($brand->logo, '/')) : null,
                 'custom_sort' => $brand->custom_sort,
                 'description' => $brand->description,
             ],
@@ -190,6 +173,64 @@ public function update(Request $request, $id)
         ], 500);
     }
 }
+
+/**
+ * Delete old brand logo by extracting filename and scanning the brands directory.
+ * Accepts either a relative path (upload/brands/abc.jpg) or a full URL.
+ */
+private function deleteOldBrandLogo(?string $logoPath): bool
+{
+    try {
+        if (empty($logoPath)) {
+            return true; // nothing to delete
+        }
+
+        // Normalize to just the filename (abc.jpg)
+        $filename = $logoPath;
+
+        // If full URL, get the path part first
+        if (Str::startsWith($filename, ['http://', 'https://'])) {
+            $path = parse_url($filename, PHP_URL_PATH) ?? '';
+            $filename = ltrim($path, '/'); // e.g. storage/upload/brands/abc.jpg
+            // Strip optional "storage/" and/or "public/"
+            $filename = ltrim(Str::after($filename, 'storage/'), '/'); // -> upload/brands/abc.jpg
+        }
+
+        // Now reduce to pure filename
+        $filename = basename($filename); // -> abc.jpg
+
+        if ($filename === '' || $filename === '.' || $filename === '..') {
+            return true; // invalid filename; treat as deleted
+        }
+
+        // Target directory
+        $dir = 'upload/brands';
+
+        // 1) Quick path: try exact path "upload/brands/filename"
+        $directPath = $dir . '/' . $filename;
+        if (Storage::disk('public')->exists($directPath)) {
+            Storage::disk('public')->delete($directPath);
+            return true;
+        }
+
+        // 2) Scan directory and match by filename (in case of subfolders or odd paths)
+        $files = Storage::disk('public')->files($dir);
+        foreach ($files as $file) {
+            if (basename($file) === $filename) {
+                Storage::disk('public')->delete($file);
+                return true;
+            }
+        }
+
+        // Not found is also "ok" per your spec
+        return true;
+    } catch (\Throwable $e) {
+        // You can log this if needed
+        // \Log::warning('deleteOldBrandLogo failed', ['error' => $e->getMessage(), 'logoPath' => $logoPath]);
+        return false;
+    }
+}
+
 
 
     // Delete
