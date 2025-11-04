@@ -118,7 +118,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // for all users
         Route::post('/all_users', [UserController::class, 'fetchUsers']); // List all users for admin
-        Route::delete('/users/{id}', [UserController::class, 'deleteUser']);
+        Route::delete('/delete/{id}', [UserController::class, 'deleteUser']);
 
         Route::prefix('users')->group(function () {
             Route::get('/admin_dashboard', [UserController::class, 'record_count']); //get product count
