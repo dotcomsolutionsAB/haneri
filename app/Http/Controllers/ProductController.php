@@ -1133,7 +1133,7 @@ class ProductController extends Controller
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
                 'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
-            ])->where('is_active', '!=', 0);
+            ]);
 
             /* --- filters --- */
             if ($searchProduct) {
