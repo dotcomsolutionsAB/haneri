@@ -158,7 +158,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Route::get('/', [BrandController::class, 'index']);            // List all brands
         // Route::get('/{id}', [BrandController::class, 'show']);         // Get details of a single brand
         Route::post('/', [BrandController::class, 'store']);           // Add a new brand (Admin only)
-        Route::post('/{id}', [BrandController::class, 'update']);       // Update a brand (Admin only)
+        Route::put('/{id}', [BrandController::class, 'update']);       // Update a brand (Admin only)
         Route::delete('/{id}', [BrandController::class, 'destroy']);   // Delete a brand (Admin only)
     });
 
