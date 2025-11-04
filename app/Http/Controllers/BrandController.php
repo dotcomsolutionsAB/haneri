@@ -133,69 +133,6 @@ class BrandController extends Controller
     }
 
     // Update
-    // public function update(Request $request, $id)
-    // {
-    //     $brand = BrandModel::find($id);
-    //     if (!$brand) {
-    //         return response()->json(['message' => 'Brand not found.'], 404);
-    //     }
-
-    //     // Validate only if present (form-data)
-    //     $validated = $request->validate([
-    //         'name'         => 'sometimes|string|max:255',
-    //         'logo'         => 'sometimes|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
-    //         'custom_sort'  => 'sometimes|integer',
-    //         'description'  => 'sometimes|nullable|string',
-    //     ]);
-
-    //     DB::beginTransaction();
-    //     try {
-    //         // If a key was sent at all (exists), update it — even if it's "0" or "".
-    //         if ($request->exists('name')) {
-    //             $brand->name = (string)($validated['name'] ?? $request->input('name', ''));
-    //         }
-
-    //         if ($request->exists('custom_sort')) {
-    //             // integer rule accepts "2" from form-data; keep raw input fallback
-    //             $brand->custom_sort = $validated['custom_sort'] ?? (int)$request->input('custom_sort');
-    //         }
-
-    //         if ($request->exists('description')) {
-    //             // Treat empty string as null; remove `?: null` if you want to store ""
-    //             $desc = $request->input('description');
-    //             $brand->description = ($desc === '' ? null : $desc);
-    //         }
-
-    //         // IMPORTANT: works only when you POST with _method=PUT
-    //         if ($request->hasFile('logo')) {
-    //             $this->deleteOldBrandLogo($brand->logo);
-    //             $newPath = $request->file('logo')->store('upload/brands', 'public'); // upload/brands/xyz.jpg
-    //             $brand->logo = $newPath; // store relative path in DB
-    //         }
-
-    //         $brand->save();
-    //         DB::commit();
-
-    //         return response()->json([
-    //             'message' => 'Brand updated successfully!',
-    //             'data' => [
-    //                 'id'          => $brand->id,
-    //                 'name'        => $brand->name,
-    //                 'logo'        => $brand->logo ? asset('storage/' . ltrim($brand->logo, '/')) : null,
-    //                 'custom_sort' => $brand->custom_sort,
-    //                 'description' => $brand->description,
-    //             ],
-    //         ]);
-    //     } catch (\Throwable $e) {
-    //         DB::rollBack();
-    //         return response()->json([
-    //             'message' => 'Update failed.',
-    //             'error'   => config('app.debug') ? $e->getMessage() : 'Unexpected error',
-    //         ], 500);
-    //     }
-    // }
-    
-
     public function update(Request $request, $id)
     {
         $brand = BrandModel::find($id);
@@ -203,27 +140,37 @@ class BrandController extends Controller
             return response()->json(['message' => 'Brand not found.'], 404);
         }
 
-        // Validate only present fields
+        // Validate only if present (form-data)
         $validated = $request->validate([
             'name'         => 'sometimes|string|max:255',
+            'logo'         => 'sometimes|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
             'custom_sort'  => 'sometimes|integer',
             'description'  => 'sometimes|nullable|string',
         ]);
 
         DB::beginTransaction();
         try {
-            // Update only the sent fields (using exists() for form-data)
+            // If a key was sent at all (exists), update it — even if it's "0" or "".
             if ($request->exists('name')) {
                 $brand->name = (string)($validated['name'] ?? $request->input('name', ''));
             }
 
             if ($request->exists('custom_sort')) {
+                // integer rule accepts "2" from form-data; keep raw input fallback
                 $brand->custom_sort = $validated['custom_sort'] ?? (int)$request->input('custom_sort');
             }
 
             if ($request->exists('description')) {
+                // Treat empty string as null; remove `?: null` if you want to store ""
                 $desc = $request->input('description');
                 $brand->description = ($desc === '' ? null : $desc);
+            }
+
+            // IMPORTANT: works only when you POST with _method=PUT
+            if ($request->hasFile('logo')) {
+                $this->deleteOldBrandLogo($brand->logo);
+                $newPath = $request->file('logo')->store('upload/brands', 'public'); // upload/brands/xyz.jpg
+                $brand->logo = $newPath; // store relative path in DB
             }
 
             $brand->save();
@@ -247,6 +194,59 @@ class BrandController extends Controller
             ], 500);
         }
     }
+    
+
+    // public function update(Request $request, $id)
+    // {
+    //     $brand = BrandModel::find($id);
+    //     if (!$brand) {
+    //         return response()->json(['message' => 'Brand not found.'], 404);
+    //     }
+
+    //     // Validate only present fields
+    //     $validated = $request->validate([
+    //         'name'         => 'sometimes|string|max:255',
+    //         'custom_sort'  => 'sometimes|integer',
+    //         'description'  => 'sometimes|nullable|string',
+    //     ]);
+
+    //     DB::beginTransaction();
+    //     try {
+    //         // Update only the sent fields (using exists() for form-data)
+    //         if ($request->exists('name')) {
+    //             $brand->name = (string)($validated['name'] ?? $request->input('name', ''));
+    //         }
+
+    //         if ($request->exists('custom_sort')) {
+    //             $brand->custom_sort = $validated['custom_sort'] ?? (int)$request->input('custom_sort');
+    //         }
+
+    //         if ($request->exists('description')) {
+    //             $desc = $request->input('description');
+    //             $brand->description = ($desc === '' ? null : $desc);
+    //         }
+
+    //         $brand->save();
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'message' => 'Brand updated successfully!',
+    //             'data' => [
+    //                 'id'          => $brand->id,
+    //                 'name'        => $brand->name,
+    //                 'logo'        => $brand->logo ? asset('storage/' . ltrim($brand->logo, '/')) : null,
+    //                 'custom_sort' => $brand->custom_sort,
+    //                 'description' => $brand->description,
+    //             ],
+    //         ]);
+    //     } catch (\Throwable $e) {
+    //         DB::rollBack();
+    //         return response()->json([
+    //             'message' => 'Update failed.',
+    //             'error'   => config('app.debug') ? $e->getMessage() : 'Unexpected error',
+    //         ], 500);
+    //     }
+    // }
 
 
     // Delete
