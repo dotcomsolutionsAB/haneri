@@ -32,27 +32,26 @@ class BrandController extends Controller
     // }
     public function store(Request $request)
 {
-    // Expect multipart/form-data
     $validated = $request->validate([
         'name'         => 'required|string|max:255',
-        'logo'         => 'nullable|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120', // up to ~5MB
+        'logo'         => 'nullable|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
         'custom_sort'  => 'nullable|integer',
         'description'  => 'nullable|string',
     ]);
 
-    // Upload logo (if provided) to the public disk
     $logoUrl = null;
+
     if ($request->hasFile('logo')) {
-        // stores to storage/app/public/brands/xxx.ext
-        $path = $request->file('logo')->store('brands', 'public');
-        // generates /storage/brands/xxx.ext (requires `php artisan storage:link` once)
-        $logoUrl = Storage::url($path);
+        // Upload into storage/app/public/upload/brands/
+        $path = $request->file('logo')->store('upload/brands', 'public');
+
+        // Get public URL (requires `php artisan storage:link`)
+        $logoUrl = asset(Storage::url($path));  // full URL, e.g. https://yourdomain.com/storage/upload/brands/xyz.jpg
     }
 
-    // Create brand with URL saved in `logo` column
     $brand = BrandModel::create([
         'name'        => $validated['name'],
-        'logo'        => $logoUrl,                       // store the public URL
+        'logo'        => $logoUrl,
         'custom_sort' => $validated['custom_sort'] ?? 0,
         'description' => $validated['description'] ?? null,
     ]);
@@ -62,7 +61,7 @@ class BrandController extends Controller
         'data' => [
             'id'          => $brand->id,
             'name'        => $brand->name,
-            'logo'        => $brand->logo,              // public URL
+            'logo'        => $brand->logo, // now full URL
             'custom_sort' => $brand->custom_sort,
             'description' => $brand->description,
         ],
