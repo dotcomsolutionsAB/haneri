@@ -129,7 +129,7 @@ class BrandController extends Controller
 
     //     return response()->json(['message' => 'Brand updated successfully!', 'data' => $brand], 200);
     // }
-use Illuminate\Support\Facades\Storage;
+
 
 public function update(Request $request, $id)
 {
