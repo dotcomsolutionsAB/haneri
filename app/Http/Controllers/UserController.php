@@ -158,7 +158,6 @@ class UserController extends Controller
         ], 201);
     }
 
-
     // Get logged-in user details
     public function profile()
     {
@@ -480,6 +479,51 @@ class UserController extends Controller
         } catch (\Exception $e) {
             // General error (e.g., database issues)
             return response()->json(['error' => 'Something went wrong: ' . $e->getMessage()], 500);
+        }
+    }
+
+    // Admin-only hard delete (no soft deletes used)
+    public function deleteUser(Request $request, $id)
+    {
+        $authUser = $request->user();
+
+        if (($authUser->role ?? null) !== 'admin') {
+            return response()->json([
+                'code' => 403, 'success' => false,
+                'message' => 'Only admins can delete users.',
+                'data' => [],
+            ], 403);
+        }
+
+        $user = User::find($id);
+        if (!$user) {
+            return response()->json([
+                'code' => 404, 'success' => false,
+                'message' => 'User not found.',
+                'data' => [],
+            ], 404);
+        }
+
+        try {
+            // Revoke Sanctum tokens
+            if (method_exists($user, 'tokens')) {
+                $user->tokens()->delete();
+            }
+
+            // Hard delete permanently (no soft deletes)
+            $user->forceDelete();
+
+            return response()->json([
+                'code' => 200, 'success' => true,
+                'message' => 'User permanently deleted.',
+                'data' => [],
+            ], 200);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code' => 500, 'success' => false,
+                'message' => 'Failed to delete user.',
+                'data' => ['error' => $e->getMessage()],
+            ], 500);
         }
     }
 }
