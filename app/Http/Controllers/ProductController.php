@@ -1584,6 +1584,128 @@ class ProductController extends Controller
         }
     }
 
+    public function addVariant(Request $request, $productId)
+    {
+        $product = ProductModel::find($productId);
+        if (!$product) {
+            return response()->json([
+                'code' => 404,
+                'success' => false,
+                'message' => 'Product not found.',
+                'data' => []
+            ], 404);
+        }
+
+        // Allow both bulk and single payload
+        $payload = $request->input('variants');
+        if (is_null($payload)) {
+            $payload = [$request->only([
+                'photo_id', 'min_qty', 'is_cod', 'weight', 'description',
+                'variant_type', 'variant_value', 'discount_price', 'regular_price',
+                'customer_discount', 'dealer_discount', 'architect_discount',
+                'hsn', 'regular_tax', 'selling_tax', 'video_url', 'product_pdf'
+            ])];
+        }
+        $request->merge(['variants' => $payload]);
+
+        // Validate (no media upload here; photo_id optional if you already have an upload id)
+        $request->validate([
+            'variants' => 'required|array|min:1',
+            'variants.*.photo_id' => 'nullable|integer|exists:t_uploads,id',
+            'variants.*.min_qty' => 'nullable|integer|min:1',
+            'variants.*.is_cod' => 'nullable|boolean',
+            'variants.*.weight' => 'nullable|numeric',
+            'variants.*.description' => 'nullable|string',
+            'variants.*.variant_type' => 'required|string',
+            'variants.*.variant_value' => 'required|string',
+            'variants.*.discount_price' => 'nullable|numeric',
+            'variants.*.regular_price' => 'required|numeric',
+            'variants.*.customer_discount' => 'nullable|numeric',
+            'variants.*.dealer_discount' => 'nullable|numeric',
+            'variants.*.architect_discount' => 'nullable|numeric',
+            'variants.*.hsn' => 'nullable|string',
+            'variants.*.regular_tax' => 'nullable|numeric',
+            'variants.*.selling_tax' => 'nullable|numeric',
+            'variants.*.video_url' => 'nullable|string',
+            'variants.*.product_pdf' => 'nullable|string',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $created = [];
+            foreach ($request->variants as $v) {
+                $created[] = ProductVariantModel::create([
+                    'product_id'         => $product->id,
+                    'photo_id'           => $v['photo_id'] ?? null,      // optional; managed by your media API
+                    'min_qty'            => $v['min_qty'] ?? 1,
+                    'is_cod'             => $v['is_cod'] ?? true,
+                    'weight'             => $v['weight'] ?? null,
+                    'description'        => $v['description'] ?? null,
+                    'variant_type'       => $v['variant_type'],
+                    'variant_value'      => $v['variant_value'],
+                    'discount_price'     => $v['discount_price'] ?? null,
+                    'regular_price'      => $v['regular_price'],
+                    'customer_discount'  => $v['customer_discount'] ?? null,
+                    'dealer_discount'    => $v['dealer_discount'] ?? null,
+                    'architect_discount' => $v['architect_discount'] ?? null,
+                    'hsn'                => $v['hsn'] ?? null,
+                    'regular_tax'        => $v['regular_tax'] ?? null,
+                    'selling_tax'        => $v['selling_tax'] ?? null,
+                    'video_url'          => $v['video_url'] ?? null,
+                    'product_pdf'        => $v['product_pdf'] ?? null,
+                ]);
+            }
+
+            DB::commit();
+
+            // Match your response style used in product details (no files/banners here)
+            $data = collect($created)->map(function ($v) {
+                $sellingPrice = $v->discount_price !== null
+                    ? (float) $v->discount_price
+                    : (float) $v->regular_price;
+
+                return [
+                    'id' => $v->id,
+                    'product_id' => $v->product_id,
+                    'variant_type' => $v->variant_type,
+                    'min_qty' => (int) $v->min_qty,
+                    'is_cod' => (int) $v->is_cod,
+                    'weight' => $v->weight !== null ? (string)$v->weight : null,
+                    'description' => $v->description,
+                    'variant_value' => $v->variant_value,
+                    'discount_price' => $v->discount_price !== null ? number_format((float)$v->discount_price, 2, '.', '') : null,
+                    'regular_price' => number_format((float)$v->regular_price, 2, '.', ''),
+                    'hsn' => $v->hsn,
+                    'regular_tax' => $v->regular_tax !== null ? number_format((float)$v->regular_tax, 2, '.', '') : null,
+                    'selling_tax' => $v->selling_tax !== null ? number_format((float)$v->selling_tax, 2, '.', '') : null,
+                    'video_url' => $v->video_url,
+                    'product_pdf' => $v->product_pdf,
+                    'customer_discount' => $v->customer_discount !== null ? (float)$v->customer_discount : null,
+                    'dealer_discount' => $v->dealer_discount !== null ? (float)$v->dealer_discount : null,
+                    'architect_discount' => $v->architect_discount !== null ? (float)$v->architect_discount : null,
+                    'selling_price' => $sellingPrice,
+                    'file_urls' => [],   // managed by your media API
+                    'banner_urls' => []  // managed by your media API
+                ];
+            })->values();
+
+            return response()->json([
+                'code' => 201,
+                'success' => true,
+                'message' => 'Variant(s) created successfully!',
+                'data' => $data
+            ], 201);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to create variants.',
+                'data' => ['error' => $e->getMessage()]
+            ], 500);
+        }
+    }
     public function deleteVariant(Request $request, int $variantId)
     {
         DB::beginTransaction();

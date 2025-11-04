@@ -101,6 +101,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Product Routes
         Route::prefix('products')->group(function () {
             Route::post('/register', [ProductController::class, 'store']);         // Add a new product (Admin only)
+            Route::post('/{productId}/variants', [ProductController::class, 'addVariant']); // create variant(s)
             Route::post('/{variant_id}/banners', [ProductController::class, 'uploadBanner']); // upload banner by variant id
             Route::post('/{variant}/photos', [ProductController::class, 'uploadPhotos']); // upload banner by variant id
             Route::delete('/variants/{variantId}', [ProductController::class, 'deleteVariant']); // Delete variant by id
