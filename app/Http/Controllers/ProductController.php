@@ -1314,7 +1314,7 @@ class ProductController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Product details fetched successfully!',
+                'message' => 'Product Updated successfully!',
                 'data' => $data,
             ], 200);
 
