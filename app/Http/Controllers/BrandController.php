@@ -120,58 +120,56 @@ public function update(Request $request, $id)
         return response()->json(['message' => 'Brand not found.'], 404);
     }
 
-    // IMPORTANT: the client must send multipart/form-data when including a file
+    // IMPORTANT: send multipart/form-data when uploading a file
     $validated = $request->validate([
-        'name'         => 'sometimes|string|max:255',
-        'logo'         => 'sometimes|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
-        'custom_sort'  => 'sometimes|integer',
-        'description'  => 'sometimes|nullable|string',
+        'name'         => 'nullable|string|max:255',  // allow missing
+        'logo'         => 'nullable|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
+        'custom_sort'  => 'nullable|integer',
+        'description'  => 'nullable|string|nullable',
     ]);
 
     DB::beginTransaction();
     try {
-        // Scalar fields
-        if ($request->has('name')) {
-            $brand->name = $validated['name'];
+        // ---- Scalars: update from request if present; otherwise keep existing ----
+        if ($request->exists('name')) {
+            $brand->name = $request->input('name', $brand->name);
         }
-        if ($request->has('custom_sort')) {
-            $brand->custom_sort = $validated['custom_sort'];
+        if ($request->exists('custom_sort')) {
+            $brand->custom_sort = $request->input('custom_sort', $brand->custom_sort);
         }
-        if ($request->has('description')) {
-            $brand->description = $validated['description'];
+        if ($request->exists('description')) {
+            $brand->description = $request->input('description', $brand->description);
         }
 
-        // Logo replacement
-        if ($request->hasFile('logo')) {
-            // Delete old file if present (handles full URL or relative path)
+        // ---- File: replace if a new one is uploaded ----
+        if ($request->file('logo')) {
+            // delete old if we can resolve a relative path
             if (!empty($brand->logo)) {
                 $relative = $brand->logo;
 
-                // If DB stored a full URL, convert to relative by stripping domain + optional "storage/"
+                // If stored as full URL, strip domain and optional "storage/"
                 if (Str::startsWith($relative, ['http://', 'https://'])) {
                     $path = parse_url($relative, PHP_URL_PATH) ?? '';
-                    $relative = ltrim($path, '/');                 // e.g. storage/upload/brands/abc.jpg
-                    $relative = ltrim(Str::after($relative, 'storage/'), '/'); // e.g. upload/brands/abc.jpg
+                    $relative = ltrim($path, '/');                             // e.g. storage/upload/brands/abc.jpg
+                    $relative = ltrim(Str::after($relative, 'storage/'), '/'); // -> upload/brands/abc.jpg
                 }
 
-                // If DB mistakenly has "public/" prefix, drop it
+                // Drop any accidental "public/" prefix
                 $relative = ltrim(Str::after($relative, 'public/'), '/');
 
-                // Only delete files under our managed folder
                 if ($relative && Str::startsWith($relative, 'upload/') && Storage::disk('public')->exists($relative)) {
                     Storage::disk('public')->delete($relative);
                 }
             }
 
-            // Store new file; DB keeps relative path like "upload/brands/xyz.jpg"
-            $newPath = $request->file('logo')->store('upload/brands', 'public');
+            // Store new file – keep ONLY relative path in DB
+            $newPath = $request->file('logo')->store('upload/brands', 'public'); // -> "upload/brands/xyz.png"
             $brand->logo = $newPath;
         }
 
         $brand->saveOrFail();
         DB::commit();
 
-        // Reload from DB to avoid stale in-memory values
         $brand->refresh();
 
         return response()->json([
@@ -188,7 +186,7 @@ public function update(Request $request, $id)
         DB::rollBack();
         return response()->json([
             'message' => 'Update failed.',
-            'error'   => app()->hasDebugModeEnabled() ? $e->getMessage() : 'Unexpected error',
+            'error'   => config('app.debug') ? $e->getMessage() : 'Unexpected error',
         ], 500);
     }
 }
