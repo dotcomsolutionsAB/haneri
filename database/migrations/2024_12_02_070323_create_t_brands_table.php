@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('t_brands', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->integer('logo')->nullable(); // Path to logo image
+            $table->string('logo')->nullable(); // Path to logo image
             $table->integer('custom_sort')->default(0); // Sorting priority
             $table->text('description')->nullable(); // Description column    
             $table->timestamps();

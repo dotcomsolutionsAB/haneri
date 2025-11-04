@@ -3,32 +3,71 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage; // <-- add this at top
 use App\Models\BrandModel;
 
 class BrandController extends Controller
 {
     //
     // Store
+    // public function store(Request $request)
+    // {
+    //     $request->validate([
+    //         'name' => 'required|string',
+    //         'logo' => 'nullable|integer', // Path to logo image
+    //         'custom_sort' => 'nullable|integer',
+    //         'description' => 'nullable|string',
+    //     ]);
+
+    //     $brand = BrandModel::create([
+    //         'name' => $request->input('name'),
+    //         'logo' => $request->input('logo', null),
+    //         'custom_sort' => $request->input('custom_sort', 0),
+    //         'description' => $request->input('description', null),
+    //     ]);
+
+    //     unset($brand['id'], $brand['created_at'], $brand['updated_at']);
+
+    //     return response()->json(['message' => 'Brand created successfully!', 'data' => $brand], 201);
+    // }
     public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string',
-            'logo' => 'nullable|integer', // Path to logo image
-            'custom_sort' => 'nullable|integer',
-            'description' => 'nullable|string',
-        ]);
+{
+    // Expect multipart/form-data
+    $validated = $request->validate([
+        'name'         => 'required|string|max:255',
+        'logo'         => 'nullable|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120', // up to ~5MB
+        'custom_sort'  => 'nullable|integer',
+        'description'  => 'nullable|string',
+    ]);
 
-        $brand = BrandModel::create([
-            'name' => $request->input('name'),
-            'logo' => $request->input('logo', null),
-            'custom_sort' => $request->input('custom_sort', 0),
-            'description' => $request->input('description', null),
-        ]);
-
-        unset($brand['id'], $brand['created_at'], $brand['updated_at']);
-
-        return response()->json(['message' => 'Brand created successfully!', 'data' => $brand], 201);
+    // Upload logo (if provided) to the public disk
+    $logoUrl = null;
+    if ($request->hasFile('logo')) {
+        // stores to storage/app/public/brands/xxx.ext
+        $path = $request->file('logo')->store('brands', 'public');
+        // generates /storage/brands/xxx.ext (requires `php artisan storage:link` once)
+        $logoUrl = Storage::url($path);
     }
+
+    // Create brand with URL saved in `logo` column
+    $brand = BrandModel::create([
+        'name'        => $validated['name'],
+        'logo'        => $logoUrl,                       // store the public URL
+        'custom_sort' => $validated['custom_sort'] ?? 0,
+        'description' => $validated['description'] ?? null,
+    ]);
+
+    return response()->json([
+        'message' => 'Brand created successfully!',
+        'data' => [
+            'id'          => $brand->id,
+            'name'        => $brand->name,
+            'logo'        => $brand->logo,              // public URL
+            'custom_sort' => $brand->custom_sort,
+            'description' => $brand->description,
+        ],
+    ], 201);
+}
 
     // View All
     public function index(Request $request)
