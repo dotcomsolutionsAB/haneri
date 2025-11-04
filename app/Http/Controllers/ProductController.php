@@ -1650,4 +1650,111 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function addFeature(Request $request, $productId)
+    {
+        $product = ProductModel::find($productId);
+        if (!$product) {
+            return response()->json([
+                'code' => 404,
+                'success' => false,
+                'message' => 'Product not found.',
+                'data' => []
+            ], 404);
+        }
+
+        // Accept either a single feature object or an array of features
+        $payload = $request->input('features', null);
+        if (is_null($payload)) {
+            // If "features" not provided, allow single feature keys at root
+            $payload = [$request->only(['feature_name', 'feature_value', 'is_filterable'])];
+        }
+
+        $request->merge(['features' => $payload]);
+
+        $request->validate([
+            'features' => 'required|array|min:1',
+            'features.*.feature_name'   => 'required|string',
+            'features.*.feature_value'  => 'nullable|string',
+            'features.*.is_filterable'  => 'nullable|boolean',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $created = [];
+            foreach ($request->features as $f) {
+                $created[] = ProductFeatureModel::create([
+                    'product_id'    => (int)$product->id,
+                    'feature_name'  => $f['feature_name'],
+                    'feature_value' => $f['feature_value'] ?? null,
+                    'is_filterable' => isset($f['is_filterable']) ? (bool)$f['is_filterable'] : false,
+                ]);
+            }
+
+            DB::commit();
+
+            // shape data like your existing responses
+            $data = collect($created)->map(function ($feat) {
+                return [
+                    'id'             => $feat->id,
+                    'product_id'     => $feat->product_id,
+                    'feature_name'   => $feat->feature_name,
+                    'feature_value'  => $feat->feature_value,
+                    'is_filterable'  => (int) ($feat->is_filterable ?? 0),
+                ];
+            })->values();
+
+            return response()->json([
+                'code' => 201,
+                'success' => true,
+                'message' => 'Feature(s) added successfully!',
+                'data' => $data
+            ], 201);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to add features.',
+                'data' => ['error' => $e->getMessage()]
+            ], 500);
+        }
+    }
+
+    public function deleteFeature($id)
+    {
+        $feature = ProductFeatureModel::find($id);
+
+        if (!$feature) {
+            return response()->json([
+                'code' => 404,
+                'success' => false,
+                'message' => 'Feature not found.',
+                'data' => []
+            ], 404);
+        }
+
+        try {
+            $feature->delete();
+
+            return response()->json([
+                'code' => 200,
+                'success' => true,
+                'message' => 'Feature deleted successfully!',
+                'data' => [
+                    'deleted_id' => $id
+                ]
+            ], 200);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to delete feature.',
+                'data' => ['error' => $e->getMessage()]
+            ], 500);
+        }
+    }
+
 }

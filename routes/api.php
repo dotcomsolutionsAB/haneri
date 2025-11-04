@@ -111,6 +111,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
             Route::get('/pull_images', [ProductController::class, 'mapVariantImagesToPhotoId']);
             Route::post('/get_admin/{id?}', [ProductController::class, 'index_admin']);
+            Route::post('/{productId}/features', [ProductController::class, 'addFeature']);
+            Route::delete('/features/{id}', [ProductController::class, 'deleteFeature']);
         });
 
         // for all orders
