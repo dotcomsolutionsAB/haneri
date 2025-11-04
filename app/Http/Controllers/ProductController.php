@@ -1248,15 +1248,12 @@ class ProductController extends Controller
             \DB::commit();
 
             // 🔄 Reload relations (include file/banner relations if you have them)
+            // 🔄 Reload relations WITHOUT non-existent relations
             $product->load([
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                // Expecting these relations on ProductVariantModel (optional):
-                // files: images list; banners: banner list
-                'variants.files:id,uploadable_id,uploadable_type,url',
-                'variants.banners:id,uploadable_id,uploadable_type,url',
-                'variants' // basic fields
+                'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,customer_discount,dealer_discount,architect_discount,hsn,regular_tax,selling_tax,video_url,product_pdf'
             ]);
 
             // 🎯 Build response EXACTLY like your original format
