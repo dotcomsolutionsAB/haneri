@@ -120,7 +120,7 @@ public function update(Request $request, $id)
         return response()->json(['message' => 'Brand not found.'], 404);
     }
 
-    // Validate (allow partial updates)
+    // Validate only if present (form-data)
     $validated = $request->validate([
         'name'         => 'sometimes|string|max:255',
         'logo'         => 'sometimes|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
@@ -130,31 +130,32 @@ public function update(Request $request, $id)
 
     DB::beginTransaction();
     try {
-        // Update scalar fields if present
-        if ($request->has('name')) {
-            $brand->name = $validated['name'];
-        }
-        if ($request->has('custom_sort')) {
-            $brand->custom_sort = $validated['custom_sort'];
-        }
-        if ($request->has('description')) {
-            $brand->description = $validated['description'];
+        // If a key was sent at all (exists), update it — even if it's "0" or "".
+        if ($request->exists('name')) {
+            $brand->name = (string)($validated['name'] ?? $request->input('name', ''));
         }
 
-        // If a new logo is uploaded: delete old file by filename and then store new
+        if ($request->exists('custom_sort')) {
+            // integer rule accepts "2" from form-data; keep raw input fallback
+            $brand->custom_sort = $validated['custom_sort'] ?? (int)$request->input('custom_sort');
+        }
+
+        if ($request->exists('description')) {
+            // Treat empty string as null; remove `?: null` if you want to store ""
+            $desc = $request->input('description');
+            $brand->description = ($desc === '' ? null : $desc);
+        }
+
+        // IMPORTANT: works only when you POST with _method=PUT
         if ($request->hasFile('logo')) {
-            // Delete old by scanning directory for the filename
             $this->deleteOldBrandLogo($brand->logo);
-
-            // Store new file (relative path only)
-            $newPath = $request->file('logo')->store('upload/brands', 'public'); // e.g. upload/brands/xyz.jpg
-            $brand->logo = $newPath;
+            $newPath = $request->file('logo')->store('upload/brands', 'public'); // upload/brands/xyz.jpg
+            $brand->logo = $newPath; // store relative path in DB
         }
 
         $brand->save();
         DB::commit();
 
-        // Build response with full URL for logo
         return response()->json([
             'message' => 'Brand updated successfully!',
             'data' => [
@@ -174,59 +175,41 @@ public function update(Request $request, $id)
     }
 }
 
-/**
- * Delete old brand logo by extracting filename and scanning the brands directory.
- * Accepts either a relative path (upload/brands/abc.jpg) or a full URL.
- */
 private function deleteOldBrandLogo(?string $logoPath): bool
 {
     try {
-        if (empty($logoPath)) {
-            return true; // nothing to delete
+        if (!$logoPath) return true;
+
+        // Normalize URL/relative into storage-relative path
+        $path = $logoPath;
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            $urlPath = parse_url($path, PHP_URL_PATH) ?? '';
+            $urlPath = ltrim($urlPath, '/');                 // storage/upload/brands/abc.jpg
+            $path    = Str::startsWith($urlPath, 'storage/')
+                      ? Str::after($urlPath, 'storage/')     // upload/brands/abc.jpg
+                      : $urlPath;
         }
 
-        // Normalize to just the filename (abc.jpg)
-        $filename = $logoPath;
+        $path = ltrim($path, '/');
+        $filename = basename($path);
+        if (!$filename || $filename === '.' || $filename === '..') return true;
 
-        // If full URL, get the path part first
-        if (Str::startsWith($filename, ['http://', 'https://'])) {
-            $path = parse_url($filename, PHP_URL_PATH) ?? '';
-            $filename = ltrim($path, '/'); // e.g. storage/upload/brands/abc.jpg
-            // Strip optional "storage/" and/or "public/"
-            $filename = ltrim(Str::after($filename, 'storage/'), '/'); // -> upload/brands/abc.jpg
-        }
-
-        // Now reduce to pure filename
-        $filename = basename($filename); // -> abc.jpg
-
-        if ($filename === '' || $filename === '.' || $filename === '..') {
-            return true; // invalid filename; treat as deleted
-        }
-
-        // Target directory
         $dir = 'upload/brands';
+        $direct = $dir . '/' . $filename;
 
-        // 1) Quick path: try exact path "upload/brands/filename"
-        $directPath = $dir . '/' . $filename;
-        if (Storage::disk('public')->exists($directPath)) {
-            Storage::disk('public')->delete($directPath);
+        if (Storage::disk('public')->exists($direct)) {
+            Storage::disk('public')->delete($direct);
             return true;
         }
 
-        // 2) Scan directory and match by filename (in case of subfolders or odd paths)
-        $files = Storage::disk('public')->files($dir);
-        foreach ($files as $file) {
+        foreach (Storage::disk('public')->files($dir) as $file) {
             if (basename($file) === $filename) {
                 Storage::disk('public')->delete($file);
                 return true;
             }
         }
-
-        // Not found is also "ok" per your spec
         return true;
     } catch (\Throwable $e) {
-        // You can log this if needed
-        // \Log::warning('deleteOldBrandLogo failed', ['error' => $e->getMessage(), 'logoPath' => $logoPath]);
         return false;
     }
 }
