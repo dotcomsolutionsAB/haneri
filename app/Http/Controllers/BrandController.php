@@ -129,59 +129,71 @@ class BrandController extends Controller
 
     //     return response()->json(['message' => 'Brand updated successfully!', 'data' => $brand], 200);
     // }
-    public function update(Request $request, $id)
-    {
-        $brand = BrandModel::find($id);
-        if (!$brand) {
-            return response()->json(['message' => 'Brand not found.'], 404);
-        }
-
-        // Accept multipart/form-data; logo can be a file
-        $validated = $request->validate([
-            'name'         => 'sometimes|string|max:255',
-            'logo'         => 'nullable|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
-            'custom_sort'  => 'nullable|integer',
-            'description'  => 'nullable|string',
-        ]);
-
-        // Start with current values
-        $data = [
-            'name'        => $validated['name']        ?? $brand->name,
-            'custom_sort' => $validated['custom_sort'] ?? $brand->custom_sort,
-            'description' => $validated['description'] ?? $brand->description,
-            'logo'        => $brand->logo, // may be replaced below
-        ];
-
-        // If a new logo file is uploaded: delete old file, store new, save full URL
-        if ($request->hasFile('logo')) {
-            // Delete previous file if present and stored under /storage/...
-            if (!empty($brand->logo)) {
-                // Convert public URL (/storage/...) to disk-relative path (upload/brands/...)
-                $publicPath = parse_url($brand->logo, PHP_URL_PATH) ?: '';
-                if (str_starts_with($publicPath, '/storage/')) {
-                    $relative = ltrim(substr($publicPath, strlen('/storage/')), '/'); // "upload/brands/xxx.jpg"
-                    Storage::disk('public')->delete($relative);
-                }
-            }
-
-            // Store new file under storage/app/public/upload/brands
-            $path = $request->file('logo')->store('upload/brands', 'public');
-            $data['logo'] = asset(Storage::url($path)); // full URL
-        }
-
-        $brand->update($data);
-
-        return response()->json([
-            'message' => 'Brand updated successfully!',
-            'data' => [
-                'id'          => $brand->id,
-                'name'        => $brand->name,
-                'logo'        => $brand->logo,        // full URL
-                'custom_sort' => $brand->custom_sort,
-                'description' => $brand->description,
-            ],
-        ], 200);
+public function update(Request $request, $id)
+{
+    $brand = BrandModel::find($id);
+    if (!$brand) {
+        return response()->json(['message' => 'Brand not found.'], 404);
     }
+
+    // Base rules
+    $rules = [
+        'name'         => 'sometimes|string|max:255',
+        'custom_sort'  => 'nullable|integer',
+        'description'  => 'nullable|string',
+    ];
+
+    // Validate logo based on what you actually send
+    if ($request->hasFile('logo')) {
+        $rules['logo'] = 'file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120';
+    } elseif ($request->filled('logo')) {
+        // allow setting an external/full URL (or path as string)
+        $rules['logo'] = 'string|max:2048';
+    }
+
+    $validated = $request->validate($rules);
+
+    // Prepare updates (keep current values by default)
+    $data = [
+        'name'        => $validated['name']        ?? $brand->name,
+        'custom_sort' => $validated['custom_sort'] ?? $brand->custom_sort,
+        'description' => $validated['description'] ?? $brand->description,
+        'logo'        => $brand->logo, // may be replaced below
+    ];
+
+    // If a new logo FILE was uploaded
+    if ($request->hasFile('logo')) {
+        // Delete old file if it was stored under /storage/upload/...
+        if (!empty($brand->logo)) {
+            $publicPath = parse_url($brand->logo, PHP_URL_PATH) ?: '';
+            if (str_starts_with($publicPath, '/storage/')) {
+                $relative = ltrim(substr($publicPath, strlen('/storage/')), '/'); // "upload/brands/xxx.jpg"
+                Storage::disk('public')->delete($relative);
+            }
+        }
+
+        // Store new file under storage/app/public/upload/brands
+        $path = $request->file('logo')->store('upload/brands', 'public');
+        $data['logo'] = asset(Storage::url($path)); // full URL
+    }
+    // Else, if a string/URL was provided for logo, just set it
+    elseif ($request->filled('logo')) {
+        $data['logo'] = $validated['logo'];
+    }
+
+    $brand->update($data);
+
+    return response()->json([
+        'message' => 'Brand updated successfully!',
+        'data' => [
+            'id'          => $brand->id,
+            'name'        => $brand->name,
+            'logo'        => $brand->logo,
+            'custom_sort' => (int) $brand->custom_sort,
+            'description' => $brand->description,
+        ],
+    ], 200);
+}
 
     // Delete
     public function destroy($id)
