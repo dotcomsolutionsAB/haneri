@@ -173,44 +173,7 @@ class BrandController extends Controller
     //         ], 500);
     //     }
     // }
-    // private function deleteOldBrandLogo(?string $logoPath): bool
-    // {
-    //     try {
-    //         if (!$logoPath) return true;
-
-    //         // Normalize URL/relative into storage-relative path
-    //         $path = $logoPath;
-    //         if (Str::startsWith($path, ['http://', 'https://'])) {
-    //             $urlPath = parse_url($path, PHP_URL_PATH) ?? '';
-    //             $urlPath = ltrim($urlPath, '/');                 // storage/upload/brands/abc.jpg
-    //             $path    = Str::startsWith($urlPath, 'storage/')
-    //                     ? Str::after($urlPath, 'storage/')     // upload/brands/abc.jpg
-    //                     : $urlPath;
-    //         }
-
-    //         $path = ltrim($path, '/');
-    //         $filename = basename($path);
-    //         if (!$filename || $filename === '.' || $filename === '..') return true;
-
-    //         $dir = 'upload/brands';
-    //         $direct = $dir . '/' . $filename;
-
-    //         if (Storage::disk('public')->exists($direct)) {
-    //             Storage::disk('public')->delete($direct);
-    //             return true;
-    //         }
-
-    //         foreach (Storage::disk('public')->files($dir) as $file) {
-    //             if (basename($file) === $filename) {
-    //                 Storage::disk('public')->delete($file);
-    //                 return true;
-    //             }
-    //         }
-    //         return true;
-    //     } catch (\Throwable $e) {
-    //         return false;
-    //     }
-    // }
+    
 
     public function update(Request $request, $id)
     {
@@ -266,15 +229,88 @@ class BrandController extends Controller
 
 
     // Delete
-    public function destroy($id)
+    // public function destroy($id)
+    // {
+    //     $brand = BrandModel::find($id);
+    //     if (!$brand) {
+    //         return response()->json(['message' => 'Brand not found.'], 404);
+    //     }
+
+    //     $brand->delete();
+
+    //     return response()->json(['message' => 'Brand deleted successfully!'], 200);
+    // }
+    public function destroy(Request $request, $id)
     {
         $brand = BrandModel::find($id);
         if (!$brand) {
             return response()->json(['message' => 'Brand not found.'], 404);
         }
 
-        $brand->delete();
+        // Keep original logo path before deleting the row
+        $logoPath = $brand->logo;
 
-        return response()->json(['message' => 'Brand deleted successfully!'], 200);
+        DB::beginTransaction();
+        try {
+            // If you use SoftDeletes and want hard delete, use: $brand->forceDelete();
+            $brand->delete();
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Delete failed.',
+                'error'   => config('app.debug') ? $e->getMessage() : 'Unexpected error',
+            ], 500);
+        }
+
+        // Try deleting the image file (best-effort; does not affect DB delete)
+        $logoDeleted = $this->deleteOldBrandLogo($logoPath);
+
+        return response()->json([
+            'message' => 'Brand deleted successfully!',
+            'data' => [
+                'id'            => (int)$id,
+                'logo_deleted'  => $logoDeleted,   // true if file removed/found-not-found OK
+            ],
+        ]);
+    }
+
+    private function deleteOldBrandLogo(?string $logoPath): bool
+    {
+        try {
+            if (!$logoPath) return true;
+
+            // Normalize URL/relative into storage-relative path
+            $path = $logoPath;
+            if (Str::startsWith($path, ['http://', 'https://'])) {
+                $urlPath = parse_url($path, PHP_URL_PATH) ?? '';
+                $urlPath = ltrim($urlPath, '/');                 // storage/upload/brands/abc.jpg
+                $path    = Str::startsWith($urlPath, 'storage/')
+                        ? Str::after($urlPath, 'storage/')     // upload/brands/abc.jpg
+                        : $urlPath;
+            }
+
+            $path = ltrim($path, '/');
+            $filename = basename($path);
+            if (!$filename || $filename === '.' || $filename === '..') return true;
+
+            $dir = 'upload/brands';
+            $direct = $dir . '/' . $filename;
+
+            if (Storage::disk('public')->exists($direct)) {
+                Storage::disk('public')->delete($direct);
+                return true;
+            }
+
+            foreach (Storage::disk('public')->files($dir) as $file) {
+                if (basename($file) === $filename) {
+                    Storage::disk('public')->delete($file);
+                    return true;
+                }
+            }
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }
