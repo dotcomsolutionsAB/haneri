@@ -978,13 +978,152 @@ class ProductController extends Controller
     }
 
     // Update
+    // public function update(Request $request, $id)
+    // {
+    //     $product = ProductModel::find($id);
+    //     if (!$product) {
+    //         return response()->json(['message' => 'Product not found.'], 404);
+    //     }
+
+    //     $request->validate([
+    //         'name' => 'sometimes|string',
+    //         'brand_id' => 'sometimes|integer|exists:t_brands,id',
+    //         'category_id' => 'sometimes|integer|exists:t_categories,id',
+    //         'slug' => 'sometimes|string|unique:t_products,slug,' . $id,
+    //         'description' => 'sometimes|string',
+    //         'is_active' => 'sometimes|boolean',
+
+    //         // Validate product features
+    //         'features' => 'nullable|array',
+    //         'features.*.id' => 'required_with:features|integer|exists:t_product_features,id',
+    //         'features.*.feature_name' => 'required_with:features|string',
+    //         'features.*.feature_value' => 'required_with:features|string',
+    //         'features.*.is_filterable' => 'nullable|boolean',
+
+    //         // Validate product variants
+    //         'variants' => 'nullable|array',
+    //         'variants.*.id' => 'required_with:variants|integer|exists:t_product_variants,id',
+    //         // 'variants.*.photo_id' => 'nullable|string|exists:t_uploads,id',
+    //         'variants.*.min_qty' => 'sometimes|integer|min:1',
+    //         'variants.*.is_cod' => 'sometimes|boolean',
+    //         'variants.*.weight' => 'nullable|numeric',
+    //         'variants.*.description' => 'sometimes|string',
+    //         'variants.*.variant_type' => 'required_with:variants|string',
+    //         'variants.*.variant_value' => 'required_with:variants|string',
+    //         'variants.*.discount_price' => 'nullable|numeric',
+    //         'variants.*.regular_price' => 'sometimes|numeric',
+    //         'variants.*.customer_discount' => 'nullable|numeric',
+    //         'variants.*.dealer_discount' => 'nullable|numeric',
+    //         'variants.*.architect_discount' => 'nullable|numeric',
+    //         'variants.*.hsn' => 'sometimes|string',
+    //         'variants.*.regular_tax' => 'sometimes|numeric',
+    //         'variants.*.video_url' => 'sometimes|string',
+    //         'variants.*.product_pdf' => 'sometimes|string',
+    //     ]);
+
+    //     // Update the product
+    //     $product->update([
+    //         'name' => $request->input('name', $product->name),
+    //         'brand_id' => $request->input('brand_id', $product->brand_id),
+    //         'category_id' => $request->input('category_id', $product->category_id),
+    //         'photo_id' => $request->input('photo_id', $product->photo_id),
+    //         'price' => $request->input('price', $product->price),
+    //         'discount_price' => $request->input('discount_price', $product->discount_price),
+    //         'hsn' => $request->input('hsn', $product->hsn),
+    //         'tax' => $request->input('tax', $product->tax),
+    //         'min_qty' => $request->input('min_qty', $product->min_qty),
+    //         'is_cod' => $request->input('is_cod', $product->is_cod),
+    //         'weight' => $request->input('weight', $product->weight),
+    //         'slug' => $request->input('slug', $product->slug),
+    //         'description' => $request->input('description', $product->description),
+    //         'is_active' => $request->input('is_active', $product->is_active),
+    //     ]);
+
+    //    // Update product features
+    //     if ($request->has('features') && is_array($request->input('features'))) {
+    //         foreach ($request->input('features') as $feature) {
+    //             $existingFeature = ProductFeatureModel::find($feature['id']);
+
+    //             if ($existingFeature) {
+    //                 // Update feature if the id is passed
+    //                 $existingFeature->update([
+    //                     'feature_name' => $feature['feature_name'],
+    //                     'is_filterable' => $feature['is_filterable'] ?? $existingFeature->is_filterable,
+    //                 ]);
+    //             } else {
+    //                 // Create new feature if id is not provided
+    //                 ProductFeatureModel::create([
+    //                     'product_id' => $product->id,
+    //                     'feature_name' => $feature['feature_name'],
+    //                     'is_filterable' => $feature['is_filterable'] ?? false,
+    //                 ]);
+    //             }
+    //         }
+    //     }
+
+    //     // Update product variants
+    //     if ($request->has('variants') && is_array($request->input('variants'))) {
+    //         foreach ($request->input('variants') as $variant) {
+    //             $existingVariant = ProductVariantModel::find($variant['id']);
+
+    //             if ($existingVariant) {
+    //                 // Update variant if the id is passed
+    //                 $existingVariant->update([
+    //                     'photo_id' => $variant['photo_id'] ?? $existingVariant->photo_id,
+    //                     'min_qty' => $variant['min_qty'] ?? $existingVariant->min_qty,
+    //                     'is_cod' => $variant['is_cod'] ?? $existingVariant->is_cod,
+    //                     'weight' => $variant['weight'] ?? $existingVariant->weight,
+    //                     'description' => $variant['description'] ?? $existingVariant->description,
+    //                     'variant_type' => $variant['variant_type'] ?? $existingVariant->variant_type,
+    //                     'variant_value' => $variant['variant_value'] ?? $existingVariant->variant_value,
+    //                     'regular_price' => $variant['regular_price'] ?? $existingVariant->regular_price,
+    //                     'customer_discount' => $variant['customer_discount'] ?? $existingVariant->customer_discount,
+    //                     'dealer_discount' => $variant['dealer_discount'] ?? $existingVariant->dealer_discount,
+    //                     'architect_discount' => $variant['architect_discount'] ?? $existingVariant->architect_discount,
+    //                     'hsn' => $variant['hsn'] ?? $existingVariant->hsn,
+    //                     'regular_tax' => $variant['regular_tax'] ?? $existingVariant->regular_tax,
+    //                     'selling_price' => $variant['selling_price'] ?? $existingVariant->selling_price,
+    //                     'video_url' => $variant['video_url'] ?? $existingVariant->video_url,
+    //                     'product_pdf' => $variant['product_pdf'] ?? $existingVariant->product_pdf,
+    //                 ]);
+    //             } else {
+    //                 // Create new variant if id is not provided
+    //                 ProductVariantModel::create([
+    //                     'product_id' => $product->id,
+    //                     'photo_id' => $variant['photo_id'] ?? null,
+    //                     'min_qty' => $variant['min_qty'] ?? 1,
+    //                     'is_cod' => $variant['is_cod'] ?? true,
+    //                     'weight' => $variant['weight'] ?? null,
+    //                     'description' => $variant['description'] ?? null,
+    //                     'variant_type' => $variant['variant_type'],
+    //                     'variant_value' => $variant['variant_value'],
+    //                     'regular_price' => $variant['regular_price'],
+    //                     'customer_discount' => $variant['customer_discount'] ?? null,
+    //                     'dealer_discount' => $variant['dealer_discount'] ?? null,
+    //                     'architect_discount' => $variant['architect_discount'] ?? null,
+    //                     'hsn' => $variant['hsn'] ?? null,
+    //                     'regular_tax' => $variant['regular_tax'] ?? null,
+    //                     'selling_price' => $variant['selling_price'],
+    //                     'video_url' => $variant['video_url'] ?? null,
+    //                     'product_pdf' => $variant['product_pdf'] ?? null,
+    //                 ]);
+    //             }
+    //         }
+    //     }
+        
+    //     unset($product['id'], $product['created_at'], $product['updated_at']);
+
+    //     return response()->json(['message' => 'Product updated successfully!', 'data' => $product], 200);
+    // }
+
     public function update(Request $request, $id)
     {
         $product = ProductModel::find($id);
         if (!$product) {
-            return response()->json(['message' => 'Product not found.'], 404);
+            return response()->json(['success' => false, 'message' => 'Product not found.'], 404);
         }
 
+        // ✅ Validate (no photo/file fields here)
         $request->validate([
             'name' => 'sometimes|string',
             'brand_id' => 'sometimes|integer|exists:t_brands,id',
@@ -993,17 +1132,14 @@ class ProductController extends Controller
             'description' => 'sometimes|string',
             'is_active' => 'sometimes|boolean',
 
-            // Validate product features
             'features' => 'nullable|array',
-            'features.*.id' => 'required_with:features|integer|exists:t_product_features,id',
+            'features.*.id' => 'nullable|integer|exists:t_product_features,id',
             'features.*.feature_name' => 'required_with:features|string',
             'features.*.feature_value' => 'required_with:features|string',
             'features.*.is_filterable' => 'nullable|boolean',
 
-            // Validate product variants
             'variants' => 'nullable|array',
-            'variants.*.id' => 'required_with:variants|integer|exists:t_product_variants,id',
-            'variants.*.photo_id' => 'nullable|string|exists:t_uploads,id',
+            'variants.*.id' => 'nullable|integer|exists:t_product_variants,id',
             'variants.*.min_qty' => 'sometimes|integer|min:1',
             'variants.*.is_cod' => 'sometimes|boolean',
             'variants.*.weight' => 'nullable|numeric',
@@ -1017,104 +1153,184 @@ class ProductController extends Controller
             'variants.*.architect_discount' => 'nullable|numeric',
             'variants.*.hsn' => 'sometimes|string',
             'variants.*.regular_tax' => 'sometimes|numeric',
-            'variants.*.video_url' => 'sometimes|string',
-            'variants.*.product_pdf' => 'sometimes|string',
+            'variants.*.selling_tax' => 'sometimes|numeric',
+            'variants.*.video_url' => 'sometimes|string|nullable',
+            'variants.*.product_pdf' => 'sometimes|string|nullable',
         ]);
 
-        // Update the product
-        $product->update([
-            'name' => $request->input('name', $product->name),
-            'brand_id' => $request->input('brand_id', $product->brand_id),
-            'category_id' => $request->input('category_id', $product->category_id),
-            'photo_id' => $request->input('photo_id', $product->photo_id),
-            'price' => $request->input('price', $product->price),
-            'discount_price' => $request->input('discount_price', $product->discount_price),
-            'hsn' => $request->input('hsn', $product->hsn),
-            'tax' => $request->input('tax', $product->tax),
-            'min_qty' => $request->input('min_qty', $product->min_qty),
-            'is_cod' => $request->input('is_cod', $product->is_cod),
-            'weight' => $request->input('weight', $product->weight),
-            'slug' => $request->input('slug', $product->slug),
-            'description' => $request->input('description', $product->description),
-            'is_active' => $request->input('is_active', $product->is_active),
-        ]);
+        \DB::beginTransaction();
+        try {
+            // ✅ Update only product fields you actually store on t_products
+            $product->update([
+                'name' => $request->input('name', $product->name),
+                'brand_id' => $request->input('brand_id', $product->brand_id),
+                'category_id' => $request->input('category_id', $product->category_id),
+                'slug' => $request->input('slug', $product->slug),
+                'description' => $request->input('description', $product->description),
+                'is_active' => $request->input('is_active', $product->is_active),
+            ]);
 
-       // Update product features
-        if ($request->has('features') && is_array($request->input('features'))) {
-            foreach ($request->input('features') as $feature) {
-                $existingFeature = ProductFeatureModel::find($feature['id']);
-
-                if ($existingFeature) {
-                    // Update feature if the id is passed
-                    $existingFeature->update([
-                        'feature_name' => $feature['feature_name'],
-                        'is_filterable' => $feature['is_filterable'] ?? $existingFeature->is_filterable,
-                    ]);
-                } else {
-                    // Create new feature if id is not provided
-                    ProductFeatureModel::create([
-                        'product_id' => $product->id,
-                        'feature_name' => $feature['feature_name'],
-                        'is_filterable' => $feature['is_filterable'] ?? false,
-                    ]);
+            // ✅ Features upsert (scoped to this product)
+            if ($request->filled('features')) {
+                foreach ($request->features as $feature) {
+                    if (!empty($feature['id'])) {
+                        $existing = ProductFeatureModel::where('id', $feature['id'])
+                            ->where('product_id', $product->id)->first();
+                        if ($existing) {
+                            $existing->update([
+                                'feature_name' => $feature['feature_name'],
+                                'feature_value' => $feature['feature_value'],
+                                'is_filterable' => $feature['is_filterable'] ?? $existing->is_filterable,
+                            ]);
+                        }
+                    } else {
+                        ProductFeatureModel::create([
+                            'product_id' => $product->id,
+                            'feature_name' => $feature['feature_name'],
+                            'feature_value' => $feature['feature_value'],
+                            'is_filterable' => $feature['is_filterable'] ?? false,
+                        ]);
+                    }
                 }
             }
-        }
 
-        // Update product variants
-        if ($request->has('variants') && is_array($request->input('variants'))) {
-            foreach ($request->input('variants') as $variant) {
-                $existingVariant = ProductVariantModel::find($variant['id']);
+            // ✅ Variants upsert (scoped to this product) — no photo/file updates here
+            if ($request->filled('variants')) {
+                foreach ($request->variants as $variant) {
+                    if (!empty($variant['id'])) {
+                        $existing = ProductVariantModel::where('id', $variant['id'])
+                            ->where('product_id', $product->id)->first();
 
-                if ($existingVariant) {
-                    // Update variant if the id is passed
-                    $existingVariant->update([
-                        'photo_id' => $variant['photo_id'] ?? $existingVariant->photo_id,
-                        'min_qty' => $variant['min_qty'] ?? $existingVariant->min_qty,
-                        'is_cod' => $variant['is_cod'] ?? $existingVariant->is_cod,
-                        'weight' => $variant['weight'] ?? $existingVariant->weight,
-                        'description' => $variant['description'] ?? $existingVariant->description,
-                        'variant_type' => $variant['variant_type'] ?? $existingVariant->variant_type,
-                        'variant_value' => $variant['variant_value'] ?? $existingVariant->variant_value,
-                        'regular_price' => $variant['regular_price'] ?? $existingVariant->regular_price,
-                        'customer_discount' => $variant['customer_discount'] ?? $existingVariant->customer_discount,
-                        'dealer_discount' => $variant['dealer_discount'] ?? $existingVariant->dealer_discount,
-                        'architect_discount' => $variant['architect_discount'] ?? $existingVariant->architect_discount,
-                        'hsn' => $variant['hsn'] ?? $existingVariant->hsn,
-                        'regular_tax' => $variant['regular_tax'] ?? $existingVariant->regular_tax,
-                        'selling_price' => $variant['selling_price'] ?? $existingVariant->selling_price,
-                        'video_url' => $variant['video_url'] ?? $existingVariant->video_url,
-                        'product_pdf' => $variant['product_pdf'] ?? $existingVariant->product_pdf,
-                    ]);
-                } else {
-                    // Create new variant if id is not provided
-                    ProductVariantModel::create([
-                        'product_id' => $product->id,
-                        'photo_id' => $variant['photo_id'] ?? null,
-                        'min_qty' => $variant['min_qty'] ?? 1,
-                        'is_cod' => $variant['is_cod'] ?? true,
-                        'weight' => $variant['weight'] ?? null,
-                        'description' => $variant['description'] ?? null,
-                        'variant_type' => $variant['variant_type'],
-                        'variant_value' => $variant['variant_value'],
-                        'regular_price' => $variant['regular_price'],
-                        'customer_discount' => $variant['customer_discount'] ?? null,
-                        'dealer_discount' => $variant['dealer_discount'] ?? null,
-                        'architect_discount' => $variant['architect_discount'] ?? null,
-                        'hsn' => $variant['hsn'] ?? null,
-                        'regular_tax' => $variant['regular_tax'] ?? null,
-                        'selling_price' => $variant['selling_price'],
-                        'video_url' => $variant['video_url'] ?? null,
-                        'product_pdf' => $variant['product_pdf'] ?? null,
-                    ]);
+                        if ($existing) {
+                            $existing->update([
+                                'min_qty' => $variant['min_qty'] ?? $existing->min_qty,
+                                'is_cod' => $variant['is_cod'] ?? $existing->is_cod,
+                                'weight' => $variant['weight'] ?? $existing->weight,
+                                'description' => $variant['description'] ?? $existing->description,
+                                'variant_type' => $variant['variant_type'] ?? $existing->variant_type,
+                                'variant_value' => $variant['variant_value'] ?? $existing->variant_value,
+                                'discount_price' => array_key_exists('discount_price', $variant) ? $variant['discount_price'] : $existing->discount_price,
+                                'regular_price' => $variant['regular_price'] ?? $existing->regular_price,
+                                'customer_discount' => array_key_exists('customer_discount', $variant) ? $variant['customer_discount'] : $existing->customer_discount,
+                                'dealer_discount' => array_key_exists('dealer_discount', $variant) ? $variant['dealer_discount'] : $existing->dealer_discount,
+                                'architect_discount' => array_key_exists('architect_discount', $variant) ? $variant['architect_discount'] : $existing->architect_discount,
+                                'hsn' => $variant['hsn'] ?? $existing->hsn,
+                                'regular_tax' => $variant['regular_tax'] ?? $existing->regular_tax,
+                                'selling_tax' => $variant['selling_tax'] ?? $existing->selling_tax,
+                                'video_url' => array_key_exists('video_url', $variant) ? $variant['video_url'] : $existing->video_url,
+                                'product_pdf' => array_key_exists('product_pdf', $variant) ? $variant['product_pdf'] : $existing->product_pdf,
+                            ]);
+                        }
+                    } else {
+                        ProductVariantModel::create([
+                            'product_id' => $product->id,
+                            'min_qty' => $variant['min_qty'] ?? 1,
+                            'is_cod' => $variant['is_cod'] ?? true,
+                            'weight' => $variant['weight'] ?? null,
+                            'description' => $variant['description'] ?? null,
+                            'variant_type' => $variant['variant_type'],
+                            'variant_value' => $variant['variant_value'],
+                            'discount_price' => $variant['discount_price'] ?? null,
+                            'regular_price' => $variant['regular_price'] ?? 0,
+                            'customer_discount' => $variant['customer_discount'] ?? null,
+                            'dealer_discount' => $variant['dealer_discount'] ?? null,
+                            'architect_discount' => $variant['architect_discount'] ?? null,
+                            'hsn' => $variant['hsn'] ?? null,
+                            'regular_tax' => $variant['regular_tax'] ?? null,
+                            'selling_tax' => $variant['selling_tax'] ?? null,
+                            'video_url' => $variant['video_url'] ?? null,
+                            'product_pdf' => $variant['product_pdf'] ?? null,
+                        ]);
+                    }
                 }
             }
-        }
-        
-        unset($product['id'], $product['created_at'], $product['updated_at']);
 
-        return response()->json(['message' => 'Product updated successfully!', 'data' => $product], 200);
+            \DB::commit();
+
+            // 🔄 Reload relations (include file/banner relations if you have them)
+            $product->load([
+                'brand:id,name',
+                'category:id,name',
+                'features:id,product_id,feature_name,feature_value,is_filterable',
+                // Expecting these relations on ProductVariantModel (optional):
+                // files: images list; banners: banner list
+                'variants.files:id,uploadable_id,uploadable_type,url',
+                'variants.banners:id,uploadable_id,uploadable_type,url',
+                'variants' // basic fields
+            ]);
+
+            // 🎯 Build response EXACTLY like your original format
+            $data = [
+                'brand' => optional($product->brand)->name,
+                'category' => optional($product->category)->name,
+                'features' => $product->features->map(function ($f) {
+                    return [
+                        'id' => $f->id,
+                        'product_id' => $f->product_id,
+                        'feature_name' => $f->feature_name,
+                        'feature_value' => $f->feature_value,
+                        'is_filterable' => (int) ($f->is_filterable ?? 0),
+                    ];
+                })->values(),
+                'variants' => $product->variants->map(function ($v) {
+                    // Compute selling_price (keep your behavior; here: if discount_price else regular_price)
+                    $sellingPrice = $v->discount_price !== null ? (float)$v->discount_price : (float)$v->regular_price;
+
+                    return [
+                        'id' => $v->id,
+                        'product_id' => $v->product_id,
+                        'variant_type' => $v->variant_type,
+                        'min_qty' => (int) $v->min_qty,
+                        'is_cod' => (int) $v->is_cod,
+                        'weight' => $v->weight !== null ? (string)$v->weight : null,
+                        'description' => $v->description,
+                        'variant_value' => $v->variant_value,
+                        'discount_price' => $v->discount_price !== null ? number_format((float)$v->discount_price, 2, '.', '') : null,
+                        'regular_price' => number_format((float)$v->regular_price, 2, '.', ''),
+                        'hsn' => $v->hsn,
+                        'regular_tax' => $v->regular_tax !== null ? number_format((float)$v->regular_tax, 2, '.', '') : null,
+                        'selling_tax' => $v->selling_tax !== null ? number_format((float)$v->selling_tax, 2, '.', '') : null,
+                        'video_url' => $v->video_url,
+                        'product_pdf' => $v->product_pdf,
+                        'customer_discount' => $v->customer_discount !== null ? (float)$v->customer_discount : null,
+                        'dealer_discount' => $v->dealer_discount !== null ? (float)$v->dealer_discount : null,
+                        'architect_discount' => $v->architect_discount !== null ? (float)$v->architect_discount : null,
+                        'selling_price' => $sellingPrice,
+
+                        // These expect relations `files` and `banners` on the Variant model.
+                        // If you don’t have them, they’ll default to empty arrays.
+                        'file_urls' => method_exists($v, 'files') && $v->relationLoaded('files')
+                            ? $v->files->map(fn ($u) => ['id' => $u->id, 'url' => $u->url])->values()
+                            : [],
+                        'banner_urls' => method_exists($v, 'banners') && $v->relationLoaded('banners')
+                            ? $v->banners->map(fn ($u) => ['id' => $u->id, 'url' => $u->url])->values()
+                            : [],
+                    ];
+                })->values(),
+                'slug' => $product->slug,
+                'name' => $product->name,
+                'description' => $product->description,
+                'type' => $product->type ?? 'simple',
+                'is_active' => (int) $product->is_active,
+                'image' => [], // keeping as per your original response
+            ];
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Product details fetched successfully!',
+                'data' => $data,
+            ], 200);
+
+        } catch (\Throwable $e) {
+            \DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Update failed.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
+
 
     // Delete
     public function destroy($id)
