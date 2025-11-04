@@ -51,10 +51,31 @@ class BrandController extends Controller
     }
 
     // View All
+    // public function index(Request $request)
+    // {
+    //     $limit = $request->input('limit', 10);
+    //     $offset = $request->input('offset', 0);
+
+    //     $query = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description');
+
+    //     if ($request->has('name')) {
+    //         $query->where('name', 'LIKE', '%' . $request->input('name') . '%');
+    //     }
+
+    //    // Get total record count before applying limit
+    //     $totalRecords = $query->count();
+        
+    //     // Apply pagination
+    //     $brands = $query->offset($offset)->limit($limit)->get();
+
+    //     return $brands->isNotEmpty()
+    //         ? response()->json(['message' => 'Brands fetched successfully!', 'data' => $brands, 'count' => count($brands), 'records' => $totalRecords], 200)
+    //         : response()->json(['message' => 'No brands available.'], 400);
+    // }
     public function index(Request $request)
     {
-        $limit = $request->input('limit', 10);
-        $offset = $request->input('offset', 0);
+        $limit  = (int) $request->input('limit', 10);
+        $offset = (int) $request->input('offset', 0);
 
         $query = BrandModel::select('id', 'name', 'logo', 'custom_sort', 'description');
 
@@ -62,14 +83,40 @@ class BrandController extends Controller
             $query->where('name', 'LIKE', '%' . $request->input('name') . '%');
         }
 
-       // Get total record count before applying limit
+        // Total count before pagination
         $totalRecords = $query->count();
-        
-        // Apply pagination
+
+        // Fetch paginated records
         $brands = $query->offset($offset)->limit($limit)->get();
 
+        // Convert logos to full URLs
+        $brands->transform(function ($brand) {
+            if ($brand->logo) {
+                $path = ltrim($brand->logo, '/');
+
+                // If already full URL, leave it
+                if (!Str::startsWith($path, ['http://', 'https://'])) {
+                    // Handle both "storage/..." and "upload/..."
+                    if (Str::startsWith($path, 'storage/')) {
+                        $brand->logo = url('/' . $path);
+                    } else {
+                        // Use Storage::url to get "/storage/upload/brands/..."
+                        $brand->logo = url(Storage::url($path));
+                    }
+                }
+            } else {
+                $brand->logo = null;
+            }
+            return $brand;
+        });
+
         return $brands->isNotEmpty()
-            ? response()->json(['message' => 'Brands fetched successfully!', 'data' => $brands, 'count' => count($brands), 'records' => $totalRecords], 200)
+            ? response()->json([
+                'message' => 'Brands fetched successfully!',
+                'data'    => $brands,
+                'count'   => $brands->count(),
+                'records' => $totalRecords
+            ], 200)
             : response()->json(['message' => 'No brands available.'], 400);
     }
 
@@ -86,32 +133,6 @@ class BrandController extends Controller
     }
 
     // Update
-    // public function update(Request $request, $id)
-    // {
-    //     $brand = BrandModel::find($id);
-    //     if (!$brand) {
-    //         return response()->json(['message' => 'Brand not found.'], 404);
-    //     }
-
-    //     $request->validate([
-    //         'name' => 'sometimes|string',
-    //         'logo' => 'nullable|string',  // Path to logo image
-    //         'custom_sort' => 'nullable|integer',
-    //         'description' => 'nullable|string',
-    //     ]);
-
-    //     $brand->update([
-    //         'name' => $request->input('name', $brand->name),
-    //         'logo' => $request->input('logo', $brand->logo),
-    //         'custom_sort' => $request->input('custom_sort', $brand->custom_sort),
-    //         'description' => $request->input('description', $brand->description),
-    //     ]);
-
-    //     unset($brand['id'], $brand['created_at'], $brand['updated_at']);
-
-    //     return response()->json(['message' => 'Brand updated successfully!', 'data' => $brand], 200);
-    // }
-
     // public function update(Request $request, $id)
     // {
     //     $brand = BrandModel::find($id);
@@ -229,17 +250,6 @@ class BrandController extends Controller
 
 
     // Delete
-    // public function destroy($id)
-    // {
-    //     $brand = BrandModel::find($id);
-    //     if (!$brand) {
-    //         return response()->json(['message' => 'Brand not found.'], 404);
-    //     }
-
-    //     $brand->delete();
-
-    //     return response()->json(['message' => 'Brand deleted successfully!'], 200);
-    // }
     public function destroy(Request $request, $id)
     {
         $brand = BrandModel::find($id);
