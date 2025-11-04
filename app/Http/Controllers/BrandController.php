@@ -129,6 +129,8 @@ class BrandController extends Controller
 
     //     return response()->json(['message' => 'Brand updated successfully!', 'data' => $brand], 200);
     // }
+use Illuminate\Support\Facades\Storage;
+
 public function update(Request $request, $id)
 {
     $brand = BrandModel::find($id);
@@ -136,47 +138,42 @@ public function update(Request $request, $id)
         return response()->json(['message' => 'Brand not found.'], 404);
     }
 
-    // Base rules
+    // Accept both multipart (file upload) and JSON (string URL)
     $rules = [
         'name'         => 'sometimes|string|max:255',
         'custom_sort'  => 'nullable|integer',
         'description'  => 'nullable|string',
     ];
-
-    // Validate logo based on what you actually send
     if ($request->hasFile('logo')) {
         $rules['logo'] = 'file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120';
     } elseif ($request->filled('logo')) {
-        // allow setting an external/full URL (or path as string)
         $rules['logo'] = 'string|max:2048';
     }
-
     $validated = $request->validate($rules);
 
-    // Prepare updates (keep current values by default)
+    // Prepare payload
     $data = [
         'name'        => $validated['name']        ?? $brand->name,
         'custom_sort' => $validated['custom_sort'] ?? $brand->custom_sort,
         'description' => $validated['description'] ?? $brand->description,
-        'logo'        => $brand->logo, // may be replaced below
+        'logo'        => $brand->logo, // will be replaced below if needed
     ];
 
-    // If a new logo FILE was uploaded
+    // If a new logo FILE was uploaded: delete old file from /public disk, then store new file
     if ($request->hasFile('logo')) {
-        // Delete old file if it was stored under /storage/upload/...
         if (!empty($brand->logo)) {
-            $publicPath = parse_url($brand->logo, PHP_URL_PATH) ?: '';
-            if (str_starts_with($publicPath, '/storage/')) {
-                $relative = ltrim(substr($publicPath, strlen('/storage/')), '/'); // "upload/brands/xxx.jpg"
-                Storage::disk('public')->delete($relative);
+            if ($relative = $this->extractPublicRelativePath($brand->logo)) {
+                if (Storage::disk('public')->exists($relative)) {
+                    Storage::disk('public')->delete($relative);
+                }
             }
         }
 
-        // Store new file under storage/app/public/upload/brands
+        // Save new file to storage/app/public/upload/brands
         $path = $request->file('logo')->store('upload/brands', 'public');
         $data['logo'] = asset(Storage::url($path)); // full URL
     }
-    // Else, if a string/URL was provided for logo, just set it
+    // Else if a string/URL is provided for logo, just set it (cannot safely delete remote/external)
     elseif ($request->filled('logo')) {
         $data['logo'] = $validated['logo'];
     }
@@ -194,6 +191,47 @@ public function update(Request $request, $id)
         ],
     ], 200);
 }
+
+/**
+ * Convert a saved logo (full URL or path) into a disk-relative path
+ * suitable for Storage::disk('public')->delete().
+ *
+ * Examples:
+ *  - http://domain.com/storage/upload/brands/foo.jpg -> upload/brands/foo.jpg
+ *  - /storage/upload/brands/foo.jpg                  -> upload/brands/foo.jpg
+ *  - storage/upload/brands/foo.jpg                   -> upload/brands/foo.jpg
+ *  - upload/brands/foo.jpg                           -> upload/brands/foo.jpg
+ *  - /upload/brands/foo.jpg                          -> upload/brands/foo.jpg
+ */
+private function extractPublicRelativePath(string $logo): ?string
+{
+    // If it's a full URL, parse its path
+    $path = parse_url($logo, PHP_URL_PATH) ?: $logo;
+
+    // Normalize backslashes (just in case)
+    $path = str_replace('\\', '/', $path);
+
+    // If it starts with /storage/..., strip that prefix
+    if (str_starts_with($path, '/storage/')) {
+        $path = substr($path, strlen('/storage/')); // now like 'upload/brands/foo.jpg'
+    }
+
+    // Remove any leading slash
+    $path = ltrim($path, '/');
+
+    // We only delete files under the public disk root; guard common cases
+    if (
+        str_starts_with($path, 'upload/brands/') ||
+        str_starts_with($path, 'brands/') ||           // legacy fallback
+        str_starts_with($path, 'upload/')              // broader fallback
+    ) {
+        return $path;
+    }
+
+    // If none of the known prefixes matched, we can't safely map to public disk
+    return null;
+}
+
 
     // Delete
     public function destroy($id)
