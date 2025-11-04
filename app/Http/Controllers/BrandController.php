@@ -119,6 +119,7 @@ public function update(Request $request, $id)
         return response()->json(['message' => 'Brand not found.'], 404);
     }
 
+    // IMPORTANT: the client must send multipart/form-data when including a file
     $validated = $request->validate([
         'name'         => 'sometimes|string|max:255',
         'logo'         => 'sometimes|file|image|mimes:jpg,jpeg,png,webp,gif,svg|max:5120',
@@ -126,62 +127,71 @@ public function update(Request $request, $id)
         'description'  => 'sometimes|nullable|string',
     ]);
 
-    // Update scalar fields if present
-    if (array_key_exists('name', $validated)) {
-        $brand->name = $validated['name'];
-    }
-    if (array_key_exists('custom_sort', $validated)) {
-        $brand->custom_sort = $validated['custom_sort'];
-    }
-    if (array_key_exists('description', $validated)) {
-        $brand->description = $validated['description'];
-    }
-
-    // If new logo uploaded: delete old, then store new (DB keeps only relative path)
-    if ($request->hasFile('logo')) {
-        // Delete old image if any
-        if (!empty($brand->logo)) {
-            $old = $brand->logo;
-
-            // Normalize to relative "upload/brands/..." even if DB has full URL
-            // 1) If it has ".../storage/...", strip up to and including "storage/"
-            $relative = Str::contains($old, '/storage/')
-                ? Str::after($old, 'storage/')
-                : $old;
-
-            // 2) If still a full URL without "storage/", take the path after the domain
-            if (Str::startsWith($relative, ['http://', 'https://'])) {
-                $parsed = parse_url($relative);
-                $relative = isset($parsed['path']) ? ltrim($parsed['path'], '/') : $relative;
-            }
-
-            // 3) Remove any accidental "public/" prefix
-            $relative = ltrim(Str::after($relative, 'public/'), '/');
-
-            // Only attempt delete if it's under our upload folder
-            if (Str::startsWith($relative, 'upload/')) {
-                Storage::disk('public')->delete($relative);
-            }
+    DB::beginTransaction();
+    try {
+        // Scalar fields
+        if ($request->has('name')) {
+            $brand->name = $validated['name'];
+        }
+        if ($request->has('custom_sort')) {
+            $brand->custom_sort = $validated['custom_sort'];
+        }
+        if ($request->has('description')) {
+            $brand->description = $validated['description'];
         }
 
-        // Store new file (returns "upload/brands/filename.ext")
-        $newPath = $request->file('logo')->store('upload/brands', 'public');
-        $brand->logo = $newPath; // save relative path
+        // Logo replacement
+        if ($request->hasFile('logo')) {
+            // Delete old file if present (handles full URL or relative path)
+            if (!empty($brand->logo)) {
+                $relative = $brand->logo;
+
+                // If DB stored a full URL, convert to relative by stripping domain + optional "storage/"
+                if (Str::startsWith($relative, ['http://', 'https://'])) {
+                    $path = parse_url($relative, PHP_URL_PATH) ?? '';
+                    $relative = ltrim($path, '/');                 // e.g. storage/upload/brands/abc.jpg
+                    $relative = ltrim(Str::after($relative, 'storage/'), '/'); // e.g. upload/brands/abc.jpg
+                }
+
+                // If DB mistakenly has "public/" prefix, drop it
+                $relative = ltrim(Str::after($relative, 'public/'), '/');
+
+                // Only delete files under our managed folder
+                if ($relative && Str::startsWith($relative, 'upload/') && Storage::disk('public')->exists($relative)) {
+                    Storage::disk('public')->delete($relative);
+                }
+            }
+
+            // Store new file; DB keeps relative path like "upload/brands/xyz.jpg"
+            $newPath = $request->file('logo')->store('upload/brands', 'public');
+            $brand->logo = $newPath;
+        }
+
+        $brand->saveOrFail();
+        DB::commit();
+
+        // Reload from DB to avoid stale in-memory values
+        $brand->refresh();
+
+        return response()->json([
+            'message' => 'Brand updated successfully!',
+            'data' => [
+                'id'          => $brand->id,
+                'name'        => $brand->name,
+                'logo'        => $brand->logo ? asset('storage/' . $brand->logo) : null, // full URL in response
+                'custom_sort' => $brand->custom_sort,
+                'description' => $brand->description,
+            ],
+        ]);
+    } catch (\Throwable $e) {
+        DB::rollBack();
+        return response()->json([
+            'message' => 'Update failed.',
+            'error'   => app()->hasDebugModeEnabled() ? $e->getMessage() : 'Unexpected error',
+        ], 500);
     }
-
-    $brand->save();
-
-    return response()->json([
-        'message' => 'Brand updated successfully!',
-        'data' => [
-            'id'          => $brand->id,
-            'name'        => $brand->name,
-            'logo'        => $brand->logo ? asset('storage/' . $brand->logo) : null, // full URL in response
-            'custom_sort' => $brand->custom_sort,
-            'description' => $brand->description,
-        ],
-    ]);
 }
+
 
     // Delete
     public function destroy($id)
