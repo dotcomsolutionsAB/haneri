@@ -111,12 +111,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);
             Route::get('/pull_images', [ProductController::class, 'mapVariantImagesToPhotoId']);
-            Route::post('/get_admin/{id?}', [ProductController::class, 'index_admin']);
-            Route::post('/get_profile/{id?}', [ProductController::class, 'getProfile']);
+            Route::post('/get_admin/{id?}', [ProductController::class, 'index_admin']);            
             Route::post('/{productId}/features', [ProductController::class, 'addFeature']);
             Route::delete('/features/{id}', [ProductController::class, 'deleteFeature']);
         });
-
+        Route::post('/get_profile/{id?}', [UserController::class, 'getProfile']);
         // for all orders
         Route::post('/fetch_all', [OrderController::class, 'fetchOrders']); // List all orders for admin
 
