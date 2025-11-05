@@ -71,13 +71,14 @@ class UserController extends Controller
             'email'         => 'required|email|unique:users,email',
             'password'      => 'required|string|min:8',
             'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
-            'selected_type' => 'nullable|string',
             'gstin'         => [
-                'nullable',
-                'string',
-                'max:15',
-                'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
-            ],
+                                'nullable',
+                                'string',
+                                'max:15',
+                                'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
+                            ],
+            'selected_type' => 'nullable|string',
+            
         ]);
 
         $user = $this->createUser($validated);
@@ -110,7 +111,7 @@ class UserController extends Controller
             'mobile'        => $attrs['mobile'],
             'role'          => $attrs['role'] ?? 'customer',
             'selected_type' => $attrs['selected_type'] ?? null,
-            'gstin'         => $validated['gstin'] ?? null,
+            'gstin'         => $attrs['gstin'] ?? null, // ✅ FIXED
         ]);
     }
 
