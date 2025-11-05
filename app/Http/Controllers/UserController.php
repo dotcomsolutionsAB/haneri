@@ -604,7 +604,7 @@ class UserController extends Controller
             'orders'    => $user->orders->map(function ($o) {
                 return [
                     'id'              => $o->id,
-                    'total_amount'    => (float) $o->total_amount,
+                    'total_amount'    => round((float) $o->total_amount, 2),
                     'status'          => $o->status,
                     'payment_status'  => $o->payment_status,
                     'shipping_address'=> $o->shipping_address,
@@ -616,8 +616,8 @@ class UserController extends Controller
                             'product_id' => $it->product_id,
                             'variant_id' => $it->variant_id,
                             'quantity'   => (int) $it->quantity,
-                            'price'      => (float) $it->price,
-                            'subtotal'   => (float) $it->price * (int) $it->quantity,
+                            'price'      => round((float) $it->price, 2),
+                            'subtotal'   => round((float) $it->price * (int) $it->quantity, 2),
                             'product'    => $it->product ? [
                                 'id'   => $it->product->id,
                                 'name' => $it->product->name,
@@ -627,14 +627,14 @@ class UserController extends Controller
                                 'id'            => $it->variant->id,
                                 'variant_value' => $it->variant->variant_value,
                                 // 'selling_price' => (float) $it->variant->selling_price,
-                                'regular_price' => (float) $it->variant->regular_price,
+                                'regular_price' => round((float) $it->variant->regular_price, 2),
                             ] : null,
                         ];
                     }),
                     'payments'        => $o->payments->map(function ($p) {
                         return [
                             'id'             => $p->id,
-                            'amount'         => (float) $p->amount,
+                            'amount'     => round((float) $p->amount, 2),
                             'status'         => $p->status,
                             // 'pg_reference_no'=> $p->pg_reference_no,
                             'created_at'     => $p->created_at,
