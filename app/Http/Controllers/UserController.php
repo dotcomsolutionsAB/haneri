@@ -565,7 +565,7 @@ class UserController extends Controller
                                    },
                                    'variant' => function ($vq) {
                                        // adjust columns to your ProductVariantModel
-                                       $vq->select('id','product_id','variant_value','selling_price','regular_price');
+                                       $vq->select('id','product_id','variant_value','regular_price');
                                    },
                                ]);
                         },
@@ -626,7 +626,7 @@ class UserController extends Controller
                             'variant'    => $it->variant ? [
                                 'id'            => $it->variant->id,
                                 'variant_value' => $it->variant->variant_value,
-                                'selling_price' => (float) $it->variant->selling_price,
+                                // 'selling_price' => (float) $it->variant->selling_price,
                                 'regular_price' => (float) $it->variant->regular_price,
                             ] : null,
                         ];
