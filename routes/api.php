@@ -115,7 +115,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/{productId}/features', [ProductController::class, 'addFeature']);
             Route::delete('/features/{id}', [ProductController::class, 'deleteFeature']);
         });
-        Route::post('/get_profile/{id?}', [UserController::class, 'getProfile']);
+        Route::get('/get_profile/{id?}', [UserController::class, 'getProfile']);
         // for all orders
         Route::post('/fetch_all', [OrderController::class, 'fetchOrders']); // List all orders for admin
 
