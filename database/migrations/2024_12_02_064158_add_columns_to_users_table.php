@@ -14,7 +14,8 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             //
             $table->string('mobile')->unique()->after('password');
-            $table->enum('role', ['admin', 'customer', 'architect','dealer'])->default('customer')->after('mobile');
+            $table->string('gstin')->nullable()->after('mobile');
+            $table->enum('role', ['admin', 'customer', 'architect','dealer'])->default('customer')->after('gstin');
             $table->string('selected_type')->after('role');
             $table->string('otp')->nullable()->after('selected_type');
             $table->timestamp('expires_at')->nullable()->after('otp');

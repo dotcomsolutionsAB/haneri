@@ -24,7 +24,9 @@ class User extends Authenticatable
         'password',
         'mobile',
         'role',
-        'selected_type'
+        'selected_type',
+        'gstin',
+        'otp'
     ];
 
     /**

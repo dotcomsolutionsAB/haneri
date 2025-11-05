@@ -72,6 +72,12 @@ class UserController extends Controller
             'password'      => 'required|string|min:8',
             'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
             'selected_type' => 'nullable|string',
+            'gstin'         => [
+                'nullable',
+                'string',
+                'max:15',
+                'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
+            ],
         ]);
 
         $user = $this->createUser($validated);
@@ -90,7 +96,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'User registered successfully!',
-            'data'    => $user->only(['name','email','mobile','role','selected_type']),
+            'data'    => $user->only(['name','email','mobile','role','gstin','selected_type']),
             'token'   => $token,
         ], 201);
     }
@@ -104,6 +110,7 @@ class UserController extends Controller
             'mobile'        => $attrs['mobile'],
             'role'          => $attrs['role'] ?? 'customer',
             'selected_type' => $attrs['selected_type'] ?? null,
+            'gstin'         => $validated['gstin'] ?? null,
         ]);
     }
 
