@@ -534,4 +534,119 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+    public function getProfile(Request $request, int $id)
+    {
+        // Eager-load everything we need while selecting safe columns
+        $user = User::select('id','name','email','mobile','role','selected_type','gstin','created_at')
+            ->with([
+                'addresses' => function ($q) {
+                    $q->select(
+                        'id','user_id','name','contact_no',
+                        'address_line1','address_line2','city','state',
+                        'postal_code','country','is_default','gst_no'
+                    );
+                },
+                'orders' => function ($q) {
+                    $q->select(
+                        'id','user_id','total_amount','status',
+                        'payment_status','shipping_address','razorpay_order_id',
+                        'created_at'
+                    )
+                    ->with([
+                        'items' => function ($iq) {
+                            $iq->select('id','order_id','product_id','variant_id','quantity','price')
+                               ->with([
+                                   'product' => function ($pq) {
+                                       // adjust columns to your ProductModel
+                                       $pq->select('id','name','slug');
+                                   },
+                                   'variant' => function ($vq) {
+                                       // adjust columns to your ProductVariantModel
+                                       $vq->select('id','product_id','variant_value','selling_price','regular_price');
+                                   },
+                               ]);
+                        },
+                        'payments' => function ($pq) {
+                            // adjust columns to your PaymentModel table
+                            $pq->select('id','order_id','amount','status','pg_reference_no','created_at');
+                        },
+                    ])
+                    ->orderByDesc('id');
+                },
+            ])
+            ->find($id);
+
+        if (!$user) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'User not found.',
+                'data'    => [],
+            ], 404);
+        }
+
+        // Shape the response
+        $payload = [
+            'user'      => [
+                'id'            => $user->id,
+                'name'          => $user->name,
+                'email'         => $user->email,
+                'mobile'        => $user->mobile,
+                'role'          => $user->role,
+                'selected_type' => $user->selected_type,
+                'gstin'         => $user->gstin,
+                'joined_at'     => $user->created_at,
+            ],
+            'addresses' => $user->addresses, // already selected fields
+            'orders'    => $user->orders->map(function ($o) {
+                return [
+                    'id'              => $o->id,
+                    'total_amount'    => (float) $o->total_amount,
+                    'status'          => $o->status,
+                    'payment_status'  => $o->payment_status,
+                    'shipping_address'=> $o->shipping_address,
+                    'razorpay_order_id' => $o->razorpay_order_id,
+                    'created_at'      => $o->created_at,
+                    'items'           => $o->items->map(function ($it) {
+                        return [
+                            'id'         => $it->id,
+                            'product_id' => $it->product_id,
+                            'variant_id' => $it->variant_id,
+                            'quantity'   => (int) $it->quantity,
+                            'price'      => (float) $it->price,
+                            'subtotal'   => (float) $it->price * (int) $it->quantity,
+                            'product'    => $it->product ? [
+                                'id'   => $it->product->id,
+                                'name' => $it->product->name,
+                                'slug' => $it->product->slug,
+                            ] : null,
+                            'variant'    => $it->variant ? [
+                                'id'            => $it->variant->id,
+                                'variant_value' => $it->variant->variant_value,
+                                'selling_price' => (float) $it->variant->selling_price,
+                                'regular_price' => (float) $it->variant->regular_price,
+                            ] : null,
+                        ];
+                    }),
+                    'payments'        => $o->payments->map(function ($p) {
+                        return [
+                            'id'             => $p->id,
+                            'amount'         => (float) $p->amount,
+                            'status'         => $p->status,
+                            'pg_reference_no'=> $p->pg_reference_no,
+                            'created_at'     => $p->created_at,
+                        ];
+                    }),
+                ];
+            }),
+        ];
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Profile fetched successfully!',
+            'data'    => $payload,
+        ], 200);
+    }
 }

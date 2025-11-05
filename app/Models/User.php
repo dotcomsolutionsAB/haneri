@@ -56,4 +56,10 @@ class User extends Authenticatable
     {
         return $this->hasMany(Address::class);
     }
+
+    // Add orders relation (by user_id)
+    public function orders()
+    {
+        return $this->hasMany(OrderModel::class, 'user_id', 'id');
+    }
 }

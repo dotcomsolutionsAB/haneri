@@ -82,6 +82,7 @@ class AuthController extends Controller
             ], 404);
         }
     }
+    
     // user `login`
     public function login(Request $request, $otp = null)
     {
