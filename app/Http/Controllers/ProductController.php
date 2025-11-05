@@ -1330,17 +1330,17 @@ class ProductController extends Controller
 
 
     // Delete
-    public function destroy($id)
-    {
-        $product = ProductModel::find($id);
-        if (!$product) {
-            return response()->json(['message' => 'Product not found.'], 404);
-        }
+    // public function destroy($id)
+    // {
+    //     $product = ProductModel::find($id);
+    //     if (!$product) {
+    //         return response()->json(['message' => 'Product not found.'], 404);
+    //     }
 
-        $product->delete();
+    //     $product->delete();
 
-        return response()->json(['message' => 'Product deleted successfully!'], 200);
-    }
+    //     return response()->json(['message' => 'Product deleted successfully!'], 200);
+    // }
 
     // import csv
     public function importProductsFromCsv()
@@ -1706,6 +1706,63 @@ class ProductController extends Controller
             ], 500);
         }
     }
+
+    public function destroy(Request $request, int $productId)
+    {
+        $product = ProductModel::find($productId);
+        if (!$product) {
+            return response()->json([
+                'code' => 404,
+                'success' => false,
+                'message' => 'Product not found.',
+                'data' => []
+            ], 404);
+        }
+
+        // Get all variant IDs for this product
+        $variantIds = ProductVariantModel::where('product_id', $productId)
+            ->pluck('id')
+            ->toArray();
+
+        $deletedVariantIds = [];
+        foreach ($variantIds as $vid) {
+            // Call your existing deleteVariant(Request $request, int $variantId)
+            // We pass a new Request (or reuse $request) since your signature requires it.
+            $response = $this->deleteVariant(new Request(), $vid);
+
+            // If your deleteVariant returns a Laravel response, decode to check status
+            if (method_exists($response, 'getStatusCode')) {
+                if ($response->getStatusCode() !== 200) {
+                    // Stop on first failure; do NOT delete the product
+                    return response()->json([
+                        'code' => 500,
+                        'success' => false,
+                        'message' => 'Failed while deleting one of the variants. Product not deleted.',
+                        'data' => [
+                            'failed_variant_id' => $vid,
+                            'deleted_variant_ids' => $deletedVariantIds
+                        ]
+                    ], 500);
+                }
+            }
+
+            $deletedVariantIds[] = $vid;
+        }
+
+        // All variants gone → delete product
+        $product->delete();
+
+        return response()->json([
+            'code' => 200,
+            'success' => true,
+            'message' => 'Product and associated variants deleted successfully!',
+            'data' => [
+                'product_id' => $productId,
+                'variants_deleted' => count($deletedVariantIds),
+                'deleted_variant_ids' => $deletedVariantIds
+            ]
+        ], 200);
+    }
     public function deleteVariant(Request $request, int $variantId)
     {
         DB::beginTransaction();
@@ -1843,7 +1900,6 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
     public function deleteFeature($id)
     {
         $feature = ProductFeatureModel::find($id);
