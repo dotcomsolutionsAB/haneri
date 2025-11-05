@@ -571,7 +571,7 @@ class UserController extends Controller
                         },
                         'payments' => function ($pq) {
                             // adjust columns to your PaymentModel table
-                            $pq->select('id','order_id','amount','status','pg_reference_no','created_at');
+                            $pq->select('id','order_id','amount','status','created_at');
                         },
                     ])
                     ->orderByDesc('id');
@@ -636,7 +636,7 @@ class UserController extends Controller
                             'id'             => $p->id,
                             'amount'         => (float) $p->amount,
                             'status'         => $p->status,
-                            'pg_reference_no'=> $p->pg_reference_no,
+                            // 'pg_reference_no'=> $p->pg_reference_no,
                             'created_at'     => $p->created_at,
                         ];
                     }),
