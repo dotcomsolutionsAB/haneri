@@ -537,63 +537,222 @@ class OrderController extends Controller
     /**
      * Fetch Orders for Admin with Filters
      */
+    // public function fetchOrders(Request $request)
+    // {
+    //     try {
+    //         // Ensure the user is an admin
+    //         $user = Auth::user();
+    //         if ($user->role !== 'admin') {
+    //             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+    //         }
+
+    //         // Set default limit and offset
+    //         $limit = $request->input('limit', 10); // Default limit is 10
+    //         $offset = $request->input('offset', 0); // Default offset is 0
+
+    //         // Query Orders with Filters
+    //         $query = OrderModel::with(['user', 'payments']);
+
+    //         // Filter by Order ID
+    //         if ($request->has('order_id')) {
+    //             $query->where('id', $request->order_id);
+    //         }
+
+    //         // Filter by Date or Date Range
+    //         if ($request->filled('date_from') && $request->filled('date_to')) {
+    //             $query->whereBetween('created_at', [$request->date_from, $request->date_to]);
+    //         } elseif ($request->filled('date')) {
+    //             $query->whereDate('created_at', $request->date);
+    //         }
+
+
+    //         // Filter by User Name
+    //         if ($request->has('user_name')) {
+    //             $query->whereHas('user', function ($q) use ($request) {
+    //                 $q->where('name', 'like', '%' . $request->user_name . '%');
+    //             });
+    //         }
+
+    //         // Filter by Status
+    //         if ($request->has('status')) {
+    //             $query->where('status', $request->status);
+    //         }
+
+    //         // Get Total Orders Count (for pagination)
+    //         $totalOrders = $query->count();
+
+    //         // Get Filtered Orders with Pagination
+    //         $orders = $query->offset($offset)->limit($limit)->get();
+
+    //         // Return Response
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Orders fetched successfully!',
+    //             'total_orders' => $totalOrders,
+    //             'data' => $orders,
+    //         ], 200);
+
+    //     } catch (\Exception $e) {
+    //         // Handle Errors
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Error fetching orders: ' . $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
     public function fetchOrders(Request $request)
     {
         try {
-            // Ensure the user is an admin
-            $user = Auth::user();
-            if ($user->role !== 'admin') {
-                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            // 1) AuthZ: only admins
+            $me = Auth::user();
+            if (!$me || $me->role !== 'admin') {
+                return response()->json([
+                    'code'    => 403,
+                    'success' => false,
+                    'message' => 'Unauthorized',
+                    'data'    => [],
+                ], 403);
             }
 
-            // Set default limit and offset
-            $limit = $request->input('limit', 10); // Default limit is 10
-            $offset = $request->input('offset', 0); // Default offset is 0
+            // 2) Inputs (with sane defaults / guards)
+            $limit  = (int) $request->input('limit', 10);
+            $offset = (int) $request->input('offset', 0);
+            $limit  = $limit > 0 ? min($limit, 100) : 10;          // cap to 100
+            $offset = $offset >= 0 ? $offset : 0;
 
-            // Query Orders with Filters
-            $query = OrderModel::with(['user', 'payments']);
+            $orderId     = $request->input('order_id');
+            $userName    = $request->input('user_name');
+            $status      = $request->input('status');              // pending|completed|cancelled|refunded
+            $payStatus   = $request->input('payment_status');      // pending|paid|failed
 
-            // Filter by Order ID
-            if ($request->has('order_id')) {
-                $query->where('id', $request->order_id);
+            // Date filters (single OR range)
+            $date       = $request->input('date');                 // "YYYY-MM-DD"
+            $dateFromIn = $request->input('date_from');            // "YYYY-MM-DD"
+            $dateToIn   = $request->input('date_to');              // "YYYY-MM-DD"
+
+            // Sorting (whitelisted)
+            $sortBy  = $request->input('sort_by', 'id');
+            $sortDir = strtolower($request->input('sort_dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+            $sortable = ['id','created_at','total_amount','status','payment_status'];
+            if (!in_array($sortBy, $sortable, true)) {
+                $sortBy = 'id';
             }
 
-            // Filter by Date
-            if ($request->has('date')) {
-                $query->whereDate('created_at', $request->date);
+            // 3) Build query
+            $query = OrderModel::with([
+                'user:id,name,email,mobile,role,selected_type,gstin',
+                'payments:id,order_id,amount,status,created_at'
+            ]);
+
+            // Order ID filter
+            if (!is_null($orderId) && $orderId !== '') {
+                $query->where('id', (int) $orderId);
             }
 
-            // Filter by User Name
-            if ($request->has('user_name')) {
-                $query->whereHas('user', function ($q) use ($request) {
-                    $q->where('name', 'like', '%' . $request->user_name . '%');
+            // User name filter
+            if (!empty($userName)) {
+                $query->whereHas('user', function ($q) use ($userName) {
+                    $q->where('name', 'like', '%' . $userName . '%');
                 });
             }
 
-            // Filter by Status
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
+            // Status filter
+            if (!empty($status)) {
+                $query->where('status', $status);
             }
 
-            // Get Total Orders Count (for pagination)
-            $totalOrders = $query->count();
+            // Payment status filter
+            if (!empty($payStatus)) {
+                $query->where('payment_status', $payStatus);
+            }
 
-            // Get Filtered Orders with Pagination
-            $orders = $query->offset($offset)->limit($limit)->get();
+            // Date / Range filter (inclusive, with start/end of day)
+            if (!empty($dateFromIn) || !empty($dateToIn)) {
+                // Range mode
+                $start = $dateFromIn ? Carbon::parse($dateFromIn)->startOfDay() : Carbon::minValue();
+                $end   = $dateToIn   ? Carbon::parse($dateToIn)->endOfDay()     : Carbon::maxValue();
+                $query->whereBetween('created_at', [$start, $end]);
+            } elseif (!empty($date)) {
+                // Single day
+                $day = Carbon::parse($date);
+                $query->whereBetween('created_at', [$day->startOfDay(), $day->endOfDay()]);
+            }
 
-            // Return Response
+            // 4) Count first (for pagination meta)
+            $total = (clone $query)->count();
+
+            // 5) Fetch page
+            $orders = $query
+                ->orderBy($sortBy, $sortDir)
+                ->offset($offset)
+                ->limit($limit)
+                ->get();
+
+            // 6) Optional shaping (format money to 2 decimals)
+            $money = fn ($v) => number_format((float) $v, 2, '.', '');
+            $data  = $orders->map(function ($o) use ($money) {
+                return [
+                    'id'                => $o->id,
+                    'total_amount'      => $money($o->total_amount),
+                    'status'            => $o->status,
+                    'payment_status'    => $o->payment_status,
+                    'shipping_address'  => $o->shipping_address,
+                    'razorpay_order_id' => $o->razorpay_order_id,
+                    'created_at'        => optional($o->created_at)->toIso8601String(),
+                    'user'              => $o->relationLoaded('user') && $o->user ? [
+                        'id'            => $o->user->id,
+                        'name'          => $o->user->name,
+                        'email'         => $o->user->email,
+                        'mobile'        => $o->user->mobile,
+                        'role'          => $o->user->role,
+                        'selected_type' => $o->user->selected_type,
+                        'gstin'         => $o->user->gstin,
+                    ] : null,
+                    'payments'          => $o->relationLoaded('payments')
+                        ? $o->payments->map(fn($p) => [
+                            'id'         => $p->id,
+                            'amount'     => $money($p->amount),
+                            'status'     => $p->status,
+                            'created_at' => optional($p->created_at)->toIso8601String(),
+                        ])->values()
+                        : [],
+                ];
+            })->values();
+
+            // 7) Meta (pagination + filters echo)
+            $meta = [
+                'limit'     => $limit,
+                'offset'    => $offset,
+                'count'     => $data->count(),
+                'total'     => $total,
+                'has_more'  => ($offset + $limit) < $total,
+                'sort_by'   => $sortBy,
+                'sort_dir'  => $sortDir,
+                'filters'   => [
+                    'order_id'       => $orderId,
+                    'user_name'      => $userName,
+                    'status'         => $status,
+                    'payment_status' => $payStatus,
+                    'date'           => $date,
+                    'date_from'      => $dateFromIn,
+                    'date_to'        => $dateToIn,
+                ],
+            ];
+
             return response()->json([
+                'code'    => 200,
                 'success' => true,
                 'message' => 'Orders fetched successfully!',
-                'total_orders' => $totalOrders,
-                'data' => $orders,
+                'meta'    => $meta,
+                'data'    => $data,
             ], 200);
 
-        } catch (\Exception $e) {
-            // Handle Errors
+        } catch (\Throwable $e) {
             return response()->json([
+                'code'    => 500,
                 'success' => false,
                 'message' => 'Error fetching orders: ' . $e->getMessage(),
+                'data'    => [],
             ], 500);
         }
     }
