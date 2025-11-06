@@ -118,8 +118,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/get_profile/{id?}', [UserController::class, 'getProfile']);
         // for all orders
         Route::post('/fetch_all', [OrderController::class, 'fetchOrders']); // List all orders for admin
+        Route::post('/fetch_order_detail', [OrderController::class, 'fetchOrderDetails']); // List all orders for admin
 
-        // for all users
+
+        // for all users 
         Route::post('/all_users', [UserController::class, 'fetchUsers']); // List all users for admin
         Route::delete('/delete/{id}', [UserController::class, 'deleteUser']);
 

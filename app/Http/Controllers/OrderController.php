@@ -422,8 +422,6 @@ class OrderController extends Controller
         return $this->price($regular, (float)$userDiscount);
     }
 
-
-
     // View all orders for a user
     public function index(Request $request)
     {
@@ -598,6 +596,107 @@ class OrderController extends Controller
                 'message' => 'Error fetching orders: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function fetchOrderDetails($id)
+    {
+        // Helpers for money formatting (keep consistent with your profile API)
+        $money = function ($v) {
+            return number_format((float) $v, 2, '.', '');
+        };
+        $mulMoney = function ($a, $b) use ($money) {
+            if (function_exists('bcmul')) {
+                $prod = bcmul((string)$a, (string)((int)$b), 2);
+                return number_format((float)$prod, 2, '.', '');
+            }
+            $raw = ((float)$a) * ((int)$b);
+            return number_format(round($raw + 1e-8, 2), 2, '.', '');
+        };
+
+        // Eager-load everything
+        $order = OrderModel::with([
+            'user' => function ($q) {
+                $q->select('id','name','email','mobile','role','selected_type','gstin');
+            },
+            'items' => function ($iq) {
+                $iq->select('id','order_id','product_id','variant_id','quantity','price')
+                ->with([
+                    'product' => function ($pq) {
+                        $pq->select('id','name','slug');
+                    },
+                    'variant' => function ($vq) {
+                        $vq->select('id','product_id','variant_value','regular_price');
+                    },
+                ]);
+            },
+            'payments' => function ($pq) {
+                $pq->select('id','order_id','amount','status','created_at');
+            },
+        ])->find($id);
+
+        if (!$order) {
+            return response()->json([
+                'code' => 404,
+                'success' => false,
+                'message' => 'Order not found.',
+                'data' => [],
+            ], 404);
+        }
+
+        // Shape data
+        $data = [
+            'id'                => $order->id,
+            'total_amount'      => $money($order->total_amount),
+            'status'            => $order->status,
+            'payment_status'    => $order->payment_status,
+            'shipping_address'  => $order->shipping_address,
+            'razorpay_order_id' => $order->razorpay_order_id,
+            'created_at'        => optional($order->created_at)->toIso8601String(),
+            'user'              => $order->user ? [
+                'id'            => $order->user->id,
+                'name'          => $order->user->name,
+                'email'         => $order->user->email,
+                'mobile'        => $order->user->mobile,
+                'role'          => $order->user->role,
+                'selected_type' => $order->user->selected_type,
+                'gstin'         => $order->user->gstin,
+            ] : null,
+            'items'             => $order->items->map(function ($it) use ($money, $mulMoney) {
+                return [
+                    'id'         => $it->id,
+                    'product_id' => $it->product_id,
+                    'variant_id' => $it->variant_id,
+                    'quantity'   => (int) $it->quantity,
+                    'price'      => $money($it->price),
+                    'subtotal'   => $mulMoney($it->price, $it->quantity),
+                    'product'    => $it->product ? [
+                        'id'   => $it->product->id,
+                        'name' => $it->product->name,
+                        'slug' => $it->product->slug,
+                    ] : null,
+                    'variant'    => $it->variant ? [
+                        'id'            => $it->variant->id,
+                        'variant_value' => $it->variant->variant_value,
+                        'regular_price' => $money($it->variant->regular_price),
+                    ] : null,
+                ];
+            })->values(),
+            'payments'          => $order->payments->map(function ($p) use ($money) {
+                return [
+                    'id'         => $p->id,
+                    'amount'     => $money($p->amount),
+                    'status'     => $p->status,
+                    'created_at' => optional($p->created_at)->toIso8601String(),
+                ];
+            })->values(),
+        ];
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Order details fetched successfully!',
+            'data'    => $data,
+        ], 200);
     }
 
 }
