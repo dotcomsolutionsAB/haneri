@@ -654,143 +654,141 @@ class UserController extends Controller
     // }
 
     public function getProfile(Request $request, int $id)
-    {
-        // --- controller-local helpers (no model changes) ---
-        $toMoney = function ($v) {
-            // numeric with exact 2-dec rounding (avoids 6569.100000000003…)
-            return (float) number_format((float) $v, 2, '.', '');
-        };
-        $mulMoney = function ($a, $b) {
-            // precise price × qty using BCMath if available
-            if (function_exists('bcmul')) {
-                return (float) number_format((float) bcmul((string) $a, (string) ((int) $b), 2), 2, '.', '');
-            }
-            $raw = ((float) $a) * ((int) $b);
-            return (float) number_format(round($raw + 1e-8, 2), 2, '.', '');
-        };
-
-        // Eager-load everything we need while selecting safe columns
-        $user = User::select('id','name','email','mobile','role','selected_type','gstin','created_at')
-            ->with([
-                'addresses' => function ($q) {
-                    $q->select(
-                        'id','user_id','name','contact_no',
-                        'address_line1','address_line2','city','state',
-                        'postal_code','country','is_default','gst_no'
-                    );
-                },
-                'orders' => function ($q) {
-                    $q->select(
-                        'id','user_id','total_amount','status',
-                        'payment_status','shipping_address','razorpay_order_id',
-                        'created_at'
-                    )
-                    ->with([
-                        'items' => function ($iq) {
-                            $iq->select('id','order_id','product_id','variant_id','quantity','price')
-                            ->with([
-                                'product' => function ($pq) {
-                                    $pq->select('id','name','slug');
-                                },
-                                'variant' => function ($vq) {
-                                    $vq->select('id','product_id','variant_value','regular_price');
-                                },
-                            ]);
-                        },
-                        'payments' => function ($pq) {
-                            $pq->select('id','order_id','amount','status','created_at');
-                        },
-                    ])
-                    ->orderByDesc('id');
-                },
-            ])
-            ->find($id);
-
-        if (!$user) {
-            return response()->json([
-                'code'    => 404,
-                'success' => false,
-                'message' => 'User not found.',
-                'data'    => [],
-            ], 404);
+{
+    // --- currency helpers -> return STRINGS, not floats ---
+    $money = function ($v) {
+        return number_format((float) $v, 2, '.', ''); // "6569.10"
+    };
+    $mulMoney = function ($a, $b) use ($money) {
+        if (function_exists('bcmul')) {
+            $prod = bcmul((string)$a, (string)((int)$b), 2); // "13138.20"
+            // ensure standard formatting
+            return number_format((float)$prod, 2, '.', '');
         }
+        $raw = ((float)$a) * ((int)$b);
+        return number_format(round($raw + 1e-8, 2), 2, '.', '');
+    };
 
-        // Shape the response
-        $payload = [
-            'user'      => [
-                'id'            => $user->id,
-                'name'          => $user->name,
-                'email'         => $user->email,
-                'mobile'        => $user->mobile,
-                'role'          => $user->role,
-                'selected_type' => $user->selected_type,
-                'gstin'         => $user->gstin,
-                'joined_at'     => optional($user->created_at)->toIso8601String(),
-            ],
-            // already selected fields; return as array
-            'addresses' => $user->addresses->map(function ($a) {
-                return [
-                    'id'           => $a->id,
-                    'user_id'      => $a->user_id,
-                    'name'         => $a->name,
-                    'contact_no'   => $a->contact_no,
-                    'address_line1'=> $a->address_line1,
-                    'address_line2'=> $a->address_line2,
-                    'city'         => $a->city,
-                    'state'        => $a->state,
-                    'postal_code'  => $a->postal_code,
-                    'country'      => $a->country,
-                    'is_default'   => (int) $a->is_default,
-                    'gst_no'       => $a->gst_no,
-                ];
-            })->values(),
-            'orders'    => $user->orders->map(function ($o) use ($toMoney, $mulMoney) {
-                return [
-                    'id'                => $o->id,
-                    'total_amount'      => $toMoney($o->total_amount),
-                    'status'            => $o->status,
-                    'payment_status'    => $o->payment_status,
-                    'shipping_address'  => $o->shipping_address,
-                    'razorpay_order_id' => $o->razorpay_order_id,
-                    'created_at'        => optional($o->created_at)->toIso8601String(),
-                    'items'             => $o->items->map(function ($it) use ($toMoney, $mulMoney) {
-                        return [
-                            'id'         => $it->id,
-                            'product_id' => $it->product_id,
-                            'variant_id' => $it->variant_id,
-                            'quantity'   => (int) $it->quantity,
-                            'price'      => $toMoney($it->price),
-                            'subtotal'   => $mulMoney($it->price, $it->quantity),
-                            'product'    => $it->product ? [
-                                'id'   => $it->product->id,
-                                'name' => $it->product->name,
-                                'slug' => $it->product->slug,
-                            ] : null,
-                            'variant'    => $it->variant ? [
-                                'id'            => $it->variant->id,
-                                'variant_value' => $it->variant->variant_value,
-                                'regular_price' => $toMoney($it->variant->regular_price),
-                            ] : null,
-                        ];
-                    })->values(),
-                    'payments'          => $o->payments->map(function ($p) use ($toMoney) {
-                        return [
-                            'id'         => $p->id,
-                            'amount'     => $toMoney($p->amount),
-                            'status'     => $p->status,
-                            'created_at' => optional($p->created_at)->toIso8601String(),
-                        ];
-                    })->values(),
-                ];
-            })->values(),
-        ];
+    $user = User::select('id','name','email','mobile','role','selected_type','gstin','created_at')
+        ->with([
+            'addresses' => function ($q) {
+                $q->select(
+                    'id','user_id','name','contact_no',
+                    'address_line1','address_line2','city','state',
+                    'postal_code','country','is_default','gst_no'
+                );
+            },
+            'orders' => function ($q) {
+                $q->select(
+                    'id','user_id','total_amount','status',
+                    'payment_status','shipping_address','razorpay_order_id',
+                    'created_at'
+                )
+                ->with([
+                    'items' => function ($iq) {
+                        $iq->select('id','order_id','product_id','variant_id','quantity','price')
+                           ->with([
+                               'product' => function ($pq) {
+                                   $pq->select('id','name','slug');
+                               },
+                               'variant' => function ($vq) {
+                                   $vq->select('id','product_id','variant_value','regular_price');
+                               },
+                           ]);
+                    },
+                    'payments' => function ($pq) {
+                        $pq->select('id','order_id','amount','status','created_at');
+                    },
+                ])
+                ->orderByDesc('id');
+            },
+        ])
+        ->find($id);
 
+    if (!$user) {
         return response()->json([
-            'code'    => 200,
-            'success' => true,
-            'message' => 'Profile fetched successfully!',
-            'data'    => $payload,
-        ], 200);
+            'code'    => 404,
+            'success' => false,
+            'message' => 'User not found.',
+            'data'    => [],
+        ], 404);
     }
+
+    $payload = [
+        'user'      => [
+            'id'            => $user->id,
+            'name'          => $user->name,
+            'email'         => $user->email,
+            'mobile'        => $user->mobile,
+            'role'          => $user->role,
+            'selected_type' => $user->selected_type,
+            'gstin'         => $user->gstin,
+            'joined_at'     => optional($user->created_at)->toIso8601String(),
+        ],
+        'addresses' => $user->addresses->map(function ($a) {
+            return [
+                'id'            => $a->id,
+                'user_id'       => $a->user_id,
+                'name'          => $a->name,
+                'contact_no'    => $a->contact_no,
+                'address_line1' => $a->address_line1,
+                'address_line2' => $a->address_line2,
+                'city'          => $a->city,
+                'state'         => $a->state,
+                'postal_code'   => $a->postal_code,
+                'country'       => $a->country,
+                'is_default'    => (int) $a->is_default,
+                'gst_no'        => $a->gst_no,
+            ];
+        })->values(),
+        'orders'    => $user->orders->map(function ($o) use ($money, $mulMoney) {
+            return [
+                'id'                => $o->id,
+                'total_amount'      => $money($o->total_amount),      // STRING "32845.50"
+                'status'            => $o->status,
+                'payment_status'    => $o->payment_status,
+                'shipping_address'  => $o->shipping_address,
+                'razorpay_order_id' => $o->razorpay_order_id,
+                'created_at'        => optional($o->created_at)->toIso8601String(),
+                'items'             => $o->items->map(function ($it) use ($money, $mulMoney) {
+                    return [
+                        'id'         => $it->id,
+                        'product_id' => $it->product_id,
+                        'variant_id' => $it->variant_id,
+                        'quantity'   => (int) $it->quantity,
+                        'price'      => $money($it->price),                       // STRING "6569.10"
+                        'subtotal'   => $mulMoney($it->price, $it->quantity),     // STRING "13138.20"
+                        'product'    => $it->product ? [
+                            'id'   => $it->product->id,
+                            'name' => $it->product->name,
+                            'slug' => $it->product->slug,
+                        ] : null,
+                        'variant'    => $it->variant ? [
+                            'id'            => $it->variant->id,
+                            'variant_value' => $it->variant->variant_value,
+                            'regular_price' => $money($it->variant->regular_price), // STRING
+                        ] : null,
+                    ];
+                })->values(),
+                'payments'          => $o->payments->map(function ($p) use ($money) {
+                    return [
+                        'id'         => $p->id,
+                        'amount'     => $money($p->amount), // STRING
+                        'status'     => $p->status,
+                        'created_at' => optional($p->created_at)->toIso8601String(),
+                    ];
+                })->values(),
+            ];
+        })->values(),
+    ];
+
+    return response()->json([
+        'code'    => 200,
+        'success' => true,
+        'message' => 'Profile fetched successfully!',
+        'data'    => $payload,
+    ], 200);
+}
+
 
 }
