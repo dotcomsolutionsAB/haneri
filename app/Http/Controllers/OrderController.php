@@ -699,4 +699,45 @@ class OrderController extends Controller
         ], 200);
     }
 
+    public function updateOrderStatus(Request $request, int $id)
+    {
+        $validated = $request->validate([
+            'status'           => 'nullable|in:pending,completed,cancelled,refunded',
+            'payment_status'   => 'nullable|in:pending,paid,failed',
+            'delivery_status'  => 'nullable|in:pending,accepted,arrived,completed,cancelled',
+        ]);
+
+        $order = OrderModel::find($id);
+
+        if (!$order) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'Order not found.',
+                'data'    => [],
+            ], 404);
+        }
+
+        // Update only provided fields
+        $order->update(array_filter([
+            'status'          => $validated['status'] ?? $order->status,
+            'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
+            'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
+        ]));
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Order status updated successfully!',
+            'data'    => [
+                'id'              => $order->id,
+                'status'          => $order->status,
+                'payment_status'  => $order->payment_status,
+                'delivery_status' => $order->delivery_status,
+                'updated_at'      => $order->updated_at->toIso8601String(),
+            ],
+        ], 200);
+    }
+
+
 }
