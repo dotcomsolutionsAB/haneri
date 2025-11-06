@@ -537,8 +537,138 @@ class UserController extends Controller
         }
     }
 
+    // public function getProfile(Request $request, int $id)
+    // {
+        
+    //     // Eager-load everything we need while selecting safe columns
+    //     $user = User::select('id','name','email','mobile','role','selected_type','gstin','created_at')
+    //         ->with([
+    //             'addresses' => function ($q) {
+    //                 $q->select(
+    //                     'id','user_id','name','contact_no',
+    //                     'address_line1','address_line2','city','state',
+    //                     'postal_code','country','is_default','gst_no'
+    //                 );
+    //             },
+    //             'orders' => function ($q) {
+    //                 $q->select(
+    //                     'id','user_id','total_amount','status',
+    //                     'payment_status','shipping_address','razorpay_order_id',
+    //                     'created_at'
+    //                 )
+    //                 ->with([
+    //                     'items' => function ($iq) {
+    //                         $iq->select('id','order_id','product_id','variant_id','quantity','price')
+    //                            ->with([
+    //                                'product' => function ($pq) {
+    //                                    // adjust columns to your ProductModel
+    //                                    $pq->select('id','name','slug');
+    //                                },
+    //                                'variant' => function ($vq) {
+    //                                    // adjust columns to your ProductVariantModel
+    //                                    $vq->select('id','product_id','variant_value','regular_price');
+    //                                },
+    //                            ]);
+    //                     },
+    //                     'payments' => function ($pq) {
+    //                         // adjust columns to your PaymentModel table
+    //                         $pq->select('id','order_id','amount','status','created_at');
+    //                     },
+    //                 ])
+    //                 ->orderByDesc('id');
+    //             },
+    //         ])
+    //         ->find($id);
+
+    //     if (!$user) {
+    //         return response()->json([
+    //             'code'    => 404,
+    //             'success' => false,
+    //             'message' => 'User not found.',
+    //             'data'    => [],
+    //         ], 404);
+    //     }
+
+    //     // Shape the response
+    //     $payload = [
+    //         'user'      => [
+    //             'id'            => $user->id,
+    //             'name'          => $user->name,
+    //             'email'         => $user->email,
+    //             'mobile'        => $user->mobile,
+    //             'role'          => $user->role,
+    //             'selected_type' => $user->selected_type,
+    //             'gstin'         => $user->gstin,
+    //             'joined_at'     => $user->created_at,
+    //         ],
+    //         'addresses' => $user->addresses, // already selected fields
+    //         'orders'    => $user->orders->map(function ($o) {
+    //             return [
+    //                 'id'              => $o->id,
+    //                 'total_amount'    => round((float) $o->total_amount, 2),
+    //                 'status'          => $o->status,
+    //                 'payment_status'  => $o->payment_status,
+    //                 'shipping_address'=> $o->shipping_address,
+    //                 'razorpay_order_id' => $o->razorpay_order_id,
+    //                 'created_at'      => $o->created_at,
+    //                 'items'           => $o->items->map(function ($it) {
+    //                     return [
+    //                         'id'         => $it->id,
+    //                         'product_id' => $it->product_id,
+    //                         'variant_id' => $it->variant_id,
+    //                         'quantity'   => (int) $it->quantity,
+    //                         'price'      => round((float) $it->price, 2),
+    //                         'subtotal'   => round((float) $it->price * (int) $it->quantity, 2),
+    //                         'product'    => $it->product ? [
+    //                             'id'   => $it->product->id,
+    //                             'name' => $it->product->name,
+    //                             'slug' => $it->product->slug,
+    //                         ] : null,
+    //                         'variant'    => $it->variant ? [
+    //                             'id'            => $it->variant->id,
+    //                             'variant_value' => $it->variant->variant_value,
+    //                             // 'selling_price' => (float) $it->variant->selling_price,
+    //                             'regular_price' => round((float) $it->variant->regular_price, 2),
+    //                         ] : null,
+    //                     ];
+    //                 }),
+    //                 'payments'        => $o->payments->map(function ($p) {
+    //                     return [
+    //                         'id'             => $p->id,
+    //                         'amount'     => round((float) $p->amount, 2),
+    //                         'status'         => $p->status,
+    //                         // 'pg_reference_no'=> $p->pg_reference_no,
+    //                         'created_at'     => $p->created_at,
+    //                     ];
+    //                 }),
+    //             ];
+    //         }),
+    //     ];
+
+    //     return response()->json([
+    //         'code'    => 200,
+    //         'success' => true,
+    //         'message' => 'Profile fetched successfully!',
+    //         'data'    => $payload,
+    //     ], 200);
+    // }
+
     public function getProfile(Request $request, int $id)
     {
+        // --- controller-local helpers (no model changes) ---
+        $toMoney = function ($v) {
+            // numeric with exact 2-dec rounding (avoids 6569.100000000003…)
+            return (float) number_format((float) $v, 2, '.', '');
+        };
+        $mulMoney = function ($a, $b) {
+            // precise price × qty using BCMath if available
+            if (function_exists('bcmul')) {
+                return (float) number_format((float) bcmul((string) $a, (string) ((int) $b), 2), 2, '.', '');
+            }
+            $raw = ((float) $a) * ((int) $b);
+            return (float) number_format(round($raw + 1e-8, 2), 2, '.', '');
+        };
+
         // Eager-load everything we need while selecting safe columns
         $user = User::select('id','name','email','mobile','role','selected_type','gstin','created_at')
             ->with([
@@ -558,19 +688,16 @@ class UserController extends Controller
                     ->with([
                         'items' => function ($iq) {
                             $iq->select('id','order_id','product_id','variant_id','quantity','price')
-                               ->with([
-                                   'product' => function ($pq) {
-                                       // adjust columns to your ProductModel
-                                       $pq->select('id','name','slug');
-                                   },
-                                   'variant' => function ($vq) {
-                                       // adjust columns to your ProductVariantModel
-                                       $vq->select('id','product_id','variant_value','regular_price');
-                                   },
-                               ]);
+                            ->with([
+                                'product' => function ($pq) {
+                                    $pq->select('id','name','slug');
+                                },
+                                'variant' => function ($vq) {
+                                    $vq->select('id','product_id','variant_value','regular_price');
+                                },
+                            ]);
                         },
                         'payments' => function ($pq) {
-                            // adjust columns to your PaymentModel table
                             $pq->select('id','order_id','amount','status','created_at');
                         },
                     ])
@@ -598,26 +725,42 @@ class UserController extends Controller
                 'role'          => $user->role,
                 'selected_type' => $user->selected_type,
                 'gstin'         => $user->gstin,
-                'joined_at'     => $user->created_at,
+                'joined_at'     => optional($user->created_at)->toIso8601String(),
             ],
-            'addresses' => $user->addresses, // already selected fields
-            'orders'    => $user->orders->map(function ($o) {
+            // already selected fields; return as array
+            'addresses' => $user->addresses->map(function ($a) {
                 return [
-                    'id'              => $o->id,
-                    'total_amount'    => round((float) $o->total_amount, 2),
-                    'status'          => $o->status,
-                    'payment_status'  => $o->payment_status,
-                    'shipping_address'=> $o->shipping_address,
+                    'id'           => $a->id,
+                    'user_id'      => $a->user_id,
+                    'name'         => $a->name,
+                    'contact_no'   => $a->contact_no,
+                    'address_line1'=> $a->address_line1,
+                    'address_line2'=> $a->address_line2,
+                    'city'         => $a->city,
+                    'state'        => $a->state,
+                    'postal_code'  => $a->postal_code,
+                    'country'      => $a->country,
+                    'is_default'   => (int) $a->is_default,
+                    'gst_no'       => $a->gst_no,
+                ];
+            })->values(),
+            'orders'    => $user->orders->map(function ($o) use ($toMoney, $mulMoney) {
+                return [
+                    'id'                => $o->id,
+                    'total_amount'      => $toMoney($o->total_amount),
+                    'status'            => $o->status,
+                    'payment_status'    => $o->payment_status,
+                    'shipping_address'  => $o->shipping_address,
                     'razorpay_order_id' => $o->razorpay_order_id,
-                    'created_at'      => $o->created_at,
-                    'items'           => $o->items->map(function ($it) {
+                    'created_at'        => optional($o->created_at)->toIso8601String(),
+                    'items'             => $o->items->map(function ($it) use ($toMoney, $mulMoney) {
                         return [
                             'id'         => $it->id,
                             'product_id' => $it->product_id,
                             'variant_id' => $it->variant_id,
                             'quantity'   => (int) $it->quantity,
-                            'price'      => round((float) $it->price, 2),
-                            'subtotal'   => round((float) $it->price * (int) $it->quantity, 2),
+                            'price'      => $toMoney($it->price),
+                            'subtotal'   => $mulMoney($it->price, $it->quantity),
                             'product'    => $it->product ? [
                                 'id'   => $it->product->id,
                                 'name' => $it->product->name,
@@ -626,22 +769,20 @@ class UserController extends Controller
                             'variant'    => $it->variant ? [
                                 'id'            => $it->variant->id,
                                 'variant_value' => $it->variant->variant_value,
-                                // 'selling_price' => (float) $it->variant->selling_price,
-                                'regular_price' => round((float) $it->variant->regular_price, 2),
+                                'regular_price' => $toMoney($it->variant->regular_price),
                             ] : null,
                         ];
-                    }),
-                    'payments'        => $o->payments->map(function ($p) {
+                    })->values(),
+                    'payments'          => $o->payments->map(function ($p) use ($toMoney) {
                         return [
-                            'id'             => $p->id,
-                            'amount'     => round((float) $p->amount, 2),
-                            'status'         => $p->status,
-                            // 'pg_reference_no'=> $p->pg_reference_no,
-                            'created_at'     => $p->created_at,
+                            'id'         => $p->id,
+                            'amount'     => $toMoney($p->amount),
+                            'status'     => $p->status,
+                            'created_at' => optional($p->created_at)->toIso8601String(),
                         ];
-                    }),
+                    })->values(),
                 ];
-            }),
+            })->values(),
         ];
 
         return response()->json([
@@ -651,4 +792,5 @@ class UserController extends Controller
             'data'    => $payload,
         ], 200);
     }
+
 }
