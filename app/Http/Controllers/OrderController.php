@@ -671,23 +671,7 @@ class OrderController extends Controller
             // User Type filter (customer | architect | dealer)
             if ($userType !== '' && in_array($userType, ['customer','architect','dealer'], true)) {
                 $query->whereHas('user', function ($uq) use ($userType) {
-                    if ($userType === 'customer') {
-                        $uq->where(function ($w) {
-                            $w->where('role', 'customer')
-                            ->orWhereNull('selected_type')
-                            ->orWhereRaw('LOWER(selected_type) = ?', ['customer']);
-                        });
-                    } elseif ($userType === 'architect') {
-                        $uq->where(function ($w) {
-                            $w->whereRaw('LOWER(selected_type) = ?', ['architect'])
-                            ->orWhere('role', 'architect');
-                        });
-                    } elseif ($userType === 'dealer') {
-                        $uq->where(function ($w) {
-                            $w->where('role', 'dealer')
-                            ->orWhereRaw('LOWER(selected_type) = ?', ['dealer']);
-                        });
-                    }
+                    $uq->whereRaw('LOWER(role) = ?', [$userType]);
                 });
             }
 
