@@ -625,6 +625,7 @@ class OrderController extends Controller
             $userName    = $request->input('user_name');
             $status      = $request->input('status');              // pending|completed|cancelled|refunded
             $payStatus   = $request->input('payment_status');      // pending|paid|failed
+            $userType    = strtolower(trim((string) $request->input('user_type', '')));
 
             // Date filters (single OR range)
             $date       = $request->input('date');                 // "YYYY-MM-DD"
@@ -665,6 +666,29 @@ class OrderController extends Controller
             // Payment status filter
             if (!empty($payStatus)) {
                 $query->where('payment_status', $payStatus);
+            }
+
+            // User Type filter (customer | architect | dealer)
+            if ($userType !== '' && in_array($userType, ['customer','architect','dealer'], true)) {
+                $query->whereHas('user', function ($uq) use ($userType) {
+                    if ($userType === 'customer') {
+                        $uq->where(function ($w) {
+                            $w->where('role', 'customer')
+                            ->orWhereNull('selected_type')
+                            ->orWhereRaw('LOWER(selected_type) = ?', ['customer']);
+                        });
+                    } elseif ($userType === 'architect') {
+                        $uq->where(function ($w) {
+                            $w->whereRaw('LOWER(selected_type) = ?', ['architect'])
+                            ->orWhere('role', 'architect');
+                        });
+                    } elseif ($userType === 'dealer') {
+                        $uq->where(function ($w) {
+                            $w->where('role', 'dealer')
+                            ->orWhereRaw('LOWER(selected_type) = ?', ['dealer']);
+                        });
+                    }
+                });
             }
 
             // Date / Range filter (inclusive, with start/end of day)
@@ -744,6 +768,7 @@ class OrderController extends Controller
                     'date'           => $date,
                     'date_from'      => $dateFromIn,
                     'date_to'        => $dateToIn,
+                    'user_type'      => $userType, 
                 ],
             ];
 
