@@ -674,10 +674,17 @@ class OrderController extends Controller
                 $end   = $dateToIn   ? Carbon::parse($dateToIn)->endOfDay()     : Carbon::maxValue();
                 $query->whereBetween('created_at', [$start, $end]);
             } elseif (!empty($date)) {
-                // Single day
-                $day = Carbon::parse($date);
-                $query->whereBetween('created_at', [$day->startOfDay(), $day->endOfDay()]);
+                // Single day filter
+                try {
+                    $startOfDay = Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
+                    $endOfDay   = Carbon::createFromFormat('Y-m-d', $date)->endOfDay();
+                    $query->whereBetween('created_at', [$startOfDay, $endOfDay]);
+                } catch (\Exception $e) {
+                    // fallback if Carbon parse fails
+                    $query->whereDate('created_at', $date);
+                }
             }
+
 
             // 4) Count first (for pagination meta)
             $total = (clone $query)->count();
