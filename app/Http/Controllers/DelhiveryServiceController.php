@@ -9,12 +9,12 @@ use Illuminate\Support\Facades\Http;
 
 class DelhiveryServiceController extends Controller
 {
-    protected DelhiveryService $delhiveryService;
+    // protected DelhiveryService $delhiveryService;
 
-    public function __construct(DelhiveryService $delhiveryService)
-    {
-        $this->delhiveryService = $delhiveryService;
-    }
+    // public function __construct(DelhiveryService $delhiveryService)
+    // {
+    //     $this->delhiveryService = $delhiveryService;
+    // }
 
     // public function createOrder(Request $request)
     // {
