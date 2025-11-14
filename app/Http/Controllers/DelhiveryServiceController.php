@@ -10,10 +10,10 @@ class DelhiveryServiceController extends Controller
 {
     protected DelhiveryService $delhiveryService;
 
-    public function __construct(DelhiveryService $delhiveryService)
-    {
-        $this->delhiveryService = $delhiveryService;
-    }
+    // public function __construct(DelhiveryService $delhiveryService)
+    // {
+    //     $this->delhiveryService = $delhiveryService;
+    // }
 
     // public function createOrder(Request $request)
     // {
@@ -53,7 +53,7 @@ class DelhiveryServiceController extends Controller
             "deliveryone_response" => $response->json()
         ]);
     }
-    
+
     public function createOrder(Request $request)
     {
         $validator = Validator::make($request->all(), [
