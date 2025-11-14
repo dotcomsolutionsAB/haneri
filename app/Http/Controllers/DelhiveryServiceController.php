@@ -44,16 +44,22 @@ class DelhiveryServiceController extends Controller
 
     public function test()
     {
+        $url = rtrim(env('DELIVERY_ONE_URL'), '/') . '/ping';
+
         $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . env('DELIVERY_ONE_TOKEN'),
-            'Accept' => 'application/json'
-        ])->get(env('DELIVERY_ONE_URL') . '/ping'); // testing endpoint
+            'Authorization' => 'Token ' . env('DELIVERY_ONE_TOKEN'),
+            'Accept'        => 'application/json',
+        ])->get($url);
 
         return response()->json([
-            "request_sent" => true,
-            "deliveryone_response" => $response->json()
+            'url'         => $url,
+            'status'      => $response->status(),
+            'successful'  => $response->successful(),
+            'body'        => $response->body(),   // raw response (may be HTML or empty)
+            'json'        => $response->json(),   // will be null if not valid JSON
         ]);
     }
+
 
     public function createOrder(Request $request)
     {
