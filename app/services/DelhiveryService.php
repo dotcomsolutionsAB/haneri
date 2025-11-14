@@ -61,6 +61,80 @@ class DelhiveryService
         }
     }
 
+    public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
+    {
+        $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
+        
+        try {
+            $response = $this->client->get($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                ],
+                'query' => [
+                    'md'  => 'E',           // Express
+                    'ss'  => 'Delivered',   // service status
+                    'd_pin' => $destinationPin,
+                    'o_pin' => $originPin,
+                    'cgm'  => $weight,      // chargeable weight
+                    'pt'   => $paymentType, // Pre-paid or COD
+                    'cod'  => ($paymentType === 'COD') ? $codAmount : 0,
+                ],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+
+        } catch (ClientException $e) {
+            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+            Log::error('Delhivery API Client Error (shipping cost): ' . json_encode($responseBody));
+            return ['error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage())];
+        } catch (\Exception $e) {
+            Log::error("Failed to calculate shipping cost: " . $e->getMessage());
+            return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
+        }
+    }
+
+    /**
+     * Calculates the estimated shipping cost for a shipment.
+     *
+     * @param string $originPin The origin pincode.
+     * @param string $destinationPin The destination pincode.
+     * @param float $codAmount The Cash on Delivery amount.
+     * @param float $weight The chargeable weight in kg.
+     * @param string $paymentType 'Pre-paid' or 'COD'.
+     * @return array The API response or an error array.
+     */
+    // public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
+    // {
+    //     $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
+        
+    //     try {
+    //         $response = $this->client->get($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //                 'Accept' => 'application/json',
+    //             ],
+    //             'query' => [
+    //                 'md' => 'E',
+    //                 'ss' => 'Pre-paid',
+    //                 'd_pin' => $destinationPin,
+    //                 'o_pin' => $originPin,
+    //                 'cgm' => $weight,
+    //                 'pt' => $paymentType,
+    //                 'cod' => ($paymentType === 'COD') ? $codAmount : 0,
+    //             ],
+    //         ]);
+    //         return json_decode($response->getBody()->getContents(), true);
+    //     } catch (ClientException $e) {
+    //         $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+    //         Log::error('Delhivery API Client Error (shipping cost): ' . json_encode($responseBody));
+    //         return ['error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage())];
+    //     } catch (\Exception $e) {
+    //         Log::error("Failed to calculate shipping cost: " . $e->getMessage());
+    //         return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
+    //     }
+    // }
+
      /**
      * Checks if a pincode is serviceable by Delhivery.
      *
@@ -236,48 +310,6 @@ class DelhiveryService
         }
     }
 
-   
-
-    /**
-     * Calculates the estimated shipping cost for a shipment.
-     *
-     * @param string $originPin The origin pincode.
-     * @param string $destinationPin The destination pincode.
-     * @param float $codAmount The Cash on Delivery amount.
-     * @param float $weight The chargeable weight in kg.
-     * @param string $paymentType 'Pre-paid' or 'COD'.
-     * @return array The API response or an error array.
-     */
-    public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
-    {
-        $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
-        
-        try {
-            $response = $this->client->get($endpoint, [
-                'headers' => [
-                    'Authorization' => 'Token ' . $this->apiKey,
-                    'Accept' => 'application/json',
-                ],
-                'query' => [
-                    'md' => 'E',
-                    'ss' => 'Pre-paid',
-                    'd_pin' => $destinationPin,
-                    'o_pin' => $originPin,
-                    'cgm' => $weight,
-                    'pt' => $paymentType,
-                    'cod' => ($paymentType === 'COD') ? $codAmount : 0,
-                ],
-            ]);
-            return json_decode($response->getBody()->getContents(), true);
-        } catch (ClientException $e) {
-            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
-            Log::error('Delhivery API Client Error (shipping cost): ' . json_encode($responseBody));
-            return ['error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage())];
-        } catch (\Exception $e) {
-            Log::error("Failed to calculate shipping cost: " . $e->getMessage());
-            return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
-        }
-    }
 
 
         // public function trackMultipleShipments(array $waybillNumbers)

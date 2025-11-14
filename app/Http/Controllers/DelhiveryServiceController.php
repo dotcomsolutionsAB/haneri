@@ -68,7 +68,80 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
+    public function getShippingCost(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'origin_pin'      => 'required|digits:6',
+            'destination_pin' => 'required|digits:6',
+            'cod_amount'      => 'required|numeric',
+            'weight'          => 'required|numeric',   // in kg
+            'payment_type'    => 'nullable|in:Pre-paid,COD',
+        ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        $originPin      = $request->input('origin_pin');
+        $destinationPin = $request->input('destination_pin');
+        $codAmount      = $request->input('cod_amount');
+        $weight         = $request->input('weight');
+        $paymentType    = $request->input('payment_type', 'Pre-paid');
+
+        // same pattern as pincode: manual service
+        $delhiveryService = new DelhiveryService();
+        $response = $delhiveryService->getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType);
+
+        if (isset($response['error'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $response['error'],
+                'data'    => [],
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipping cost fetched.',
+            'data'    => $response,
+        ]);
+    }
+
+        /**
+     * Endpoint to get the shipping cost.
+     */
+    // public function getShippingCost(Request $request)
+    // {
+    //     $validator = Validator::make($request->all(), [
+    //         'origin_pin' => 'required|string|size:6',
+    //         'destination_pin' => 'required|string|size:6',
+    //         'cod_amount' => 'required|numeric',
+    //         'weight' => 'required|numeric', // in kg
+    //         'payment_type' => 'nullable|in:Pre-paid,COD',
+    //     ]);
+    
+    //     if ($validator->fails()) {
+    //         return response()->json(['error' => $validator->errors()], 422);
+    //     }
+        
+    //     $originPin = $request->input('origin_pin');
+    //     $destinationPin = $request->input('destination_pin');
+    //     $codAmount = $request->input('cod_amount');
+    //     $weight = $request->input('weight');
+    //     $paymentType = $request->input('payment_type', 'Pre-paid');
+    
+    //     $response = $this->delhiveryService->getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType);
+        
+    //     if (isset($response['error'])) {
+    //         return response()->json($response, 400);
+    //     }
+    
+    //     return response()->json($response);
+    // }
     /**
      * Endpoint to check if a pincode is serviceable.
      */
@@ -170,39 +243,6 @@ class DelhiveryServiceController extends Controller
         return response()->json($response);
     }
     
-    
-    /**
-     * Endpoint to get the shipping cost.
-     */
-    public function getShippingCost(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'origin_pin' => 'required|string|size:6',
-            'destination_pin' => 'required|string|size:6',
-            'cod_amount' => 'required|numeric',
-            'weight' => 'required|numeric', // in kg
-            'payment_type' => 'nullable|in:Pre-paid,COD',
-        ]);
-    
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 422);
-        }
-        
-        $originPin = $request->input('origin_pin');
-        $destinationPin = $request->input('destination_pin');
-        $codAmount = $request->input('cod_amount');
-        $weight = $request->input('weight');
-        $paymentType = $request->input('payment_type', 'Pre-paid');
-    
-        $response = $this->delhiveryService->getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType);
-        
-        if (isset($response['error'])) {
-            return response()->json($response, 400);
-        }
-    
-        return response()->json($response);
-    }
-
     // public function trackMultipleShipments(Request $request)
     // {
     //     // This method should receive the Request object
