@@ -9,12 +9,12 @@ use Illuminate\Support\Facades\Http;
 
 class DelhiveryServiceController extends Controller
 {
-    protected DelhiveryService $delhiveryService;
+    // protected DelhiveryService $delhiveryService;
 
-    public function __construct(DelhiveryService $delhiveryService)
-    {
-        $this->delhiveryService = $delhiveryService;
-    }
+    // public function __construct(DelhiveryService $delhiveryService)
+    // {
+    //     $this->delhiveryService = $delhiveryService;
+    // }
 
     public function test()
     {
@@ -33,6 +33,64 @@ class DelhiveryServiceController extends Controller
             'json'        => $response->json(),   // will be null if not valid JSON
         ]);
     }
+
+    public function checkPincodeServiceability(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'pincode' => 'required|digits:6',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        // ✅ create service manually (no container)
+        $delhiveryService = new DelhiveryService();
+
+        $pincode  = $request->input('pincode');
+        $response = $delhiveryService->checkPincodeServiceability($pincode);
+
+        if (isset($response['error'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $response['error'],
+                'data'    => [],
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pincode serviceability fetched.',
+            'data'    => $response,
+        ]);
+    }
+
+    /**
+     * Endpoint to check if a pincode is serviceable.
+     */
+    // public function checkPincodeServiceability(Request $request)
+    // {
+    //     $validator = Validator::make($request->all(), [
+    //         'pincode' => 'required|string|size:6',
+    //     ]);
+    
+    //     if ($validator->fails()) {
+    //         return response()->json(['error' => $validator->errors()], 422);
+    //     }
+    
+    //     $pincode = $request->input('pincode');
+    //     $response = $this->delhiveryService->checkPincodeServiceability($pincode);
+    
+    //     if (isset($response['error'])) {
+    //         return response()->json($response, 400);
+    //     }
+    
+    //     return response()->json($response);
+    // }
 
     public function createOrder(Request $request)
     {
@@ -112,29 +170,7 @@ class DelhiveryServiceController extends Controller
         return response()->json($response);
     }
     
-    /**
-     * Endpoint to check if a pincode is serviceable.
-     */
-    public function checkPincodeServiceability(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'pincode' => 'required|string|size:6',
-        ]);
     
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 422);
-        }
-    
-        $pincode = $request->input('pincode');
-        $response = $this->delhiveryService->checkPincodeServiceability($pincode);
-    
-        if (isset($response['error'])) {
-            return response()->json($response, 400);
-        }
-    
-        return response()->json($response);
-    }
-
     /**
      * Endpoint to get the shipping cost.
      */
