@@ -181,24 +181,21 @@ class DelhiveryService
     {
         $endpoint = $this->getBaseUrl() . '/api/v1/packages/json/';
 
-        try {
-            $waybillString = implode(',', $waybillNumbers);
-            $response = $this->client->get($endpoint, [
-                'headers' => [
-                    'Authorization' => 'Token ' . $this->apiKey,
-                    'Accept'        => 'application/json',
-                ],
-                'query' => [
-                    'waybill' => $waybillString,
-                ],
-            ]);
+        $waybillString = implode(',', $waybillNumbers);
 
-            return json_decode($response->getBody()->getContents(), true);
+        $response = $this->client->get($endpoint, [
+            'headers' => [
+                'Authorization' => 'Token ' . $this->apiKey,
+                'Accept'        => 'application/json',
+            ],
+            'query' => [
+                'waybill' => $waybillString,
+            ],
+        ]);
 
-        } catch (ClientException $e) {
-            // ...
-        }
+        return json_decode($response->getBody()->getContents(), true);
     }
+
 
 
     /**

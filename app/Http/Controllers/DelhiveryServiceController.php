@@ -192,22 +192,24 @@ class DelhiveryServiceController extends Controller
 
     public function trackShipments(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'waybills'   => 'required|array',
-            'waybills.*' => 'string',
-        ]);
+        $waybill = $request->query('waybill');
+        $refIds  = $request->query('ref_ids'); // optional
 
-        if ($validator->fails()) {
+        if (!$waybill) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation error',
-                'data'    => $validator->errors(),
+                'message' => 'The waybill parameter is required.',
+                'data'    => [],
             ], 422);
         }
 
-        $waybillNumbers    = $request->input('waybills');
-        $delhiveryService  = new DelhiveryService();
-        $response          = $delhiveryService->trackShipments($waybillNumbers);
+        // Multiple comma-separated waybills supported by Delhivery
+        $waybillList = array_map('trim', explode(',', $waybill));
+
+        // Manual service (no DI)
+        $delhiveryService = new DelhiveryService();
+
+        $response = $delhiveryService->trackShipments($waybillList);
 
         if (isset($response['error'])) {
             return response()->json([
@@ -223,6 +225,7 @@ class DelhiveryServiceController extends Controller
             'data'    => $response,
         ]);
     }
+
 
     /**
      * Endpoint to track one or more shipments.
