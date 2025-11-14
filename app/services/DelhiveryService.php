@@ -196,6 +196,61 @@ class DelhiveryService
         return json_decode($response->getBody()->getContents(), true);
     }
 
+    public function getTat(
+            string $originPin,
+            string $destinationPin,
+            string $mot = 'S',                  // 'S' = Surface, 'E' = Express
+            ?string $pdt = null,                // 'B2B', 'B2C', or null
+            ?string $expectedPickupDate = null  // e.g. '2025-11-16T15:30:00'
+        ): array 
+    {
+        // According to docs:
+        // /api/dc/expected_tat?origin_pin=...&destination_pin=...&mot=...
+        $endpoint = $this->getBaseUrl() . '/api/dc/expected_tat';
+
+        try {
+            $query = [
+                'origin_pin'      => $originPin,
+                'destination_pin' => $destinationPin,
+                'mot'             => $mot,
+            ];
+
+            if (!empty($pdt)) {
+                $query['pdt'] = $pdt; // B2B / B2C
+            }
+
+            if (!empty($expectedPickupDate)) {
+                // Pass as-is; format depends on Delhivery’s spec
+                $query['expected_pickup_date'] = $expectedPickupDate;
+            }
+
+            $response = $this->client->get($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                    'Content-Type'  => 'application/json',
+                ],
+                'query' => $query,
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+
+        } catch (ClientException $e) {
+            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+            Log::error('Delhivery API Client Error (TAT): ' . json_encode($responseBody));
+
+            return [
+                'error' => 'API Error: ' . ($responseBody['detail'] ?? $e->getMessage()),
+                'raw'   => $responseBody,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch TAT: ' . $e->getMessage());
+
+            return [
+                'error' => 'TAT fetch failed: ' . $e->getMessage(),
+            ];
+        }
+    }
 
 
     /**

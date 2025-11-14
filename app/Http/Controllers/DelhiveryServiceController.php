@@ -226,6 +226,48 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
+    public function getTat(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'origin_pin'         => 'required|digits:6',
+            'destination_pin'    => 'required|digits:6',
+            'mot'                => 'required|in:S,E',           // Surface / Express
+            'pdt'                => 'nullable|in:B2B,B2C',
+            'expected_pickup_date' => 'nullable|string',         // you can tighten this to date_format if needed
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        $originPin         = $request->input('origin_pin');
+        $destinationPin    = $request->input('destination_pin');
+        $mot               = $request->input('mot', 'S');
+        $pdt               = $request->input('pdt');
+        $expectedPickup    = $request->input('expected_pickup_date');
+
+        $delhiveryService  = new DelhiveryService();
+        $response          = $delhiveryService->getTat($originPin, $destinationPin, $mot, $pdt, $expectedPickup);
+
+        if (isset($response['error'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $response['error'],
+                'data'    => $response['raw'] ?? [],
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'TAT fetched successfully.',
+            'data'    => $response,
+        ]);
+    }
+
 
     /**
      * Endpoint to track one or more shipments.
