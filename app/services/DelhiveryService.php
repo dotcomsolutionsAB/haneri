@@ -142,97 +142,6 @@ class DelhiveryService
 
         return response()->json(['success' => true, 'data' => $result]);
     }
-
-    // public function trackMultipleShipments(array $waybillNumbers)
-    // {
-    //     $endpoint = 'https://track.delhivery.com/api/v1/packages/json/';
-    //     try {
-    //         $waybillString = implode(',', $waybillNumbers);
-    //         $response = $this->client->get($endpoint, [
-    //             'query' => [
-    //                 'waybill' => $waybillString,
-    //             ],
-    //         ]);
-    //         return json_decode($response->getBody()->getContents(), true);
-    //     } catch (\Exception $e) {
-    //         Log::error("Failed to track shipments: " . $e->getMessage());
-    //         return ['error' => 'API Request Error: ' . $e->getMessage()];
-    //     }
-    // }
-
-    // public function checkPincodeServiceability($pincode)
-    // {
-    //     // Use the correct endpoint for B2C Pincode Serviceability
-    //     $endpoint = $this->getBaseUrl() . '/c/api/pin-codes/json/';
-    
-    //     try {
-    //         $response = $this->client->get($endpoint, [
-    //             'headers' => [
-    //                 'Authorization' => 'Token ' . $this->apiKey,
-    //             ],
-    //             'query' => [
-    //                 'filter_codes' => $pincode,
-    //             ],
-    //         ]);
-    
-    //         return json_decode($response->getBody()->getContents(), true);
-    
-    //     } catch (\Exception $e) {
-    //         return ['error' => 'Pincode serviceability check failed: ' . $e->getMessage()];
-    //     }
-    // }
-
-    // public function trackShipments(array $waybillNumbers)
-    // {
-    //     // Use the correct endpoint for Shipment Tracking
-    //     $endpoint = $this->getBaseUrl() . '/api/v1/packages/json/';
-        
-    //     try {
-    //         $waybillString = implode(',', $waybillNumbers);
-    
-    //         $response = $this->client->get($endpoint, [
-    //             'query' => [
-    //                 'waybill' => $waybillString,
-    //             ],
-    //             'headers' => [
-    //                 'Authorization' => 'Token ' . $this->apiKey,
-    //             ],
-    //         ]);
-            
-    //         return json_decode($response->getBody()->getContents(), true);
-    
-    //     } catch (\Exception $e) {
-    //         return ['error' => 'Shipment tracking failed: ' . $e->getMessage()];
-    //     }
-    // }
-
-    // public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
-    // {
-    //     $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
-        
-    //     try {
-    //         $response = $this->client->get($endpoint, [
-    //             'headers' => [
-    //                 'Authorization' => 'Token ' . $this->apiKey,
-    //             ],
-    //             'query' => [
-    //                 'md' => 'E', // This is likely for "Express"
-    //                 'ss' => 'Delivered', // Service Status
-    //                 'd_pin' => $destinationPin,
-    //                 'o_pin' => $originPin,
-    //                 'cgm' => $weight, // Chargeable weight
-    //                 'pt' => $paymentType, // Pre-paid or COD
-    //                 'cod' => ($paymentType === 'COD') ? $codAmount : 0, // COD Amount
-    //             ],
-    //         ]);
-            
-    //         return json_decode($response->getBody()->getContents(), true);
-    
-    //     } catch (\Exception $e) {
-    //         return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
-    //     }
-    // }
-
     /**
      * Tracks one or more shipments by waybill number.
      * This consolidated method replaces both trackMultipleShipments and the previous trackShipments.
@@ -337,5 +246,96 @@ class DelhiveryService
             return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
         }
     }
+
+
+        // public function trackMultipleShipments(array $waybillNumbers)
+    // {
+    //     $endpoint = 'https://track.delhivery.com/api/v1/packages/json/';
+    //     try {
+    //         $waybillString = implode(',', $waybillNumbers);
+    //         $response = $this->client->get($endpoint, [
+    //             'query' => [
+    //                 'waybill' => $waybillString,
+    //             ],
+    //         ]);
+    //         return json_decode($response->getBody()->getContents(), true);
+    //     } catch (\Exception $e) {
+    //         Log::error("Failed to track shipments: " . $e->getMessage());
+    //         return ['error' => 'API Request Error: ' . $e->getMessage()];
+    //     }
+    // }
+
+    // public function checkPincodeServiceability($pincode)
+    // {
+    //     // Use the correct endpoint for B2C Pincode Serviceability
+    //     $endpoint = $this->getBaseUrl() . '/c/api/pin-codes/json/';
+    
+    //     try {
+    //         $response = $this->client->get($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //             ],
+    //             'query' => [
+    //                 'filter_codes' => $pincode,
+    //             ],
+    //         ]);
+    
+    //         return json_decode($response->getBody()->getContents(), true);
+    
+    //     } catch (\Exception $e) {
+    //         return ['error' => 'Pincode serviceability check failed: ' . $e->getMessage()];
+    //     }
+    // }
+
+    // public function trackShipments(array $waybillNumbers)
+    // {
+    //     // Use the correct endpoint for Shipment Tracking
+    //     $endpoint = $this->getBaseUrl() . '/api/v1/packages/json/';
+        
+    //     try {
+    //         $waybillString = implode(',', $waybillNumbers);
+    
+    //         $response = $this->client->get($endpoint, [
+    //             'query' => [
+    //                 'waybill' => $waybillString,
+    //             ],
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //             ],
+    //         ]);
+            
+    //         return json_decode($response->getBody()->getContents(), true);
+    
+    //     } catch (\Exception $e) {
+    //         return ['error' => 'Shipment tracking failed: ' . $e->getMessage()];
+    //     }
+    // }
+
+    // public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
+    // {
+    //     $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
+        
+    //     try {
+    //         $response = $this->client->get($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //             ],
+    //             'query' => [
+    //                 'md' => 'E', // This is likely for "Express"
+    //                 'ss' => 'Delivered', // Service Status
+    //                 'd_pin' => $destinationPin,
+    //                 'o_pin' => $originPin,
+    //                 'cgm' => $weight, // Chargeable weight
+    //                 'pt' => $paymentType, // Pre-paid or COD
+    //                 'cod' => ($paymentType === 'COD') ? $codAmount : 0, // COD Amount
+    //             ],
+    //         ]);
+            
+    //         return json_decode($response->getBody()->getContents(), true);
+    
+    //     } catch (\Exception $e) {
+    //         return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
+    //     }
+    // }
 
 }

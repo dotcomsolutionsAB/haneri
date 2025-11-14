@@ -9,38 +9,12 @@ use Illuminate\Support\Facades\Http;
 
 class DelhiveryServiceController extends Controller
 {
-    // protected DelhiveryService $delhiveryService;
+    protected DelhiveryService $delhiveryService;
 
-    // public function __construct(DelhiveryService $delhiveryService)
-    // {
-    //     $this->delhiveryService = $delhiveryService;
-    // }
-
-    // public function createOrder(Request $request)
-    // {
-    //     // 1. Validate the incoming request data for order creation
-    //     // You MUST validate the structure of the order data
-    //     $validator = Validator::make($request->all(), [
-    //         // Add validation rules for your order payload
-    //         'customer_name' => 'required',
-    //         'customer_address' => 'required',
-    //         // ... and so on
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-        
-    //     $orderData = $request->all();
-    //     $response = $this->delhiveryService->placeOrder($orderData);
-    //     // $response = $this->delhiveryService->debugPlaceOrder($orderData);
-
-    //     if (isset($response['Error'])) {
-    //         return response()->json(['error' => $response['Error']], 400);
-    //     }
-
-    //     return response()->json($response);
-    // }
+    public function __construct(DelhiveryService $delhiveryService)
+    {
+        $this->delhiveryService = $delhiveryService;
+    }
 
     public function test()
     {
@@ -59,7 +33,6 @@ class DelhiveryServiceController extends Controller
             'json'        => $response->json(),   // will be null if not valid JSON
         ]);
     }
-
 
     public function createOrder(Request $request)
     {
@@ -114,27 +87,6 @@ class DelhiveryServiceController extends Controller
         return response()->json(['success' => true, 'data' => $response]);
     }
 
-    // public function trackMultipleShipments(Request $request)
-    // {
-    //     // This method should receive the Request object
-    //     $validator = Validator::make($request->all(), [
-    //         'waybills' => 'required|array',
-    //         'waybills.*' => 'string', // Ensure each element is a string
-    //     ]);
-        
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-
-    //     $waybillNumbers = $request->input('waybills');
-    //     $response = $this->delhiveryService->trackMultipleShipments($waybillNumbers);
-
-    //     if (isset($response['Error'])) {
-    //         return response()->json(['error' => $response['Error']], 400);
-    //     }
-
-    //     return response()->json($response);
-    // }
     /**
      * Endpoint to track one or more shipments.
      * This replaces the old trackMultipleShipments.
@@ -214,4 +166,51 @@ class DelhiveryServiceController extends Controller
     
         return response()->json($response);
     }
+
+    // public function trackMultipleShipments(Request $request)
+    // {
+    //     // This method should receive the Request object
+    //     $validator = Validator::make($request->all(), [
+    //         'waybills' => 'required|array',
+    //         'waybills.*' => 'string', // Ensure each element is a string
+    //     ]);
+        
+    //     if ($validator->fails()) {
+    //         return response()->json(['error' => $validator->errors()], 422);
+    //     }
+
+    //     $waybillNumbers = $request->input('waybills');
+    //     $response = $this->delhiveryService->trackMultipleShipments($waybillNumbers);
+
+    //     if (isset($response['Error'])) {
+    //         return response()->json(['error' => $response['Error']], 400);
+    //     }
+
+    //     return response()->json($response);
+    // }
+    // public function createOrder(Request $request)
+    // {
+    //     // 1. Validate the incoming request data for order creation
+    //     // You MUST validate the structure of the order data
+    //     $validator = Validator::make($request->all(), [
+    //         // Add validation rules for your order payload
+    //         'customer_name' => 'required',
+    //         'customer_address' => 'required',
+    //         // ... and so on
+    //     ]);
+
+    //     if ($validator->fails()) {
+    //         return response()->json(['error' => $validator->errors()], 422);
+    //     }
+        
+    //     $orderData = $request->all();
+    //     $response = $this->delhiveryService->placeOrder($orderData);
+    //     // $response = $this->delhiveryService->debugPlaceOrder($orderData);
+
+    //     if (isset($response['Error'])) {
+    //         return response()->json(['error' => $response['Error']], 400);
+    //     }
+
+    //     return response()->json($response);
+    // }
 }
