@@ -41,6 +41,19 @@ class DelhiveryServiceController extends Controller
     //     return response()->json($response);
     // }
 
+    public function test()
+    {
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . env('DELIVERY_ONE_TOKEN'),
+            'Accept' => 'application/json'
+        ])->get(env('DELIVERY_ONE_URL') . '/ping'); // testing endpoint
+
+        return response()->json([
+            "request_sent" => true,
+            "deliveryone_response" => $response->json()
+        ]);
+    }
+    
     public function createOrder(Request $request)
     {
         $validator = Validator::make($request->all(), [

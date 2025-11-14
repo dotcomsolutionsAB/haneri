@@ -96,7 +96,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
     });
 
-    Route::middleware('role:admin')->group(function () {
+    Route::middleware('role:admin')->group(function () {       
         
         // Product Routes
         Route::prefix('products')->group(function () {
@@ -139,6 +139,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // delhivery
         Route::prefix('delivery')->group(function () {
+            Route::get('/deliveryone/test', [DelhiveryServiceController::class, 'test']);
             Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); 
             //Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
             Route::get('/track', [DelhiveryServiceController::class, 'trackShipments']);
