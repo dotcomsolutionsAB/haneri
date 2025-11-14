@@ -62,38 +62,231 @@ class DelhiveryService
     }
 
     public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
-{
-    $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
+    {
+        $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
 
-    try {
-        $response = $this->client->get($endpoint, [
-            'headers' => [
-                'Authorization' => 'Token ' . $this->apiKey,
-                'Content-Type'  => 'application/json',
-                'Accept'        => 'application/json',
-            ],
-            'query' => [
-                'md'  => 'E',
-                'ss'  => 'Delivered',
-                'd_pin' => $destinationPin,
-                'o_pin' => $originPin,
-                'cgm'  => $weight,
-                'pt'   => $paymentType,
-                'cod'  => $paymentType === 'COD' ? $codAmount : 0,
-            ],
-        ]);
+        try {
+            $response = $this->client->get($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Content-Type'  => 'application/json',
+                    'Accept'        => 'application/json',
+                ],
+                'query' => [
+                    'md'  => 'E',
+                    'ss'  => 'Delivered',
+                    'd_pin' => $destinationPin,
+                    'o_pin' => $originPin,
+                    'cgm'  => $weight,
+                    'pt'   => $paymentType,
+                    'cod'  => $paymentType === 'COD' ? $codAmount : 0,
+                ],
+            ]);
 
-        return json_decode($response->getBody()->getContents(), true);
+            return json_decode($response->getBody()->getContents(), true);
 
-    } catch (ClientException $e) {
-        $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
-        Log::error('Delhivery API Client Error (shipping cost): ' . json_encode($responseBody));
-        return ['error' => 'API Error: ' . ($responseBody['detail'] ?? $e->getMessage())];
-    } catch (\Exception $e) {
-        Log::error("Shipping cost calculation failed: " . $e->getMessage());
-        return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
+        } catch (ClientException $e) {
+            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+            Log::error('Delhivery API Client Error (shipping cost): ' . json_encode($responseBody));
+            return ['error' => 'API Error: ' . ($responseBody['detail'] ?? $e->getMessage())];
+        } catch (\Exception $e) {
+            Log::error("Shipping cost calculation failed: " . $e->getMessage());
+            return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
+        }
     }
-}
+
+    public function placeOrder(array $orderData): array
+    {
+        $endpoint = $this->getBaseUrl() . '/api/cmu/create.json';
+
+        try {
+            // 1) Build shipments array (1 shipment per order)
+            $shipments = [
+                [
+                    'name'           => $orderData['customer_name'],          // Consignee name
+                    'add'            => $orderData['customer_address'],
+                    'pin'            => $orderData['pin'],
+                    'city'           => $orderData['city'],
+                    'state'          => $orderData['state'],
+                    'country'        => 'India',
+                    'phone'          => $orderData['phone'],
+                    'order'          => $orderData['order_no'],              // Your order no
+                    'payment_mode'   => $orderData['payment_mode'],          // 'Prepaid' or 'COD'
+                    'products_desc'  => $orderData['products_description'],  // Short desc
+                    'cod_amount'     => $orderData['cod_amount'] ?? 0,       // If COD, else 0
+                    'total_amount'   => $orderData['total_amount'],          // Invoice total
+                    'order_date'     => $orderData['order_date'],            // YYYY-MM-DD
+                    'seller_add'     => $orderData['seller_address'],
+                    'seller_name'    => $orderData['seller_name'],
+                    'seller_inv'     => $orderData['seller_invoice'],        // Invoice no
+                    'quantity'       => $orderData['quantity'],              // Total items
+                    'weight'         => $orderData['weight'],                // In kg
+                    'shipment_width' => $orderData['shipment_width'] ?? null,
+                    'shipment_height'=> $orderData['shipment_height'] ?? null,
+                    'shipping_mode'  => $orderData['shipping_mode'] ?? 'Surface',
+                    'address_type'   => $orderData['address_type'] ?? 'home',
+                    // optional return address (else defaults to pickup)
+                    'return_pin'     => $orderData['return_pin']     ?? $orderData['pickup_pin'],
+                    'return_city'    => $orderData['return_city']    ?? $orderData['pickup_city'],
+                    'return_phone'   => $orderData['return_phone']   ?? $orderData['pickup_phone'],
+                    'return_add'     => $orderData['return_address'] ?? $orderData['pickup_address'],
+                    'return_state'   => $orderData['return_state']   ?? $orderData['pickup_state'],
+                    'return_country' => $orderData['return_country'] ?? 'India',
+                ],
+            ];
+
+            // 2) Pickup location (from your warehouse / sender)
+            $finalPayload = [
+                'pickup_name'  => $orderData['pickup_name'],
+                'pickup_add'   => $orderData['pickup_address'],
+                'pickup_pin'   => $orderData['pickup_pin'],
+                'pickup_city'  => $orderData['pickup_city'],
+                'pickup_state' => $orderData['pickup_state'],
+                'pickup_phone' => $orderData['pickup_phone'],
+                'shipments'    => $shipments,
+            ];
+
+            // 3) Call Delhivery CMU API
+            $response = $this->client->post($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                ],
+                'form_params' => [
+                    'format' => 'json',
+                    'data'   => json_encode($finalPayload),
+                ],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+
+        } catch (ClientException $e) {
+            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+            Log::error('Delhivery API Client Error (placeOrder): ' . json_encode($responseBody));
+
+            return [
+                'error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage()),
+                'raw'   => $responseBody,
+            ];
+        } catch (\Exception $e) {
+            Log::error("Failed to place Delhivery order: " . $e->getMessage());
+
+            return [
+                'error' => 'Order creation failed: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    // public function placeOrder($orderData)
+    // {
+    //     // Make sure to use the correct endpoint for your environment
+    //     $endpoint = $this->getBaseUrl() . '/api/cmu/create.json';
+
+    //     try {
+    //         $shipments = [
+    //             [
+    //                 'name' => $orderData['customer_name'],
+    //                 'add' => $orderData['customer_address'],
+    //                 'pin' => $orderData['pin'],
+    //                 'city' => $orderData['city'],
+    //                 'state' => $orderData['state'],
+    //                 'country' => 'India',
+    //                 'phone' => $orderData['phone'],
+    //                 'order' => $orderData['order'],
+    //                 'payment_mode' => 'Prepaid',
+    //                 'return_pin' => $orderData['return_pin'],
+    //                 'return_city' => $orderData['return_city'],
+    //                 'return_phone' => $orderData['return_phone'],
+    //                 'return_add' => $orderData['return_address'], // Note: 'return_add' maps to 'return_address' from request
+    //                 'return_state' => $orderData['return_state'],
+    //                 'return_country' => $orderData['return_country'],
+    //                 'products_desc' => $orderData['products_description'],
+    //                 'hsn_code' => $orderData['hsn_code'],
+    //                 'cod_amount' => $orderData['cod_amount'],
+    //                 'order_date' => $orderData['order_date'],
+    //                 'total_amount' => $orderData['total_amount'],
+    //                 'seller_add' => $orderData['seller_address'],
+    //                 'seller_name' => $orderData['seller_name'],
+    //                 'seller_inv' => $orderData['seller_invoice'],
+    //                 'quantity' => $orderData['quantity'],
+    //                 'waybill' => $orderData['waybill'],
+    //                 'shipment_width' => $orderData['shipment_width'],
+    //                 'shipment_height' => $orderData['shipment_height'],
+    //                 'weight' => $orderData['weight'],
+    //                 'shipping_mode' => $orderData['shipping_mode'],
+    //                 'address_type' => $orderData['address_type'],
+    //                 //'end_date' => $orderData['end_date'],
+    //             ],
+    //         ];
+
+    //         // // The critical fix:
+    //         // // The pickup_location object must be fully populated with correct details,
+    //         // // not just the name. The API needs to verify the pincode, city, etc.
+    //         // $pickupLocationData = [
+    //         //     'name' => 'Burhanuddin',
+    //         //     'add' => '26, Netaji Subhas Rd, opp. Goopta Mansion, China Bazar',
+    //         //     'pin' => '700001',
+    //         //     'city' => 'Kolkata',
+    //         //     'state' => 'West Bengal',
+    //         //     'phone' => '8597348785',
+    //         // ];
+
+    //         // // Combine the pickup location and shipment data into the final API payload
+    //         // $finalPayload = [
+    //         //     'shipments' => $shipments,
+    //         //     'pickup_location' => $pickupLocationData,
+    //         // ];
+
+    //         // This is the updated part.
+    //         // We are now flattening the pickup location details into the main array.
+    //         $finalPayload = [
+    //             'shipments' => $shipments,
+    //             'pickup_name' => 'Burhanuddin',
+    //             'pickup_add' => '26, Netaji Subhas Rd, opp. Goopta Mansion, China Bazar',
+    //             'pickup_pin' => '700001',
+    //             'pickup_city' => 'Kolkata',
+    //             'pickup_state' => 'West Bengal',
+    //             'pickup_phone' => '8597348785',
+    //         ];
+            
+    //         // This endpoint expects the data as 'form_params', with a 'data' key
+    //         $response = $this->client->post($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //             ],
+    //             'form_params' => [
+    //                 'format' => 'json',
+    //                 'data' => json_encode($finalPayload),
+    //             ],
+    //         ]);
+
+    //         return json_decode($response->getBody()->getContents(), true);
+            
+    //     } catch (\Exception $e) {
+    //         Log::error("Failed to connect to Delhivery API: " . $e->getMessage());
+    //         return ['error' => 'API Request Error: ' . $e->getMessage()];
+    //     }
+    // }
+    // public function createOrder(Request $request)
+    // {
+    //     // ... your validation code here
+
+    //     if ($validator->fails()) {
+    //         return response()->json(['error' => $validator->errors()], 422);
+    //     }
+
+    //     $orderData = $request->all();
+
+    //     // Call the new debug method
+    //     $result = $this->delhiveryService->debugPlaceOrder($orderData);
+
+    //     // Check if the result is an error and return it
+    //     if (isset($result['error'])) {
+    //         return response()->json($result, 500);
+    //     }
+
+    //     return response()->json(['success' => true, 'data' => $result]);
+    // }
 
     // public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
     // {
@@ -200,117 +393,7 @@ class DelhiveryService
     //     }
     // }
 
-    public function placeOrder($orderData)
-    {
-        // Make sure to use the correct endpoint for your environment
-        $endpoint = $this->getBaseUrl() . '/api/cmu/create.json';
-
-        try {
-            $shipments = [
-                [
-                    'name' => $orderData['customer_name'],
-                    'add' => $orderData['customer_address'],
-                    'pin' => $orderData['pin'],
-                    'city' => $orderData['city'],
-                    'state' => $orderData['state'],
-                    'country' => 'India',
-                    'phone' => $orderData['phone'],
-                    'order' => $orderData['order'],
-                    'payment_mode' => 'Prepaid',
-                    'return_pin' => $orderData['return_pin'],
-                    'return_city' => $orderData['return_city'],
-                    'return_phone' => $orderData['return_phone'],
-                    'return_add' => $orderData['return_address'], // Note: 'return_add' maps to 'return_address' from request
-                    'return_state' => $orderData['return_state'],
-                    'return_country' => $orderData['return_country'],
-                    'products_desc' => $orderData['products_description'],
-                    'hsn_code' => $orderData['hsn_code'],
-                    'cod_amount' => $orderData['cod_amount'],
-                    'order_date' => $orderData['order_date'],
-                    'total_amount' => $orderData['total_amount'],
-                    'seller_add' => $orderData['seller_address'],
-                    'seller_name' => $orderData['seller_name'],
-                    'seller_inv' => $orderData['seller_invoice'],
-                    'quantity' => $orderData['quantity'],
-                    'waybill' => $orderData['waybill'],
-                    'shipment_width' => $orderData['shipment_width'],
-                    'shipment_height' => $orderData['shipment_height'],
-                    'weight' => $orderData['weight'],
-                    'shipping_mode' => $orderData['shipping_mode'],
-                    'address_type' => $orderData['address_type'],
-                    //'end_date' => $orderData['end_date'],
-                ],
-            ];
-
-            // // The critical fix:
-            // // The pickup_location object must be fully populated with correct details,
-            // // not just the name. The API needs to verify the pincode, city, etc.
-            // $pickupLocationData = [
-            //     'name' => 'Burhanuddin',
-            //     'add' => '26, Netaji Subhas Rd, opp. Goopta Mansion, China Bazar',
-            //     'pin' => '700001',
-            //     'city' => 'Kolkata',
-            //     'state' => 'West Bengal',
-            //     'phone' => '8597348785',
-            // ];
-
-            // // Combine the pickup location and shipment data into the final API payload
-            // $finalPayload = [
-            //     'shipments' => $shipments,
-            //     'pickup_location' => $pickupLocationData,
-            // ];
-
-            // This is the updated part.
-            // We are now flattening the pickup location details into the main array.
-            $finalPayload = [
-                'shipments' => $shipments,
-                'pickup_name' => 'Burhanuddin',
-                'pickup_add' => '26, Netaji Subhas Rd, opp. Goopta Mansion, China Bazar',
-                'pickup_pin' => '700001',
-                'pickup_city' => 'Kolkata',
-                'pickup_state' => 'West Bengal',
-                'pickup_phone' => '8597348785',
-            ];
-            
-            // This endpoint expects the data as 'form_params', with a 'data' key
-            $response = $this->client->post($endpoint, [
-                'headers' => [
-                    'Authorization' => 'Token ' . $this->apiKey,
-                ],
-                'form_params' => [
-                    'format' => 'json',
-                    'data' => json_encode($finalPayload),
-                ],
-            ]);
-
-            return json_decode($response->getBody()->getContents(), true);
-            
-        } catch (\Exception $e) {
-            Log::error("Failed to connect to Delhivery API: " . $e->getMessage());
-            return ['error' => 'API Request Error: ' . $e->getMessage()];
-        }
-    }
-
-    public function createOrder(Request $request)
-    {
-        // ... your validation code here
-
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 422);
-        }
-
-        $orderData = $request->all();
-
-        // Call the new debug method
-        $result = $this->delhiveryService->debugPlaceOrder($orderData);
-
-        // Check if the result is an error and return it
-        if (isset($result['error'])) {
-            return response()->json($result, 500);
-        }
-
-        return response()->json(['success' => true, 'data' => $result]);
-    }
+    
     /**
      * Tracks one or more shipments by waybill number.
      * This consolidated method replaces both trackMultipleShipments and the previous trackShipments.
