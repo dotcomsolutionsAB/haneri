@@ -190,6 +190,64 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
+    public function trackShipments(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'waybills'   => 'required|array',
+            'waybills.*' => 'string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        $waybillNumbers    = $request->input('waybills');
+        $delhiveryService  = new DelhiveryService();
+        $response          = $delhiveryService->trackShipments($waybillNumbers);
+
+        if (isset($response['error'])) {
+            return response()->json([
+                'success' => false,
+                'message' => $response['error'],
+                'data'    => [],
+            ], 400);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipment tracking fetched.',
+            'data'    => $response,
+        ]);
+    }
+
+    /**
+     * Endpoint to track one or more shipments.
+     * This replaces the old trackMultipleShipments.
+     */
+    // public function trackShipments(Request $request)
+    // {
+    //     $validator = Validator::make($request->all(), [
+    //         'waybills' => 'required|array',
+    //         'waybills.*' => 'string',
+    //     ]);
+        
+    //     if ($validator->fails()) {
+    //         return response()->json(['error' => $validator->errors()], 422);
+    //     }
+
+    //     $waybillNumbers = $request->input('waybills');
+    //     $response = $this->delhiveryService->trackShipments($waybillNumbers);
+
+    //     if (isset($response['error'])) {
+    //         return response()->json($response, 400);
+    //     }
+
+    //     return response()->json($response);
+    // }
 
     // public function createOrder(Request $request)
     // {
@@ -296,31 +354,6 @@ class DelhiveryServiceController extends Controller
     
     //     return response()->json($response);
     // }
-
-    /**
-     * Endpoint to track one or more shipments.
-     * This replaces the old trackMultipleShipments.
-     */
-    public function trackShipments(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'waybills' => 'required|array',
-            'waybills.*' => 'string',
-        ]);
-        
-        if ($validator->fails()) {
-            return response()->json(['error' => $validator->errors()], 422);
-        }
-
-        $waybillNumbers = $request->input('waybills');
-        $response = $this->delhiveryService->trackShipments($waybillNumbers);
-
-        if (isset($response['error'])) {
-            return response()->json($response, 400);
-        }
-
-        return response()->json($response);
-    }
     
     // public function trackMultipleShipments(Request $request)
     // {

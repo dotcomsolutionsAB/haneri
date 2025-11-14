@@ -177,6 +177,63 @@ class DelhiveryService
         }
     }
 
+    public function trackShipments(array $waybillNumbers)
+    {
+        $endpoint = $this->getBaseUrl() . '/api/v1/packages/json/';
+
+        try {
+            $waybillString = implode(',', $waybillNumbers);
+            $response = $this->client->get($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                ],
+                'query' => [
+                    'waybill' => $waybillString,
+                ],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+
+        } catch (ClientException $e) {
+            // ...
+        }
+    }
+
+
+    /**
+     * Tracks one or more shipments by waybill number.
+     * This consolidated method replaces both trackMultipleShipments and the previous trackShipments.
+     *
+     * @param array $waybillNumbers An array of waybill numbers.
+     * @return array The API response or an error array.
+     */
+    // public function trackShipments(array $waybillNumbers)
+    // {
+    //     $endpoint = $this->getBaseUrl() . '/api/v1/packages/json/';
+        
+    //     try {
+    //         $waybillString = implode(',', $waybillNumbers);
+    //         $response = $this->client->get($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //                 'Accept' => 'application/json',
+    //             ],
+    //             'query' => [
+    //                 'waybill' => $waybillString,
+    //             ],
+    //         ]);
+    //         return json_decode($response->getBody()->getContents(), true);
+    //     } catch (ClientException $e) {
+    //         $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+    //         Log::error('Delhivery API Client Error (trackShipments): ' . json_encode($responseBody));
+    //         return ['error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage())];
+    //     } catch (\Exception $e) {
+    //         Log::error("Failed to track shipments: " . $e->getMessage());
+    //         return ['error' => 'API Request Error: ' . $e->getMessage()];
+    //     }
+    // }
+
     // public function placeOrder($orderData)
     // {
     //     // Make sure to use the correct endpoint for your environment
@@ -394,38 +451,7 @@ class DelhiveryService
     // }
 
     
-    /**
-     * Tracks one or more shipments by waybill number.
-     * This consolidated method replaces both trackMultipleShipments and the previous trackShipments.
-     *
-     * @param array $waybillNumbers An array of waybill numbers.
-     * @return array The API response or an error array.
-     */
-    public function trackShipments(array $waybillNumbers)
-    {
-        $endpoint = $this->getBaseUrl() . '/api/v1/packages/json/';
-        
-        try {
-            $waybillString = implode(',', $waybillNumbers);
-            $response = $this->client->get($endpoint, [
-                'headers' => [
-                    'Authorization' => 'Token ' . $this->apiKey,
-                    'Accept' => 'application/json',
-                ],
-                'query' => [
-                    'waybill' => $waybillString,
-                ],
-            ]);
-            return json_decode($response->getBody()->getContents(), true);
-        } catch (ClientException $e) {
-            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
-            Log::error('Delhivery API Client Error (trackShipments): ' . json_encode($responseBody));
-            return ['error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage())];
-        } catch (\Exception $e) {
-            Log::error("Failed to track shipments: " . $e->getMessage());
-            return ['error' => 'API Request Error: ' . $e->getMessage()];
-        }
-    }
+    
 
 
 
