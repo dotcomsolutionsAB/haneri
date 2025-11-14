@@ -12,24 +12,85 @@ class DelhiveryService
     protected $client;
     protected $apiKey;
     protected $apiUrl;
+    protected $isTestEnvironment;
 
     public function __construct()
     {
         $this->client = new Client();
         $this->apiKey = env('DELHIVERY_API_KEY');
-        // Set the base URL correctly. For Delhivery One, it's often https://api.delhivery.com/
-        // but tracking can be on a different subdomain.
-        //$this->apiUrl = env('DELHIVERY_API_URL', 'https://api.delhivery.com');
         $this->isTestEnvironment = env('DELHIVERY_TEST_MODE', true);
     }
 
     private function getBaseUrl()
     {
-        // Use a single method to get the correct base URL
         return $this->isTestEnvironment 
             ? 'https://staging-express.delhivery.com' 
             : 'https://track.delhivery.com';
     }
+
+    public function checkPincodeServiceability(string $pincode): array
+    {
+        $endpoint = $this->getBaseUrl() . '/c/api/pin-codes/json/';
+
+        try {
+            $response = $this->client->get($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                ],
+                'query' => [
+                    'filter_codes' => $pincode,
+                ],
+            ]);
+
+            return json_decode($response->getBody()->getContents(), true);
+
+        } catch (ClientException $e) {
+            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+            Log::error('Delhivery API Client Error (pincode check): ' . json_encode($responseBody));
+
+            return [
+                'error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage()),
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to check pincode serviceability: ' . $e->getMessage());
+
+            return [
+                'error' => 'Pincode serviceability check failed: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+     /**
+     * Checks if a pincode is serviceable by Delhivery.
+     *
+     * @param string $pincode The pincode to check.
+     * @return array The API response or an error array.
+     */
+    // public function checkPincodeServiceability($pincode)
+    // {
+    //     $endpoint = $this->getBaseUrl() . '/c/api/pin-codes/json/';
+    
+    //     try {
+    //         $response = $this->client->get($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //                 'Accept' => 'application/json',
+    //             ],
+    //             'query' => [
+    //                 'filter_codes' => $pincode,
+    //             ],
+    //         ]);
+    //         return json_decode($response->getBody()->getContents(), true);
+    //     } catch (ClientException $e) {
+    //         $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+    //         Log::error('Delhivery API Client Error (pincode check): ' . json_encode($responseBody));
+    //         return ['error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage())];
+    //     } catch (\Exception $e) {
+    //         Log::error("Failed to check pincode serviceability: " . $e->getMessage());
+    //         return ['error' => 'Pincode serviceability check failed: ' . $e->getMessage()];
+    //     }
+    // }
 
     public function placeOrder($orderData)
     {
@@ -175,36 +236,7 @@ class DelhiveryService
         }
     }
 
-    /**
-     * Checks if a pincode is serviceable by Delhivery.
-     *
-     * @param string $pincode The pincode to check.
-     * @return array The API response or an error array.
-     */
-    public function checkPincodeServiceability($pincode)
-    {
-        $endpoint = $this->getBaseUrl() . '/c/api/pin-codes/json/';
-    
-        try {
-            $response = $this->client->get($endpoint, [
-                'headers' => [
-                    'Authorization' => 'Token ' . $this->apiKey,
-                    'Accept' => 'application/json',
-                ],
-                'query' => [
-                    'filter_codes' => $pincode,
-                ],
-            ]);
-            return json_decode($response->getBody()->getContents(), true);
-        } catch (ClientException $e) {
-            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
-            Log::error('Delhivery API Client Error (pincode check): ' . json_encode($responseBody));
-            return ['error' => 'API Error: ' . ($responseBody['rmk'] ?? $e->getMessage())];
-        } catch (\Exception $e) {
-            Log::error("Failed to check pincode serviceability: " . $e->getMessage());
-            return ['error' => 'Pincode serviceability check failed: ' . $e->getMessage()];
-        }
-    }
+   
 
     /**
      * Calculates the estimated shipping cost for a shipment.
