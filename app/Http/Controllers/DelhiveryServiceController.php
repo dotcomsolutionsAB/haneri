@@ -48,7 +48,6 @@ class DelhiveryServiceController extends Controller
             ], 422);
         }
 
-        // ✅ create service manually (no container)
         $delhiveryService = new DelhiveryService();
 
         $pincode  = $request->input('pincode');
@@ -68,6 +67,7 @@ class DelhiveryServiceController extends Controller
             'data'    => $response,
         ]);
     }
+
 
     /**
      * Endpoint to check if a pincode is serviceable.
