@@ -11,10 +11,10 @@ class DelhiveryServiceController extends Controller
 {
     protected DelhiveryService $delhiveryService;
 
-    // public function __construct(DelhiveryService $delhiveryService)
-    // {
-    //     $this->delhiveryService = $delhiveryService;
-    // }
+    public function __construct(DelhiveryService $delhiveryService)
+    {
+        $this->delhiveryService = $delhiveryService;
+    }
 
     // public function createOrder(Request $request)
     // {
