@@ -267,26 +267,73 @@ class DelhiveryServiceController extends Controller
 
             $productsDescription = implode(', ', $descParts);
 
-            // 5) Map shipping details
-            // NOTE: adjust these column names to your schema
+            // 5) Map shipping details from single shipping_address string
             $shippingAddress = $order->shipping_address;
 
-            // Try from order first, else from user (if you store them there)
-            $pin   = $order->shipping_pin   ?? $user->pin   ?? null;
-            $city  = $order->shipping_city  ?? $user->city  ?? null;
-            $state = $order->shipping_state ?? $user->state ?? null;
+            // Default nulls
+            $pin     = null;
+            $city    = null;
+            $state   = null;
+            $country = null;
+            $nameFromAddress  = null;
+            $phoneFromAddress = null;
 
+            if ($shippingAddress) {
+                // Split by comma and trim
+                $parts = array_map('trim', explode(',', $shippingAddress));
+                // Remove empty values and reindex
+                $parts = array_values(array_filter($parts, fn($v) => $v !== ''));
+
+                $count = count($parts);
+
+                if ($count >= 7) {
+                    // According to your pattern:
+                    // 0 -> name
+                    // 1 -> mobile
+                    // ... middle address chunks ...
+                    // [count-5] -> city
+                    // [count-4] -> district (not used for Delhivery)
+                    // [count-3] -> state
+                    // [count-2] -> pin
+                    // [count-1] -> country
+
+                    $nameFromAddress  = $parts[0] ?? null;
+                    $phoneFromAddress = $parts[1] ?? null;
+
+                    $country = $parts[$count - 1] ?? null;
+                    $maybePin = $parts[$count - 2] ?? null;
+                    $state  = $parts[$count - 3] ?? null;
+                    // district = $parts[$count - 4] ?? null; // if you ever need it
+                    $city   = $parts[$count - 5] ?? null;
+
+                    // Validate pin shape (6 digits)
+                    if ($maybePin && preg_match('/^\d{6}$/', $maybePin)) {
+                        $pin = $maybePin;
+                    }
+                }
+            }
+
+            // Prefer parsed values, but fallback to user fields if needed
+            if (!$pin)   { $pin   = $user->pin   ?? null; }
+            if (!$city)  { $city  = $user->city  ?? null; }
+            if (!$state) { $state = $user->state ?? null; }
+
+            // If STILL missing critical pieces, error out
             if (!$pin || !$city || !$state) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Missing shipping pincode/city/state for this order. Please complete address first.',
                     'data'    => [
-                        'pin'   => $pin,
-                        'city'  => $city,
-                        'state' => $state,
+                        'shipping_address' => $shippingAddress,
+                        'pin'              => $pin,
+                        'city'             => $city,
+                        'state'            => $state,
                     ],
                 ], 422);
             }
+
+            // Optionally, you can also override phone from address if missing:
+            $finalPhone = $user->mobile ?? $phoneFromAddress ?? null;
 
             // 6) Payment mode from order.payment_status
             // tweak mapping as per your logic
@@ -314,7 +361,7 @@ class DelhiveryServiceController extends Controller
                 'pin'                  => $pin,
                 'city'                 => $city,
                 'state'                => $state,
-                'phone'                => $user->mobile,
+                'phone'                => $finalPhone, //$user->mobile,
 
                 // Order / payment
                 'order_no'             => (string) $order->id,   // or your custom order number field
@@ -365,7 +412,7 @@ class DelhiveryServiceController extends Controller
             $shipment->user_id            = $order->user_id;
             $shipment->courier            = 'delhivery';
             $shipment->customer_name      = $orderData['customer_name'];
-            $shipment->customer_phone     = $orderData['phone'];
+            $shipment->customer_phone     = $finalPhone; // = $orderData['phone'];
             $shipment->customer_email     = $user->email;
             $shipment->shipping_address   = $orderData['customer_address'];
             $shipment->shipping_pin       = $orderData['pin'];
