@@ -329,20 +329,33 @@ class DelhiveryServiceController extends Controller
             $sellerAddress = config('shipping.seller_address', 'Your Warehouse Address');
             $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
 
-            // Resolve pickup_location_id:
-            //  - from request if provided
-            //  - else default to 1
-            $pickupLocationId = $request->input('pickup_location_id', 1);
+            // 7) Resolve pickup location
+            $pickup = null;
+            $pickupLocationId = $request->input('pickup_location_id');
 
-            // Try to load that pickup from DB
-            $pickup = PickupLocationModel::find($pickupLocationId);
-
-            // If not found, as absolute fallback try id=1
-            if (!$pickup && $pickupLocationId !== 1) {
-                $pickup = PickupLocationModel::find(1);
+            // If pickup_location_id is explicitly passed in request
+            if (!empty($pickupLocationId)) {
+                $pickup = PickupLocationModel::find($pickupLocationId);
             }
 
-            // If still no pickup, error
+            // If not passed OR not found, fall back to default pickup
+            if (!$pickup) {
+                $pickup = PickupLocationModel::where('is_default', 1)
+                    ->when(function ($q) {
+                        // if you use is_active column
+                        $q->where('is_active', 1);
+                    })
+                    ->first();
+            }
+
+            // If still not found, fall back to first active pickup
+            if (!$pickup) {
+                $pickup = PickupLocationModel::where('is_active', 1)
+                    ->orderBy('id')
+                    ->first();
+            }
+
+            // If STILL no pickup, error
             if (!$pickup) {
                 return response()->json([
                     'success' => false,
