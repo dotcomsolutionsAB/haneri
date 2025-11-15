@@ -199,7 +199,7 @@ class DelhiveryServiceController extends Controller
     {
         // 1) Validate only order_id – everything else is auto-fetched
         $validator = Validator::make($request->all(), [
-            'order_id' => 'required|integer|exists:orders,id',
+            'order_id' => 'required|integer|exists:t_orders,id',
         ]);
 
         if ($validator->fails()) {
