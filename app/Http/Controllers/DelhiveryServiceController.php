@@ -921,8 +921,6 @@ class DelhiveryServiceController extends Controller
     }
 
 
-
-
     // public function trackMultipleShipments(Request $request)
     // {
     //     // This method should receive the Request object
