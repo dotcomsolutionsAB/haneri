@@ -252,31 +252,7 @@ class DelhiveryService
         }
     }
 
-    public function createPickupLocation(array $data): array
-    {
-        $endpoint = $this->getBaseUrl() . '/api/backend/clientwarehouse/';
-
-        try {
-            $response = $this->client->post($endpoint, [
-                'headers' => [
-                    'Authorization' => 'Token ' . $this->apiKey,
-                    'Accept'        => 'application/json',
-                    'Content-Type'  => 'application/json',
-                ],
-                'body' => json_encode($data),
-            ]);
-
-            return json_decode($response->getBody()->getContents(), true);
-
-        } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'error'   => 'Create pickup location failed: ' . $e->getMessage(),
-            ];
-        }
-    }
-
-        // public function trackMultipleShipments(array $waybillNumbers)
+    // public function trackMultipleShipments(array $waybillNumbers)
     // {
     //     $endpoint = 'https://track.delhivery.com/api/v1/packages/json/';
     //     try {

@@ -155,7 +155,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/auto_ship_setup/{orderId}', [DelhiveryServiceController::class, 'autoShipSetup']);
 
             // pickup crud
-            Route::post('/pickup/create', [DelhiveryServiceController::class, 'createPickup']);
+            Route::post('/pickup/create', [DelhiveryServiceController::class, 'createPickupLocation']);
 
         });
 

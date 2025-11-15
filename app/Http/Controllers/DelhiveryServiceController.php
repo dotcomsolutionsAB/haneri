@@ -726,87 +726,64 @@ class DelhiveryServiceController extends Controller
     }
 
     // pickup details :
-    public function createPickup(Request $request)
+    public function createPickupLocation(Request $request)
     {
+        // 1) Validate input
         $validator = Validator::make($request->all(), [
-            'name'            => 'required|string',
-            'contact_person'  => 'required|string',
-            'phone'           => 'required|string',
-            'alternate_phone' => 'nullable|string',
-            'email'           => 'nullable|email',
-            'address_line1'   => 'required|string',
-            'address_line2'   => 'nullable|string',
-            'landmark'        => 'nullable|string',
-            'city'            => 'required|string',
-            'district'        => 'nullable|string',
-            'state'           => 'required|string',
-            'pin'             => 'required|digits:6',
-            'country'         => 'required|string',
-            'is_default'      => 'nullable|boolean',
+            'name'                => 'required|string|max:255',   // internal name
+            'code'                => 'nullable|string|max:100',
+            'courier_pickup_name' => 'nullable|string|max:255',   // warehouse name in Delhivery (e.g. "Burhanuddin")
+            'courier_pickup_code' => 'nullable|string|max:100',
+
+            'contact_person'      => 'nullable|string|max:255',
+            'phone'               => 'required|string|max:20',
+            'alternate_phone'     => 'nullable|string|max:20',
+            'email'               => 'nullable|email|max:255',
+
+            'address_line1'       => 'required|string|max:255',
+            'address_line2'       => 'nullable|string|max:255',
+            'landmark'            => 'nullable|string|max:255',
+
+            'city'                => 'required|string|max:100',
+            'district'            => 'nullable|string|max:100',
+            'state'               => 'required|string|max:100',
+            'pin'                 => 'required|string|max:10',    // can be digits:6 if always Indian PIN
+            'country'             => 'nullable|string|max:50',
+
+            'is_default'          => 'nullable|boolean',
+            'is_active'           => 'nullable|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed',
+                'message' => 'Validation error',
                 'data'    => $validator->errors(),
             ], 422);
         }
 
-        // 1️⃣ Call Delhivery API
-        $service = new DelhiveryService();
-        $delhiveryResp = $service->createPickupLocation([
-            'name'    => $request->name,
-            'phone'   => $request->phone,
-            'address' => $request->address_line1,
-            'city'    => $request->city,
-            'state'   => $request->state,
-            'country' => $request->country,
-            'pin'     => $request->pin,
-            'email'   => $request->email
-        ]);
+        $data = $validator->validated();
 
-        if (isset($delhiveryResp['error'])) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Delhivery API Error',
-                'data'    => $delhiveryResp['error'],
-            ], 500);
+        // Normalize flags
+        $data['is_default'] = isset($data['is_default']) ? (bool)$data['is_default'] : false;
+        $data['is_active']  = isset($data['is_active']) ? (bool)$data['is_active'] : true;
+        $data['country']    = $data['country'] ?? 'India';
+
+        // 2) If this is marked as default, unset default on others
+        if ($data['is_default']) {
+            PickupLocationModel::where('is_default', 1)->update(['is_default' => 0]);
         }
 
-        // Extract delhivery data
-        $courierName = $delhiveryResp['data']['name'] ?? null;
-        $courierCode = $delhiveryResp['data']['warehouse_id'] ?? null;
-
-        // 2️⃣ SAVE IN YOUR DATABASE (THIS IS EXACTLY WHERE YOU PUT THE SAVE CODE)
-        $pickup = PickupLocationModel::create([
-            'name'                => $request->name,
-            'contact_person'      => $request->contact_person,
-            'phone'               => $request->phone,
-            'alternate_phone'     => $request->alternate_phone,
-            'email'               => $request->email,
-            'address_line1'       => $request->address_line1,
-            'address_line2'       => $request->address_line2,
-            'landmark'            => $request->landmark,
-            'city'                => $request->city,
-            'district'            => $request->district,
-            'state'               => $request->state,
-            'pin'                 => $request->pin,
-            'country'             => $request->country,
-            'is_default'          => $request->is_default ?? 0,
-            'is_active'           => 1,
-
-            // Save Delhivery returned values
-            'courier_pickup_name' => $courierName,
-            'courier_pickup_code' => $courierCode,
-        ]);
+        // 3) Create pickup location in DB
+        $pickup = PickupLocationModel::create($data);
 
         return response()->json([
             'success' => true,
             'message' => 'Pickup location created successfully.',
-            'data'    => $pickup
-        ]);
+            'data'    => $pickup,
+        ], 201);
     }
+
 
 
     // public function trackMultipleShipments(Request $request)
