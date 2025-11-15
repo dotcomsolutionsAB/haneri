@@ -146,6 +146,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/pincode-serviceability', [DelhiveryServiceController::class, 'checkPincodeServiceability']);
             Route::get('/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
             Route::get('/expected-time', [DelhiveryServiceController::class, 'getTat']);
+            // manual creation (admin)
+            Route::post('/create_ship_by_order', [DelhiveryServiceController::class, 'createShipByOrder']);
+
+            // optional separate setup api
+            Route::post('/auto_ship_setup/{orderId}', [DelhiveryServiceController::class, 'autoShipSetup']);
         });
 
         Route::post('/switch_user', [UserController::class, 'switchUser']);

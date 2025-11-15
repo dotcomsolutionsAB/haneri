@@ -1,11 +1,16 @@
 <?php
 
 namespace App\Http\Controllers;
+
+use App\Models\OrderModel;
+use App\Models\OrderItemModel;
+use App\Models\OrderShipment;
 use App\services\DelhiveryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Carbon\Carbon;
 
 class DelhiveryServiceController extends Controller
 {
@@ -187,6 +192,291 @@ class DelhiveryServiceController extends Controller
             'success' => true,
             'message' => 'Delhivery order created successfully.',
             'data'    => $response,
+        ]);
+    }
+
+    public function createShipByOrder(Request $request)
+    {
+        // 1) Validate only order_id – everything else is auto-fetched
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|integer|exists:orders,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        $orderId = (int) $request->input('order_id');
+
+        try {
+            // 2) Load order + user
+            $order = OrderModel::with('user')->findOrFail($orderId);
+            $user  = $order->user;
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found for this order.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            // 3) Load order items with product + variant (for name & weight)
+            $items = OrderItemModel::with([
+                    'product:id,name',
+                    'variant:id,weight'
+                ])
+                ->where('order_id', $order->id)
+                ->get();
+
+            if ($items->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No items found for this order.',
+                    'data'    => [],
+                ], 400);
+            }
+
+            // 4) Build products_description, total quantity, total weight
+            $descParts   = [];
+            $totalQty    = 0;
+            $totalWeight = 0.0; // in kg
+
+            foreach ($items as $item) {
+                $name = optional($item->product)->name ?? ('Product #'.$item->product_id);
+                $qty  = (int) $item->quantity;
+
+                $descParts[] = $name.' x '.$qty;
+                $totalQty   += $qty;
+
+                // weight from variant (if available)
+                $variantWeight = optional($item->variant)->weight; // assume in kg
+                if (!is_null($variantWeight)) {
+                    $totalWeight += ((float) $variantWeight) * $qty;
+                }
+            }
+
+            if ($totalWeight <= 0) {
+                // Fallback – you can change default
+                $totalWeight = 1.0;
+            }
+
+            $productsDescription = implode(', ', $descParts);
+
+            // 5) Map shipping details
+            // NOTE: adjust these column names to your schema
+            $shippingAddress = $order->shipping_address;
+
+            // Try from order first, else from user (if you store them there)
+            $pin   = $order->shipping_pin   ?? $user->pin   ?? null;
+            $city  = $order->shipping_city  ?? $user->city  ?? null;
+            $state = $order->shipping_state ?? $user->state ?? null;
+
+            if (!$pin || !$city || !$state) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Missing shipping pincode/city/state for this order. Please complete address first.',
+                    'data'    => [
+                        'pin'   => $pin,
+                        'city'  => $city,
+                        'state' => $state,
+                    ],
+                ], 422);
+            }
+
+            // 6) Payment mode from order.payment_status
+            // tweak mapping as per your logic
+            $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
+            $codAmount   = $paymentMode === 'COD' ? (float) $order->total_amount : 0.0;
+
+            // 7) Seller / pickup details – take from config or hard-code
+            // Create config/shipping.php or edit below defaults
+            $sellerName    = config('shipping.seller_name', 'Your Store Name');
+            $sellerAddress = config('shipping.seller_address', 'Your Warehouse Address');
+            $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
+
+            $pickupName    = config('shipping.pickup.name', 'Default Pickup');
+            $pickupAddress = config('shipping.pickup.address', 'Your Warehouse Address');
+            $pickupPin     = config('shipping.pickup.pin', '700001');
+            $pickupCity    = config('shipping.pickup.city', 'Kolkata');
+            $pickupState   = config('shipping.pickup.state', 'West Bengal');
+            $pickupPhone   = config('shipping.pickup.phone', '9000000000');
+
+            // 8) Build payload for DelhiveryService->placeOrder()
+            $orderData = [
+                // Customer
+                'customer_name'        => $user->name,
+                'customer_address'     => $shippingAddress,
+                'pin'                  => $pin,
+                'city'                 => $city,
+                'state'                => $state,
+                'phone'                => $user->mobile,
+
+                // Order / payment
+                'order_no'             => (string) $order->id,   // or your custom order number field
+                'payment_mode'         => $paymentMode,
+                'total_amount'         => (float) $order->total_amount,
+                'cod_amount'           => $codAmount,
+
+                // Products
+                'products_description' => $productsDescription,
+                'quantity'             => $totalQty,
+                'weight'               => round($totalWeight, 3), // in kg
+                'order_date'           => $order->created_at
+                                            ? $order->created_at->toDateString()
+                                            : Carbon::now()->toDateString(),
+
+                // Seller
+                'seller_name'          => $sellerName,
+                'seller_address'       => $sellerAddress,
+                'seller_invoice'       => $sellerInvoice,
+
+                // Pickup
+                'pickup_name'          => $pickupName,
+                'pickup_address'       => $pickupAddress,
+                'pickup_pin'           => $pickupPin,
+                'pickup_city'          => $pickupCity,
+                'pickup_state'         => $pickupState,
+                'pickup_phone'         => $pickupPhone,
+
+                // Optional
+                'shipment_width'       => null,
+                'shipment_height'      => null,
+                'shipping_mode'        => 'Surface',
+                'address_type'         => 'home',
+                'return_pin'           => $pickupPin,
+                'return_city'          => $pickupCity,
+                'return_phone'         => $pickupPhone,
+                'return_address'       => $pickupAddress,
+                'return_state'         => $pickupState,
+                'return_country'       => 'India',
+            ];
+
+            // 9) Call DelhiveryService
+            $delhiveryService = new DelhiveryService();
+            $apiResponse      = $delhiveryService->placeOrder($orderData);
+
+            // 10) Prepare / update shipment record in DB
+            $shipment = OrderShipment::firstOrNew(['order_id' => $order->id]);
+            $shipment->user_id            = $order->user_id;
+            $shipment->courier            = 'delhivery';
+            $shipment->customer_name      = $orderData['customer_name'];
+            $shipment->customer_phone     = $orderData['phone'];
+            $shipment->customer_email     = $user->email;
+            $shipment->shipping_address   = $orderData['customer_address'];
+            $shipment->shipping_pin       = $orderData['pin'];
+            $shipment->shipping_city      = $orderData['city'];
+            $shipment->shipping_state     = $orderData['state'];
+            $shipment->payment_mode       = $orderData['payment_mode'];
+            $shipment->total_amount       = $orderData['total_amount'];
+            $shipment->cod_amount         = $orderData['cod_amount'];
+            $shipment->quantity           = $orderData['quantity'];
+            $shipment->weight             = $orderData['weight'];
+            $shipment->products_description = $orderData['products_description'];
+            $shipment->pickup_name        = $orderData['pickup_name'];
+            $shipment->pickup_address     = $orderData['pickup_address'];
+            $shipment->pickup_pin         = $orderData['pickup_pin'];
+            $shipment->pickup_city        = $orderData['pickup_city'];
+            $shipment->pickup_state       = $orderData['pickup_state'];
+            $shipment->pickup_phone       = $orderData['pickup_phone'];
+            $shipment->request_payload    = $orderData;
+            $shipment->response_payload   = $apiResponse;
+
+            // If Delhivery returned an error
+            if (isset($apiResponse['error'])) {
+                $shipment->status        = 'failed';
+                $shipment->error_message = $apiResponse['error'];
+                $shipment->save();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $apiResponse['error'],
+                    'data'    => $apiResponse['raw'] ?? [],
+                ], 400);
+            }
+
+            // Extract AWB / waybill – adjust keys based on your actual response
+            $awbNo   = $apiResponse['packages'][0]['waybill'] ?? null;
+            $refNum  = $apiResponse['packages'][0]['refnum']  ?? null;
+
+            $shipment->awb_no           = $awbNo;
+            $shipment->courier_reference= $refNum;
+            $shipment->status           = 'booked';
+            $shipment->booked_at        = Carbon::now();
+            $shipment->error_message    = null;
+            $shipment->save();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Shipment created on Delhivery for this order.',
+                'data'    => [
+                    'order_id'    => $order->id,
+                    'shipment_id' => $shipment->id,
+                    'awb_no'      => $shipment->awb_no,
+                    'courier'     => $shipment->courier,
+                    'status'      => $shipment->status,
+                    'api'         => $apiResponse,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('createShipByOrder (auto) failed for order '.$orderId.': '.$e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unexpected error while creating shipment: '.$e->getMessage(),
+                'data'    => [],
+            ], 500);
+        }
+    }
+
+
+    // auto ship once run it fetch order id
+    public function autoShipSetup(Request $request, $orderId)
+    {
+        $order = OrderModel::with('user')->findOrFail($orderId);
+
+        // If it already exists, just return it
+        $existing = OrderShipment::where('order_id', $order->id)->first();
+        if ($existing) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Shipment setup already exists for this order.',
+                'data'    => $existing,
+            ]);
+        }
+
+        $user = $order->user;
+
+        $shipment = OrderShipment::create([
+            'order_id'        => $order->id,
+            'user_id'         => $order->user_id,
+            'courier'         => 'delhivery',
+            'status'          => 'setup',
+
+            'customer_name'   => $user->name ?? 'Customer',
+            'customer_phone'  => $user->mobile ?? null,
+            'customer_email'  => $user->email ?? null,
+            'shipping_address'=> $order->shipping_address,
+            'shipping_pin'    => $order->shipping_pin ?? null,
+            'shipping_city'   => $order->shipping_city ?? null,
+            'shipping_state'  => $order->shipping_state ?? null,
+
+            'payment_mode'    => 'Prepaid',
+            'total_amount'    => $order->total_amount,
+            'cod_amount'      => 0,
+            'quantity'        => 1,
+            'products_description' => 'Order #'.$order->id.' items',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipment setup created for order.',
+            'data'    => $shipment,
         ]);
     }
 

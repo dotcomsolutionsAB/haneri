@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
+use App\Models\OrderShipment;
 use App\Models\CartModel;
 use App\Models\User;
 use Carbon\Carbon;
@@ -286,6 +287,44 @@ class OrderController extends Controller
                 'payment_status' => $request->input('payment_status', 'pending'),
                 'shipping_address' => $request->input('shipping_address'),
                 'razorpay_order_id' => $razorpayData['order']['id'],
+            ]);
+
+            // --- AUTO SHIP SETUP (runs when order is punched) ---
+            OrderShipment::create([
+                'order_id'        => $order->id,
+                'user_id'         => $orderUser->id,
+                'courier'         => 'delhivery',
+                'status'          => 'setup',
+
+                'customer_name'   => $user_name,
+                'customer_phone'  => $user_phone,
+                'customer_email'  => $user_email,
+                'shipping_address'=> $order->shipping_address,
+
+                // if you have separate columns for pin/city/state then map them here:
+                'shipping_pin'    => $order->shipping_pin ?? null,
+                'shipping_city'   => $order->shipping_city ?? null,
+                'shipping_state'  => $order->shipping_state ?? null,
+
+                // Amounts
+                'payment_mode'    => $request->input('payment_mode', 'Prepaid'), // if you store it somewhere
+                'total_amount'    => $order->total_amount,
+                'cod_amount'      => $request->input('payment_mode') === 'COD'
+                                    ? $order->total_amount
+                                    : 0,
+
+                // Package summary (simple default)
+                'quantity'        => $cartItems->sum('quantity'),
+                'weight'          => null, // we can set in manual API
+                'products_description' => 'Order #'.$order->id.' items',
+
+                // Pickup info – if you have configured somewhere, you can fill from config
+                'pickup_name'     => config('shipping.default_pickup.name', 'Default Pickup'),
+                'pickup_address'  => config('shipping.default_pickup.address', ''),
+                'pickup_pin'      => config('shipping.default_pickup.pin', ''),
+                'pickup_city'     => config('shipping.default_pickup.city', ''),
+                'pickup_state'    => config('shipping.default_pickup.state', ''),
+                'pickup_phone'    => config('shipping.default_pickup.phone', ''),
             ]);
 
             // Iterate through each cart item to add it to the order items table
