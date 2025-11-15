@@ -153,6 +153,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
             // optional separate setup api
             Route::post('/auto_ship_setup/{orderId}', [DelhiveryServiceController::class, 'autoShipSetup']);
+
+            // pickup crud
+            Route::post('/pickup/create', [DelhiveryServiceController::class, 'createPickup']);
+
         });
 
         Route::post('/switch_user', [UserController::class, 'switchUser']);

@@ -49,6 +49,7 @@ return new class extends Migration
             $table->decimal('weight', 8, 3)->nullable(); // in kg
             $table->string('products_description')->nullable();
 
+            $table->unsignedBigInteger('pickup_location_id');
             // Pickup snapshot (in case you have multiple pickup locations)
             $table->string('pickup_name')->nullable();
             $table->text('pickup_address')->nullable();

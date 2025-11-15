@@ -26,6 +26,7 @@ class OrderShipment extends Model
         'quantity',
         'weight',
         'products_description',
+        'pickup_location_id',
         'pickup_name',
         'pickup_address',
         'pickup_pin',
@@ -58,5 +59,10 @@ class OrderShipment extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+    
+    public function pickupLocation()
+    {
+        return $this->belongsTo(PickupLocationModel::class, 'pickup_location_id');
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
 use App\Models\OrderShipment;
+use App\Models\PickupLocationModel;
 use App\services\DelhiveryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -182,6 +183,7 @@ class DelhiveryServiceController extends Controller
         // 1) Validate only order_id – everything else is auto-fetched
         $validator = Validator::make($request->all(), [
             'order_id' => 'required|integer|exists:t_orders,id',
+            'pickup_location_id' => 'nullable|integer|exists:t_pickup_location,id',
         ]);
 
         if ($validator->fails()) {
@@ -322,18 +324,46 @@ class DelhiveryServiceController extends Controller
             $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
             $codAmount   = $paymentMode === 'COD' ? (float) $order->total_amount : 0.0;
 
-            // 7) Seller / pickup details – take from config or hard-code
-            // Create config/shipping.php or edit below defaults
+            // Seller can still come from config
             $sellerName    = config('shipping.seller_name', 'Your Store Name');
             $sellerAddress = config('shipping.seller_address', 'Your Warehouse Address');
             $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
 
-            $pickupName    = config('shipping.pickup.name', 'Default Pickup');
-            $pickupAddress = config('shipping.pickup.address', 'Your Warehouse Address');
-            $pickupPin     = config('shipping.pickup.pin', '700001');
-            $pickupCity    = config('shipping.pickup.city', 'Kolkata');
-            $pickupState   = config('shipping.pickup.state', 'West Bengal');
-            $pickupPhone   = config('shipping.pickup.phone', '9000000000');
+            // Resolve pickup_location_id:
+            //  - from request if provided
+            //  - else default to 1
+            $pickupLocationId = $request->input('pickup_location_id', 1);
+
+            // Try to load that pickup from DB
+            $pickup = PickupLocationModel::find($pickupLocationId);
+
+            // If not found, as absolute fallback try id=1
+            if (!$pickup && $pickupLocationId !== 1) {
+                $pickup = PickupLocationModel::find(1);
+            }
+
+            // If still no pickup, error
+            if (!$pickup) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No valid pickup location found. Please configure t_pickup_location.',
+                    'data'    => [
+                        'pickup_location_id' => $pickupLocationId,
+                    ],
+                ], 500);
+            }
+
+            // Use courier_pickup_name if set, else internal name
+            $pickupName    = $pickup->courier_pickup_name ?: $pickup->name;
+            $pickupAddress = trim(
+                $pickup->address_line1
+                . ($pickup->address_line2 ? ', '.$pickup->address_line2 : '')
+                . ($pickup->landmark ? ', '.$pickup->landmark : '')
+            );
+            $pickupPin     = $pickup->pin;
+            $pickupCity    = $pickup->city;
+            $pickupState   = $pickup->state;
+            $pickupPhone   = $pickup->phone ?: $pickup->alternate_phone;
 
             // 8) Build payload for DelhiveryService->placeOrder()
             $orderData = [
@@ -391,29 +421,30 @@ class DelhiveryServiceController extends Controller
 
             // 10) Prepare / update shipment record in DB
             $shipment = OrderShipment::firstOrNew(['order_id' => $order->id]);
-            $shipment->user_id            = $order->user_id;
-            $shipment->courier            = 'delhivery';
-            $shipment->customer_name      = $orderData['customer_name'];
-            $shipment->customer_phone     = $finalPhone; // = $orderData['phone'];
-            $shipment->customer_email     = $user->email;
-            $shipment->shipping_address   = $orderData['customer_address'];
-            $shipment->shipping_pin       = $orderData['pin'];
-            $shipment->shipping_city      = $orderData['city'];
-            $shipment->shipping_state     = $orderData['state'];
-            $shipment->payment_mode       = $orderData['payment_mode'];
-            $shipment->total_amount       = $orderData['total_amount'];
-            $shipment->cod_amount         = $orderData['cod_amount'];
-            $shipment->quantity           = $orderData['quantity'];
-            $shipment->weight             = $orderData['weight'];
+            $shipment->user_id              = $order->user_id;
+            $shipment->courier              = 'delhivery';
+            $shipment->pickup_location_id   = $pickup->id;   // ⭐ store pickup id here
+            $shipment->customer_name        = $orderData['customer_name'];
+            $shipment->customer_phone       = $finalPhone;
+            $shipment->customer_email       = $user->email;
+            $shipment->shipping_address     = $orderData['customer_address'];
+            $shipment->shipping_pin         = $orderData['pin'];
+            $shipment->shipping_city        = $orderData['city'];
+            $shipment->shipping_state       = $orderData['state'];
+            $shipment->payment_mode         = $orderData['payment_mode'];
+            $shipment->total_amount         = $orderData['total_amount'];
+            $shipment->cod_amount           = $orderData['cod_amount'];
+            $shipment->quantity             = $orderData['quantity'];
+            $shipment->weight               = $orderData['weight'];
             $shipment->products_description = $orderData['products_description'];
-            $shipment->pickup_name        = $orderData['pickup_name'];
-            $shipment->pickup_address     = $orderData['pickup_address'];
-            $shipment->pickup_pin         = $orderData['pickup_pin'];
-            $shipment->pickup_city        = $orderData['pickup_city'];
-            $shipment->pickup_state       = $orderData['pickup_state'];
-            $shipment->pickup_phone       = $orderData['pickup_phone'];
-            $shipment->request_payload    = $orderData;
-            $shipment->response_payload   = $apiResponse;
+            $shipment->pickup_name          = $orderData['pickup_name'];
+            $shipment->pickup_address       = $orderData['pickup_address'];
+            $shipment->pickup_pin           = $orderData['pickup_pin'];
+            $shipment->pickup_city          = $orderData['pickup_city'];
+            $shipment->pickup_state         = $orderData['pickup_state'];
+            $shipment->pickup_phone         = $orderData['pickup_phone'];
+            $shipment->request_payload      = $orderData;
+            $shipment->response_payload     = $apiResponse;
 
             // If Delhivery returned an error
             if (isset($apiResponse['error'])) {
@@ -694,7 +725,90 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
-    
+    // pickup details :
+    public function createPickup(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'name'            => 'required|string',
+            'contact_person'  => 'required|string',
+            'phone'           => 'required|string',
+            'alternate_phone' => 'nullable|string',
+            'email'           => 'nullable|email',
+            'address_line1'   => 'required|string',
+            'address_line2'   => 'nullable|string',
+            'landmark'        => 'nullable|string',
+            'city'            => 'required|string',
+            'district'        => 'nullable|string',
+            'state'           => 'required|string',
+            'pin'             => 'required|digits:6',
+            'country'         => 'required|string',
+            'is_default'      => 'nullable|boolean',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        // 1️⃣ Call Delhivery API
+        $service = new DelhiveryService();
+        $delhiveryResp = $service->createPickupLocation([
+            'name'    => $request->name,
+            'phone'   => $request->phone,
+            'address' => $request->address_line1,
+            'city'    => $request->city,
+            'state'   => $request->state,
+            'country' => $request->country,
+            'pin'     => $request->pin,
+            'email'   => $request->email
+        ]);
+
+        if (isset($delhiveryResp['error'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Delhivery API Error',
+                'data'    => $delhiveryResp['error'],
+            ], 500);
+        }
+
+        // Extract delhivery data
+        $courierName = $delhiveryResp['data']['name'] ?? null;
+        $courierCode = $delhiveryResp['data']['warehouse_id'] ?? null;
+
+        // 2️⃣ SAVE IN YOUR DATABASE (THIS IS EXACTLY WHERE YOU PUT THE SAVE CODE)
+        $pickup = PickupLocationModel::create([
+            'name'                => $request->name,
+            'contact_person'      => $request->contact_person,
+            'phone'               => $request->phone,
+            'alternate_phone'     => $request->alternate_phone,
+            'email'               => $request->email,
+            'address_line1'       => $request->address_line1,
+            'address_line2'       => $request->address_line2,
+            'landmark'            => $request->landmark,
+            'city'                => $request->city,
+            'district'            => $request->district,
+            'state'               => $request->state,
+            'pin'                 => $request->pin,
+            'country'             => $request->country,
+            'is_default'          => $request->is_default ?? 0,
+            'is_active'           => 1,
+
+            // Save Delhivery returned values
+            'courier_pickup_name' => $courierName,
+            'courier_pickup_code' => $courierCode,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup location created successfully.',
+            'data'    => $pickup
+        ]);
+    }
+
+
     // public function trackMultipleShipments(Request $request)
     // {
     //     // This method should receive the Request object
