@@ -784,6 +784,110 @@ class DelhiveryServiceController extends Controller
         ], 201);
     }
 
+    public function fetchPickupLocations(Request $request, $id = null)
+    {
+        // If ID is passed in the URL => return single record
+        if ($id !== null) {
+            $pickup = PickupLocationModel::find($id);
+
+            if (!$pickup) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pickup location not found.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            // Hide timestamps
+            $pickup->makeHidden(['created_at', 'updated_at']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pickup location fetched successfully.',
+                'data'    => $pickup,
+            ]);
+        }
+
+        // Otherwise => list with filters from body
+
+        $validator = Validator::make($request->all(), [
+            'is_active' => 'nullable|in:0,1',       // filter by active
+            'default'   => 'nullable|in:0,1',       // maps to is_default
+            'name'      => 'nullable|string',       // search in name / courier_pickup_name
+            'pincode'   => 'nullable|string',       // search in pin
+
+            'limit'     => 'nullable|integer|min:1|max:200',
+            'offset'    => 'nullable|integer|min:0',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        $filters = $validator->validated();
+
+        $limit  = $filters['limit']  ?? 50;
+        $offset = $filters['offset'] ?? 0;
+
+        $query = PickupLocationModel::query();
+
+        // is_active filter
+        if (isset($filters['is_active'])) {
+            $query->where('is_active', (int) $filters['is_active']);
+        }
+
+        // default filter (maps to is_default)
+        if (isset($filters['default'])) {
+            $query->where('is_default', (int) $filters['default']);
+        }
+
+        // name filter (name + courier_pickup_name)
+        if (!empty($filters['name'])) {
+            $name = $filters['name'];
+            $query->where(function ($q) use ($name) {
+                $q->where('name', 'like', "%{$name}%")
+                ->orWhere('courier_pickup_name', 'like', "%{$name}%");
+            });
+        }
+
+        // pincode filter
+        if (!empty($filters['pincode'])) {
+            $query->where('pin', 'like', "%{$filters['pincode']}%");
+        }
+
+        // Order: default first, then by name
+        $query->orderByDesc('is_default')
+            ->orderBy('name');
+
+        // Total BEFORE limit/offset
+        $total = $query->count();
+
+        // Apply limit/offset
+        $items = $query->skip($offset)
+                    ->take($limit)
+                    ->get();
+
+        // Hide timestamps on each item
+        $items->makeHidden(['created_at', 'updated_at']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup locations fetched successfully.',
+            'data'    => [
+                'items' => $items->values(),   // reset index
+                'meta'  => [
+                    'limit'  => $limit,
+                    'offset' => $offset,
+                    'total'  => $total,
+                ],
+            ],
+        ]);
+    }
+
 
 
     // public function trackMultipleShipments(Request $request)
