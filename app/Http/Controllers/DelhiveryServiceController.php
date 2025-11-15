@@ -569,7 +569,7 @@ class DelhiveryServiceController extends Controller
                         'success' => false,
                         'message' => 'Shipment not found.',
                         'data' => []
-                    ], 404);
+                    ], 200);
                 }
 
                 return response()->json([
