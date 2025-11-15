@@ -157,6 +157,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             // pickup crud
             Route::post('/pickup/create', [DelhiveryServiceController::class, 'createPickupLocation']); // for create
             Route::post('/pickup/fetch/{id?}', [DelhiveryServiceController::class, 'fetchPickupLocations']); // for fetch
+            Route::delete('/pickup/delete/{id?}', [DelhiveryServiceController::class, 'deletePickupLocation']); // for fetch
 
         });
 

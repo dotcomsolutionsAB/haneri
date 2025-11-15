@@ -777,14 +777,13 @@ class DelhiveryServiceController extends Controller
         // 3) Create pickup location in DB
         $pickup = PickupLocationModel::create($data);
         $pickup->makeHidden(['created_at', 'updated_at']);
-        
+
         return response()->json([
             'success' => true,
             'message' => 'Pickup location created successfully.',
             'data'    => $pickup,
         ], 201);
     }
-
     public function fetchPickupLocations(Request $request, $id = null)
     {
         // If ID is passed in the URL => return single record
@@ -813,7 +812,7 @@ class DelhiveryServiceController extends Controller
 
         $validator = Validator::make($request->all(), [
             'is_active' => 'nullable|in:0,1',       // filter by active
-            'is_default'   => 'nullable|in:0,1',       // maps to is_default
+            'default'   => 'nullable|in:0,1',       // maps to is_default
             'name'      => 'nullable|string',       // search in name / courier_pickup_name
             'pincode'   => 'nullable|string',       // search in pin
 
@@ -843,7 +842,7 @@ class DelhiveryServiceController extends Controller
 
         // default filter (maps to is_default)
         if (isset($filters['default'])) {
-            $query->where('is_default', (int) $filters['is_default']);
+            $query->where('is_default', (int) $filters['default']);
         }
 
         // name filter (name + courier_pickup_name)
@@ -888,6 +887,39 @@ class DelhiveryServiceController extends Controller
             ],
         ]);
     }
+    public function deletePickupLocation($id)
+    {
+        $pickup = PickupLocationModel::find($id);
+
+        if (!$pickup) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pickup location not found.',
+                'data'    => [],
+            ], 404);
+        }
+
+        // Protect default pickup (optional)
+        // If you want to prevent deleting default pickup, uncomment:
+        /*
+        if ($pickup->is_default) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Default pickup location cannot be deleted.',
+                'data'    => [],
+            ], 400);
+        }
+        */
+
+        $pickup->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pickup location deleted successfully.',
+            'data'    => ['id' => $id],
+        ]);
+    }
+
 
 
 
