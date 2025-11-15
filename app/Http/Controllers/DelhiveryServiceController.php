@@ -329,40 +329,35 @@ class DelhiveryServiceController extends Controller
             $sellerAddress = config('shipping.seller_address', 'Your Warehouse Address');
             $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
 
-            // 7) Resolve pickup location
-            $pickup = null;
+            // Resolve pickup location:
             $pickupLocationId = $request->input('pickup_location_id');
+            $pickup = null;
 
-            // If pickup_location_id is explicitly passed in request
+            // If pickup_location_id explicitly provided, try loading it
             if (!empty($pickupLocationId)) {
                 $pickup = PickupLocationModel::find($pickupLocationId);
             }
 
-            // If not passed OR not found, fall back to default pickup
+            // If not provided OR not found, find default pickup
             if (!$pickup) {
                 $pickup = PickupLocationModel::where('is_default', 1)
-                    ->when(function ($q) {
-                        // if you use is_active column
-                        $q->where('is_active', 1);
-                    })
+                    ->where('is_active', 1)
                     ->first();
             }
 
-            // If still not found, fall back to first active pickup
+            // If still not found, pick first active pickup
             if (!$pickup) {
                 $pickup = PickupLocationModel::where('is_active', 1)
                     ->orderBy('id')
                     ->first();
             }
 
-            // If STILL no pickup, error
+            // If STILL no pickup → throw error
             if (!$pickup) {
                 return response()->json([
                     'success' => false,
                     'message' => 'No valid pickup location found. Please configure t_pickup_location.',
-                    'data'    => [
-                        'pickup_location_id' => $pickupLocationId,
-                    ],
+                    'data'    => [],
                 ], 500);
             }
 
