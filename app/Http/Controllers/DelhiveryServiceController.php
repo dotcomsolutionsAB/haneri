@@ -776,7 +776,8 @@ class DelhiveryServiceController extends Controller
 
         // 3) Create pickup location in DB
         $pickup = PickupLocationModel::create($data);
-
+        $pickup->makeHidden(['created_at', 'updated_at']);
+        
         return response()->json([
             'success' => true,
             'message' => 'Pickup location created successfully.',
@@ -812,7 +813,7 @@ class DelhiveryServiceController extends Controller
 
         $validator = Validator::make($request->all(), [
             'is_active' => 'nullable|in:0,1',       // filter by active
-            'default'   => 'nullable|in:0,1',       // maps to is_default
+            'is_default'   => 'nullable|in:0,1',       // maps to is_default
             'name'      => 'nullable|string',       // search in name / courier_pickup_name
             'pincode'   => 'nullable|string',       // search in pin
 
@@ -842,7 +843,7 @@ class DelhiveryServiceController extends Controller
 
         // default filter (maps to is_default)
         if (isset($filters['default'])) {
-            $query->where('is_default', (int) $filters['default']);
+            $query->where('is_default', (int) $filters['is_default']);
         }
 
         // name filter (name + courier_pickup_name)
