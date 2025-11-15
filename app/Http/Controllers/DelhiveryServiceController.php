@@ -21,24 +21,6 @@ class DelhiveryServiceController extends Controller
     //     $this->delhiveryService = $delhiveryService;
     // }
 
-    public function test()
-    {
-        $url = rtrim(env('DELIVERY_ONE_URL'), '/') . '/ping';
-
-        $response = Http::withHeaders([
-            'Authorization' => 'Token ' . env('DELIVERY_ONE_TOKEN'),
-            'Accept'        => 'application/json',
-        ])->get($url);
-
-        return response()->json([
-            'url'         => $url,
-            'status'      => $response->status(),
-            'successful'  => $response->successful(),
-            'body'        => $response->body(),   // raw response (may be HTML or empty)
-            'json'        => $response->json(),   // will be null if not valid JSON
-        ]);
-    }
-
     public function checkPincodeServiceability(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -481,6 +463,113 @@ class DelhiveryServiceController extends Controller
         }
     }
 
+    // fetch delivery details from db
+    public function fetchShipment(Request $request, $order_id = null)
+    {
+        try {
+            // Pagination
+            $limit  = (int) $request->input('limit', 10);
+            $offset = (int) $request->input('offset', 0);
+
+            if ($limit <= 0) $limit = 10;
+            if ($offset < 0) $offset = 0;
+
+            // Body params
+            $shipmentId = $request->input('id');            // shipment primary ID
+            $search     = $request->input('search');
+            $courier    = $request->input('courier');
+            $status     = $request->input('status');
+            $awbNo      = $request->input('awb_no');         // optional AWB filter
+
+            $query = OrderShipment::query();
+
+            // 🔹 Filter by ORDER ID (URL param)
+            if ($order_id) {
+                $query->where('order_id', $order_id);
+            }
+
+            // 🔹 Filter by SHIPMENT ID (BODY)
+            if ($shipmentId) {
+                $query->where('id', $shipmentId);
+            }
+
+            // Courier filter (body)
+            if (!empty($courier)) {
+                $query->where('courier', $courier);
+            }
+
+            // Status filter (body)
+            if (!empty($status)) {
+                $query->where('status', $status);
+            }
+
+            // AWB filter
+            if (!empty($awbNo)) {
+                $query->where('awb_no', 'like', '%' . $awbNo . '%');
+            }
+
+            // Generic search box
+            if (!empty($search)) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('awb_no', 'like', "%{$search}%")
+                    ->orWhere('courier_reference', 'like', "%{$search}%")
+                    ->orWhere('customer_name', 'like', "%{$search}%")
+                    ->orWhere('customer_phone', 'like', "%{$search}%")
+                    ->orWhere('customer_email', 'like', "%{$search}%")
+                    ->orWhere('shipping_pin', 'like', "%{$search}%");
+                });
+            }
+
+            // If ONLY a single shipment ID is given → return single row
+            if ($shipmentId) {
+                $shipment = $query->first();
+
+                if (!$shipment) {
+                    return response()->json([
+                        'code' => 404,
+                        'success' => false,
+                        'message' => 'Shipment not found.',
+                        'data' => []
+                    ], 404);
+                }
+
+                return response()->json([
+                    'code' => 200,
+                    'success' => true,
+                    'message' => 'Shipment fetched successfully.',
+                    'data' => $shipment,
+                    'records' => 1,
+                    'count_perpage' => 1
+                ]);
+            }
+
+            // Pagination for list
+            $totalRecords = $query->count();
+
+            $shipments = $query
+                ->orderBy('id', 'desc')
+                ->skip($offset)
+                ->take($limit)
+                ->get();
+
+            return response()->json([
+                'code'          => 200,
+                'success'       => true,
+                'message'       => 'Shipping details fetched successfully.',
+                'data'          => $shipments,
+                'records'       => $totalRecords,
+                'count_perpage' => $limit
+            ]);
+            
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => $e->getMessage(),
+                'data' => []
+            ], 500);
+        }
+    }
 
     // auto ship once run it fetch order id
     public function autoShipSetup(Request $request, $orderId)
@@ -605,137 +694,6 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
-
-    /**
-     * Endpoint to track one or more shipments.
-     * This replaces the old trackMultipleShipments.
-     */
-    // public function trackShipments(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'waybills' => 'required|array',
-    //         'waybills.*' => 'string',
-    //     ]);
-        
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-
-    //     $waybillNumbers = $request->input('waybills');
-    //     $response = $this->delhiveryService->trackShipments($waybillNumbers);
-
-    //     if (isset($response['error'])) {
-    //         return response()->json($response, 400);
-    //     }
-
-    //     return response()->json($response);
-    // }
-
-    // public function createOrder(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'customer_name' => 'required',
-    //         'customer_address' => 'required',
-    //         'pin' => 'required',
-    //         'city' => 'required',
-    //         'state' => 'required',
-    //         'phone' => 'required',
-    //         'order' => 'required',
-    //         'shipment_width' => 'required',
-    //         'shipment_height' => 'required',
-    //         'shipping_mode' => 'required',
-    //         'return_pin' => 'nullable',
-    //         'return_city' => 'nullable',
-    //         'return_phone' => 'nullable',
-    //         'return_address' => 'nullable',
-    //         'return_state' => 'nullable',
-    //         'return_country' => 'nullable',
-    //         'products_description' => 'nullable',
-    //         'hsn_code' => 'nullable',
-    //         'cod_amount' => 'nullable',
-    //         'order_date' => 'nullable',
-    //         'total_amount' => 'nullable',
-    //         'seller_address' => 'nullable',
-    //         'seller_name' => 'nullable',
-    //         'seller_invoice' => 'nullable',
-    //         'quantity' => 'nullable',
-    //         'waybill' => 'nullable',
-    //         'weight' => 'nullable',
-    //         'address_type' => 'nullable',
-    //         //'end_date' => 'required',
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-
-    //     $orderData = $request->all();
-    //     $response = $this->delhiveryService->placeOrder($orderData);
-
-    //     // if (isset($response['error'])) {
-    //     //     Log::error('Delhivery API Error: ' . json_encode($response));
-    //     //     return response()->json(['error' => $response['error']], 400);
-    //     // }
-    //     if (isset($response['error'])) {
-    //         Log::error('Delhivery API Error: ' . json_encode($response));
-    //         return response()->json($response, 400);
-    //     }
-
-    //     return response()->json(['success' => true, 'data' => $response]);
-    // }
-    /**
-     * Endpoint to get the shipping cost.
-     */
-    // public function getShippingCost(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'origin_pin' => 'required|string|size:6',
-    //         'destination_pin' => 'required|string|size:6',
-    //         'cod_amount' => 'required|numeric',
-    //         'weight' => 'required|numeric', // in kg
-    //         'payment_type' => 'nullable|in:Pre-paid,COD',
-    //     ]);
-    
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-        
-    //     $originPin = $request->input('origin_pin');
-    //     $destinationPin = $request->input('destination_pin');
-    //     $codAmount = $request->input('cod_amount');
-    //     $weight = $request->input('weight');
-    //     $paymentType = $request->input('payment_type', 'Pre-paid');
-    
-    //     $response = $this->delhiveryService->getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType);
-        
-    //     if (isset($response['error'])) {
-    //         return response()->json($response, 400);
-    //     }
-    
-    //     return response()->json($response);
-    // }
-    /**
-     * Endpoint to check if a pincode is serviceable.
-     */
-    // public function checkPincodeServiceability(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'pincode' => 'required|string|size:6',
-    //     ]);
-    
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-    
-    //     $pincode = $request->input('pincode');
-    //     $response = $this->delhiveryService->checkPincodeServiceability($pincode);
-    
-    //     if (isset($response['error'])) {
-    //         return response()->json($response, 400);
-    //     }
-    
-    //     return response()->json($response);
-    // }
     
     // public function trackMultipleShipments(Request $request)
     // {
