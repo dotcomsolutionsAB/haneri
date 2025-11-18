@@ -686,7 +686,7 @@ class ProductController extends Controller
         }
     }
 
-    public function productModelList(Request $request)
+    public function getProductModels(Request $request)
     {
         try {
             $productId   = $request->input('id');     // optional
