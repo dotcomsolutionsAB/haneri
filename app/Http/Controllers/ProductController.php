@@ -686,13 +686,13 @@ class ProductController extends Controller
         }
     }
 
-    public function getProductModels(Request $request)
+    public function productModelList(Request $request)
     {
         try {
             $productId   = $request->input('id');     // optional
             $productName = $request->input('name');   // optional
 
-            $query = ProductModel::query()
+            $query = ProductModel::with('category:id,name')
                 ->where('is_active', '!=', 0);
 
             // Filter by ID
@@ -706,15 +706,29 @@ class ProductController extends Controller
             }
 
             $products = $query
-                ->select('id', 'name')
+                ->select('id', 'name', 'category_id')
                 ->orderBy('name')
                 ->get();
 
-            // Return required structure
-            $data = $products->map(fn ($p) => [
-                'model_id'   => $p->id,
-                'model_name' => $p->name,
-            ]);
+            $data = $products->map(function ($p) {
+                $modelName = $p->name;
+
+                // If category exists, remove category name from product name
+                if ($p->category && !empty($p->category->name)) {
+                    $catName = $p->category->name;
+
+                    // Case-insensitive remove of category name from product name
+                    $modelName = str_ireplace($catName, '', $modelName);
+
+                    // Clean extra spaces
+                    $modelName = trim(preg_replace('/\s+/', ' ', $modelName));
+                }
+
+                return [
+                    'model_id'   => $p->id,
+                    'model_name' => $modelName,
+                ];
+            });
 
             return response()->json([
                 'code'    => 200,
