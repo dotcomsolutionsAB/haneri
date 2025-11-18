@@ -59,6 +59,7 @@ Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 
 Route::prefix('products')->group(function () {
     Route::post('/get_products/{id?}', [ProductController::class, 'index']);          // List all products
+    Route::post('/get_models', [ProductController::class, 'getProductModels']); 
     Route::get('/product_slug/{slug}', [ProductController::class, 'show']);     // Get details of a single product
     Route::get('/unique_variant', [ProductController::class, 'unique_type']);     // Get details of a single product
 });

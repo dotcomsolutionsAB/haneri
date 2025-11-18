@@ -686,6 +686,53 @@ class ProductController extends Controller
         }
     }
 
+    public function getProductModels(Request $request)
+    {
+        try {
+            $productId   = $request->input('id');     // optional
+            $productName = $request->input('name');   // optional
+
+            $query = ProductModel::query()
+                ->where('is_active', '!=', 0);
+
+            // Filter by ID
+            if (!empty($productId)) {
+                $query->where('id', $productId);
+            }
+
+            // Filter by Name
+            if (!empty($productName)) {
+                $query->where('name', 'LIKE', '%' . $productName . '%');
+            }
+
+            $products = $query
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get();
+
+            // Return required structure
+            $data = $products->map(fn ($p) => [
+                'model_id'   => $p->id,
+                'model_name' => $p->name,
+            ]);
+
+            return response()->json([
+                'code'    => 200,
+                'success' => true,
+                'message' => 'Product models fetched successfully.',
+                'data'    => $data,
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'code'    => 500,
+                'success' => false,
+                'message' => 'Something went wrong: ' . $e->getMessage(),
+                'data'    => [],
+            ], 500);
+        }
+    }
+
     /* Helper function to extract product page type (e.g., 'ProductPage_Main') from file path */
     private function getBannerType($filePath)
     {
@@ -978,144 +1025,6 @@ class ProductController extends Controller
     }
 
     // Update
-    // public function update(Request $request, $id)
-    // {
-    //     $product = ProductModel::find($id);
-    //     if (!$product) {
-    //         return response()->json(['message' => 'Product not found.'], 404);
-    //     }
-
-    //     $request->validate([
-    //         'name' => 'sometimes|string',
-    //         'brand_id' => 'sometimes|integer|exists:t_brands,id',
-    //         'category_id' => 'sometimes|integer|exists:t_categories,id',
-    //         'slug' => 'sometimes|string|unique:t_products,slug,' . $id,
-    //         'description' => 'sometimes|string',
-    //         'is_active' => 'sometimes|boolean',
-
-    //         // Validate product features
-    //         'features' => 'nullable|array',
-    //         'features.*.id' => 'required_with:features|integer|exists:t_product_features,id',
-    //         'features.*.feature_name' => 'required_with:features|string',
-    //         'features.*.feature_value' => 'required_with:features|string',
-    //         'features.*.is_filterable' => 'nullable|boolean',
-
-    //         // Validate product variants
-    //         'variants' => 'nullable|array',
-    //         'variants.*.id' => 'required_with:variants|integer|exists:t_product_variants,id',
-    //         // 'variants.*.photo_id' => 'nullable|string|exists:t_uploads,id',
-    //         'variants.*.min_qty' => 'sometimes|integer|min:1',
-    //         'variants.*.is_cod' => 'sometimes|boolean',
-    //         'variants.*.weight' => 'nullable|numeric',
-    //         'variants.*.description' => 'sometimes|string',
-    //         'variants.*.variant_type' => 'required_with:variants|string',
-    //         'variants.*.variant_value' => 'required_with:variants|string',
-    //         'variants.*.discount_price' => 'nullable|numeric',
-    //         'variants.*.regular_price' => 'sometimes|numeric',
-    //         'variants.*.customer_discount' => 'nullable|numeric',
-    //         'variants.*.dealer_discount' => 'nullable|numeric',
-    //         'variants.*.architect_discount' => 'nullable|numeric',
-    //         'variants.*.hsn' => 'sometimes|string',
-    //         'variants.*.regular_tax' => 'sometimes|numeric',
-    //         'variants.*.video_url' => 'sometimes|string',
-    //         'variants.*.product_pdf' => 'sometimes|string',
-    //     ]);
-
-    //     // Update the product
-    //     $product->update([
-    //         'name' => $request->input('name', $product->name),
-    //         'brand_id' => $request->input('brand_id', $product->brand_id),
-    //         'category_id' => $request->input('category_id', $product->category_id),
-    //         'photo_id' => $request->input('photo_id', $product->photo_id),
-    //         'price' => $request->input('price', $product->price),
-    //         'discount_price' => $request->input('discount_price', $product->discount_price),
-    //         'hsn' => $request->input('hsn', $product->hsn),
-    //         'tax' => $request->input('tax', $product->tax),
-    //         'min_qty' => $request->input('min_qty', $product->min_qty),
-    //         'is_cod' => $request->input('is_cod', $product->is_cod),
-    //         'weight' => $request->input('weight', $product->weight),
-    //         'slug' => $request->input('slug', $product->slug),
-    //         'description' => $request->input('description', $product->description),
-    //         'is_active' => $request->input('is_active', $product->is_active),
-    //     ]);
-
-    //    // Update product features
-    //     if ($request->has('features') && is_array($request->input('features'))) {
-    //         foreach ($request->input('features') as $feature) {
-    //             $existingFeature = ProductFeatureModel::find($feature['id']);
-
-    //             if ($existingFeature) {
-    //                 // Update feature if the id is passed
-    //                 $existingFeature->update([
-    //                     'feature_name' => $feature['feature_name'],
-    //                     'is_filterable' => $feature['is_filterable'] ?? $existingFeature->is_filterable,
-    //                 ]);
-    //             } else {
-    //                 // Create new feature if id is not provided
-    //                 ProductFeatureModel::create([
-    //                     'product_id' => $product->id,
-    //                     'feature_name' => $feature['feature_name'],
-    //                     'is_filterable' => $feature['is_filterable'] ?? false,
-    //                 ]);
-    //             }
-    //         }
-    //     }
-
-    //     // Update product variants
-    //     if ($request->has('variants') && is_array($request->input('variants'))) {
-    //         foreach ($request->input('variants') as $variant) {
-    //             $existingVariant = ProductVariantModel::find($variant['id']);
-
-    //             if ($existingVariant) {
-    //                 // Update variant if the id is passed
-    //                 $existingVariant->update([
-    //                     'photo_id' => $variant['photo_id'] ?? $existingVariant->photo_id,
-    //                     'min_qty' => $variant['min_qty'] ?? $existingVariant->min_qty,
-    //                     'is_cod' => $variant['is_cod'] ?? $existingVariant->is_cod,
-    //                     'weight' => $variant['weight'] ?? $existingVariant->weight,
-    //                     'description' => $variant['description'] ?? $existingVariant->description,
-    //                     'variant_type' => $variant['variant_type'] ?? $existingVariant->variant_type,
-    //                     'variant_value' => $variant['variant_value'] ?? $existingVariant->variant_value,
-    //                     'regular_price' => $variant['regular_price'] ?? $existingVariant->regular_price,
-    //                     'customer_discount' => $variant['customer_discount'] ?? $existingVariant->customer_discount,
-    //                     'dealer_discount' => $variant['dealer_discount'] ?? $existingVariant->dealer_discount,
-    //                     'architect_discount' => $variant['architect_discount'] ?? $existingVariant->architect_discount,
-    //                     'hsn' => $variant['hsn'] ?? $existingVariant->hsn,
-    //                     'regular_tax' => $variant['regular_tax'] ?? $existingVariant->regular_tax,
-    //                     'selling_price' => $variant['selling_price'] ?? $existingVariant->selling_price,
-    //                     'video_url' => $variant['video_url'] ?? $existingVariant->video_url,
-    //                     'product_pdf' => $variant['product_pdf'] ?? $existingVariant->product_pdf,
-    //                 ]);
-    //             } else {
-    //                 // Create new variant if id is not provided
-    //                 ProductVariantModel::create([
-    //                     'product_id' => $product->id,
-    //                     'photo_id' => $variant['photo_id'] ?? null,
-    //                     'min_qty' => $variant['min_qty'] ?? 1,
-    //                     'is_cod' => $variant['is_cod'] ?? true,
-    //                     'weight' => $variant['weight'] ?? null,
-    //                     'description' => $variant['description'] ?? null,
-    //                     'variant_type' => $variant['variant_type'],
-    //                     'variant_value' => $variant['variant_value'],
-    //                     'regular_price' => $variant['regular_price'],
-    //                     'customer_discount' => $variant['customer_discount'] ?? null,
-    //                     'dealer_discount' => $variant['dealer_discount'] ?? null,
-    //                     'architect_discount' => $variant['architect_discount'] ?? null,
-    //                     'hsn' => $variant['hsn'] ?? null,
-    //                     'regular_tax' => $variant['regular_tax'] ?? null,
-    //                     'selling_price' => $variant['selling_price'],
-    //                     'video_url' => $variant['video_url'] ?? null,
-    //                     'product_pdf' => $variant['product_pdf'] ?? null,
-    //                 ]);
-    //             }
-    //         }
-    //     }
-        
-    //     unset($product['id'], $product['created_at'], $product['updated_at']);
-
-    //     return response()->json(['message' => 'Product updated successfully!', 'data' => $product], 200);
-    // }
-
     public function update(Request $request, $id)
     {
         $product = ProductModel::find($id);
