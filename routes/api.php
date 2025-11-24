@@ -146,7 +146,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/track', [DelhiveryServiceController::class, 'trackShipments']);
             Route::get('/pincode-serviceability', [DelhiveryServiceController::class, 'checkPincodeServiceability']);
             Route::post('/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
-            Route::get('/expected-time', [DelhiveryServiceController::class, 'getTat']);
+            Route::post('/expected-time', [DelhiveryServiceController::class, 'getTat']);
 
             // manual creation (admin)
             Route::post('/create_ship_by_order', [DelhiveryServiceController::class, 'createShipByOrder']); // create shipment and save in db
