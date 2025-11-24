@@ -477,6 +477,11 @@ class ProductController extends Controller
             $limit          = $request->input('limit', 10);
             $offset         = $request->input('offset', 0);
             $variantType    = $request->input('variant_type');
+
+            // NEW: order by selling price
+            $orderPriceRaw  = $request->input('order_price'); // e.g. "Ascending" / "Descending"
+            $orderPrice     = strtolower(trim((string) $orderPriceRaw)); // "ascending"/"descending"/"asc"/"desc"
+
             // --- parsed filters for per-product variant trimming ---
             $minPrice = (float) $request->input('min_priceFilter', 0);
             $maxPrice = (float) $request->input('max_priceFilter', 0);
@@ -670,7 +675,31 @@ class ProductController extends Controller
                     'features' => $features,
                 ];
             });
+            
+            // 🔥 NEW: sort products by selling_price (min price among variants)
+            if (in_array($orderPrice, ['ascending', 'asc', 'descending', 'desc'], true)) {
+                $descending = in_array($orderPrice, ['descending', 'desc'], true);
 
+                $products = $products->sortBy(function ($prod) {
+                    if (empty($prod['variants'])) {
+                        return 0;
+                    }
+
+                    $prices = collect($prod['variants'])->map(function ($variant) {
+                        $sp = $variant['selling_price'] ?? 0;
+
+                        // "9,999" -> 9999
+                        if (is_string($sp)) {
+                            $sp = str_replace(',', '', $sp);
+                        }
+
+                        return (float) $sp;
+                    });
+
+                    // we use MIN here; sortBy's $descending flag will flip direction
+                    return $prices->min();
+                }, SORT_NUMERIC, $descending)->values(); // reset keys
+            }
             return response()->json([
                 'success'       => true,
                 'message'       => 'Products fetched successfully!',
