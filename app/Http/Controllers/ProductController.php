@@ -904,6 +904,8 @@ class ProductController extends Controller
             $limit          = $request->input('limit', 10);
             $offset         = $request->input('offset', 0);
             $variantType    = $request->input('variant_type');
+            $orderPriceRaw  = $request->input('order_price'); // e.g. "Ascending" / "Descending"
+            $orderPrice     = strtolower(trim((string) $orderPriceRaw)); // normalize
 
             $query = ProductModel::with([
                 'brand:id,name',
@@ -992,6 +994,32 @@ class ProductController extends Controller
                     'features' => $features,
                 ];
             });
+            // --- sort products by selling_price if requested ---
+            if (in_array($orderPrice, ['ascending', 'descending', 'asc', 'desc'], true)) {
+                $descending = in_array($orderPrice, ['descending', 'desc'], true);
+
+                $products = $products->sortBy(function ($prod) use ($descending) {
+                    // No variants = treat as zero
+                    if (empty($prod['variants'])) {
+                        return 0;
+                    }
+
+                    $prices = collect($prod['variants'])->map(function ($variant) {
+                        $sp = $variant['selling_price'] ?? 0;
+
+                        // handle "9,999" string -> 9999.0
+                        if (is_string($sp)) {
+                            $sp = str_replace(',', '', $sp);
+                        }
+
+                        return (float) $sp;
+                    });
+
+                    // For ASC: use MIN price (cheapest variant)
+                    // For DESC: use MAX price (costliest variant)
+                    return $descending ? $prices->max() : $prices->min();
+                }, SORT_NUMERIC, $descending)->values(); // ->values() to reset keys
+            }
 
             return response()->json([
                 'success'       => true,
