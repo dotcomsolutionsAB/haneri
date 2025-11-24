@@ -784,7 +784,154 @@ class DelhiveryServiceController extends Controller
             'data'    => $response,
         ]);
     }
+    public function getTat(Request $request)
+    {
+        $through = $request->input('through');
 
+        // 1) Validate "through" first
+        if (!in_array($through, ['order', 'simple', 'product'], true)) {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Invalid "through" value. Allowed: order, simple, product.',
+                'data'    => [],
+            ], 422);
+        }
+
+        /* -------------------------------------------------
+         * 2) Conditional validation based on "through"
+         * ------------------------------------------------- */
+
+        if ($through === 'order') {
+            // order mode: only order_id required
+            $validator = Validator::make($request->all(), [
+                'order_id' => 'required|integer|exists:t_orders,id',
+            ]);
+        } elseif ($through === 'simple') {
+            // simple mode: same as your original, but via POST body
+            $validator = Validator::make($request->all(), [
+                'origin_pin'         => 'required|digits:6',
+                'destination_pin'    => 'required|digits:6',
+                'mot'                => 'required|in:S,E',           // Surface / Express
+                'pdt'                => 'nullable|in:B2B,B2C',
+                'expected_pickup_date' => 'nullable|string',         // you can change to date_format if needed
+            ]);
+        } else { // through === 'product'
+            // product mode: only destination_pin required
+            $validator = Validator::make($request->all(), [
+                'destination_pin' => 'required|digits:6',
+            ]);
+        }
+
+        if ($validator->fails()) {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        /* -------------------------------------------------
+         * 3) Derive final parameters by mode
+         * ------------------------------------------------- */
+
+        $originPin      = null;
+        $destinationPin = null;
+        $mot            = null;
+        $pdt            = null;
+        $expectedPickup = null;
+
+        if ($through === 'order') {
+            // ---------- MODE: order ----------
+            $orderId = (int) $request->input('order_id');
+
+            // Fetch order
+            $order = OrderModel::find($orderId);
+            if (!$order) {
+                return response()->json([
+                    'code'    => 404,
+                    'success' => false,
+                    'message' => 'Order not found.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            // Fetch shipment (latest for this order)
+            $shipment = OrderShipment::where('order_id', $orderId)
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$shipment || empty($shipment->pickup_pin) || empty($shipment->shipping_pin)) {
+                return response()->json([
+                    'code'    => 400,
+                    'success' => false,
+                    'message' => 'Shipment pins not found for this order.',
+                    'data'    => [],
+                ], 400);
+            }
+
+            $originPin      = (string) $shipment->pickup_pin;   // from t_order_shipments.pickup_pin
+            $destinationPin = (string) $shipment->shipping_pin; // from t_order_shipments.shipping_pin
+            $mot            = 'E';                              // always
+            $pdt            = 'B2C';                            // always
+
+            // order created_at as expected_pickup_date
+            $expectedPickup = $order->created_at
+                ? $order->created_at->format('Y-m-d\TH:i:s')
+                : now()->format('Y-m-d\TH:i:s');
+
+        } elseif ($through === 'simple') {
+            // ---------- MODE: simple ----------
+            $originPin      = $request->input('origin_pin');
+            $destinationPin = $request->input('destination_pin');
+            $mot            = $request->input('mot', 'S');
+            $pdt            = $request->input('pdt'); // optional (B2B/B2C)
+            $expectedPickup = $request->input('expected_pickup_date'); // optional
+
+        } else {
+            // ---------- MODE: product ----------
+            // destination_pin from body
+            $destinationPin = $request->input('destination_pin');
+            // origin_pin fixed
+            $originPin      = '713146';
+            // mot & pdt always
+            $mot            = 'E';
+            $pdt            = 'B2C';
+            // expected_pickup_date = current fetch time
+            $expectedPickup = now()->format('Y-m-d\TH:i:s');
+        }
+
+        /* -------------------------------------------------
+         * 4) Call service
+         * ------------------------------------------------- */
+
+        $delhiveryService = new DelhiveryService();
+        $response = $delhiveryService->getTat(
+            $originPin,
+            $destinationPin,
+            $mot,
+            $pdt,
+            $expectedPickup
+        );
+
+        if (isset($response['error'])) {
+            return response()->json([
+                'code'    => 400,
+                'success' => false,
+                'message' => $response['error'],
+                'data'    => $response['raw'] ?? [],
+            ], 400);
+        }
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'TAT fetched successfully.',
+            'data'    => $response,
+        ]);
+    }
+    
     // auto ship once run it fetch order id
     public function autoShipSetup(Request $request, $orderId)
     {
@@ -830,83 +977,47 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
-    // public function trackShipments(Request $request)
+    // public function getTat(Request $request)
     // {
-    //     $waybill = $request->query('waybill');
-    //     $refIds  = $request->query('ref_ids'); // optional
+    //     $validator = Validator::make($request->all(), [
+    //         'origin_pin'         => 'required|digits:6',
+    //         'destination_pin'    => 'required|digits:6',
+    //         'mot'                => 'required|in:S,E',           // Surface / Express
+    //         'pdt'                => 'nullable|in:B2B,B2C',
+    //         'expected_pickup_date' => 'nullable|string',         // you can tighten this to date_format if needed
+    //     ]);
 
-    //     if (!$waybill) {
+    //     if ($validator->fails()) {
     //         return response()->json([
     //             'success' => false,
-    //             'message' => 'The waybill parameter is required.',
-    //             'data'    => [],
+    //             'message' => 'Validation error',
+    //             'data'    => $validator->errors(),
     //         ], 422);
     //     }
 
-    //     // Multiple comma-separated waybills supported by Delhivery
-    //     $waybillList = array_map('trim', explode(',', $waybill));
+    //     $originPin         = $request->input('origin_pin');
+    //     $destinationPin    = $request->input('destination_pin');
+    //     $mot               = $request->input('mot', 'S');
+    //     $pdt               = $request->input('pdt');
+    //     $expectedPickup    = $request->input('expected_pickup_date');
 
-    //     // Manual service (no DI)
-    //     $delhiveryService = new DelhiveryService();
-
-    //     $response = $delhiveryService->trackShipments($waybillList);
+    //     $delhiveryService  = new DelhiveryService();
+    //     $response          = $delhiveryService->getTat($originPin, $destinationPin, $mot, $pdt, $expectedPickup);
 
     //     if (isset($response['error'])) {
     //         return response()->json([
     //             'success' => false,
     //             'message' => $response['error'],
-    //             'data'    => [],
+    //             'data'    => $response['raw'] ?? [],
     //         ], 400);
     //     }
 
     //     return response()->json([
     //         'success' => true,
-    //         'message' => 'Shipment tracking fetched.',
+    //         'message' => 'TAT fetched successfully.',
     //         'data'    => $response,
     //     ]);
     // }
-
-    public function getTat(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'origin_pin'         => 'required|digits:6',
-            'destination_pin'    => 'required|digits:6',
-            'mot'                => 'required|in:S,E',           // Surface / Express
-            'pdt'                => 'nullable|in:B2B,B2C',
-            'expected_pickup_date' => 'nullable|string',         // you can tighten this to date_format if needed
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'data'    => $validator->errors(),
-            ], 422);
-        }
-
-        $originPin         = $request->input('origin_pin');
-        $destinationPin    = $request->input('destination_pin');
-        $mot               = $request->input('mot', 'S');
-        $pdt               = $request->input('pdt');
-        $expectedPickup    = $request->input('expected_pickup_date');
-
-        $delhiveryService  = new DelhiveryService();
-        $response          = $delhiveryService->getTat($originPin, $destinationPin, $mot, $pdt, $expectedPickup);
-
-        if (isset($response['error'])) {
-            return response()->json([
-                'success' => false,
-                'message' => $response['error'],
-                'data'    => $response['raw'] ?? [],
-            ], 400);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'TAT fetched successfully.',
-            'data'    => $response,
-        ]);
-    }
 
     // pickup details :
     public function createPickupLocation(Request $request)
