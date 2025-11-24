@@ -58,34 +58,99 @@ class DelhiveryServiceController extends Controller
 
     public function getShippingCost(Request $request)
     {
+        // 1. Basic validation for "through"
         $validator = Validator::make($request->all(), [
-            'origin_pin'      => 'required|digits:6',
-            'destination_pin' => 'required|digits:6',
-            'cod_amount'      => 'required|numeric',
-            'weight'          => 'required|numeric',   // in kg
+            'through'   => 'required|in:order,simple',
+
+            // when through = order
+            'order_id'  => 'required_if:through,order|integer|exists:t_orders,id',
+
+            // when through = simple
+            'origin_pin'      => 'required_if:through,simple|digits:6',
+            'destination_pin' => 'required_if:through,simple|digits:6',
+            'cod_amount'      => 'required_if:through,simple|numeric',
+            'weight'          => 'required_if:through,simple|numeric',
             'payment_type'    => 'nullable|in:Pre-paid,COD',
         ]);
 
         if ($validator->fails()) {
             return response()->json([
+                'code'    => 422,
                 'success' => false,
                 'message' => 'Validation error',
                 'data'    => $validator->errors(),
             ], 422);
         }
 
-        $originPin      = $request->input('origin_pin');
-        $destinationPin = $request->input('destination_pin');
-        $codAmount      = $request->input('cod_amount');
-        $weight         = $request->input('weight');
-        $paymentType    = $request->input('payment_type', 'Pre-paid');
+        $through = $request->input('through');
 
-        // same pattern as pincode: manual service
+        // =========================
+        // CASE 1: through = "order"
+        // =========================
+        if ($through === 'order') {
+            $orderId = $request->input('order_id');
+
+            // Get latest shipment for this order
+            $shipment = OrderShipment::where('order_id', $orderId)
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$shipment) {
+                return response()->json([
+                    'code'    => 404,
+                    'success' => false,
+                    'message' => 'No shipment record found for this order.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            // You can also fetch order if needed
+            $order = OrderModel::find($orderId);
+
+            // ---- Map DB fields to Delhivery params ----
+            // Adjust these according to your real DB data
+            $originPin      = $shipment->pickup_pin;     // pickup pincode
+            $destinationPin = $shipment->shipping_pin;   // customer pincode
+            $weight         = $shipment->weight ?? 1;    // default to 1kg if null
+
+            // Payment / COD logic
+            // Assuming payment_mode in ['Pre-paid','COD'] or similar
+            $paymentMode = $shipment->payment_mode ?? 'Pre-paid';
+
+            $paymentType = $paymentMode === 'COD' ? 'COD' : 'Pre-paid';
+
+            // If you store cod_amount separately, use that, else fall back to total_amount
+            $codAmount = $paymentType === 'COD'
+                ? ($shipment->cod_amount ?? $shipment->total_amount ?? 0)
+                : 0;
+
+        } else {
+        // =========================
+        // CASE 2: through = "simple"
+        // =========================
+            $originPin      = $request->input('origin_pin');
+            $destinationPin = $request->input('destination_pin');
+            $codAmount      = $request->input('cod_amount');
+            $weight         = $request->input('weight');
+            $paymentType    = $request->input('payment_type', 'Pre-paid');
+        }
+
+        // =========================
+        // Call Delhivery Service
+        // =========================
         $delhiveryService = new DelhiveryService();
-        $response = $delhiveryService->getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType);
+
+        $response = $delhiveryService->getShippingCost(
+            $originPin,
+            $destinationPin,
+            $codAmount,
+            $weight,
+            $paymentType
+        );
 
         if (isset($response['error'])) {
             return response()->json([
+                'code'    => 400,
                 'success' => false,
                 'message' => $response['error'],
                 'data'    => [],
@@ -93,11 +158,54 @@ class DelhiveryServiceController extends Controller
         }
 
         return response()->json([
+            'code'    => 200,
             'success' => true,
             'message' => 'Shipping cost fetched.',
             'data'    => $response,
         ]);
     }
+    // public function getShippingCost(Request $request)
+    // {
+    //     $validator = Validator::make($request->all(), [
+    //         'origin_pin'      => 'required|digits:6',
+    //         'destination_pin' => 'required|digits:6',
+    //         'cod_amount'      => 'required|numeric',
+    //         'weight'          => 'required|numeric',   // in kg
+    //         'payment_type'    => 'nullable|in:Pre-paid,COD',
+    //     ]);
+
+    //     if ($validator->fails()) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Validation error',
+    //             'data'    => $validator->errors(),
+    //         ], 422);
+    //     }
+
+    //     $originPin      = $request->input('origin_pin');
+    //     $destinationPin = $request->input('destination_pin');
+    //     $codAmount      = $request->input('cod_amount');
+    //     $weight         = $request->input('weight');
+    //     $paymentType    = $request->input('payment_type', 'Pre-paid');
+
+    //     // same pattern as pincode: manual service
+    //     $delhiveryService = new DelhiveryService();
+    //     $response = $delhiveryService->getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType);
+
+    //     if (isset($response['error'])) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => $response['error'],
+    //             'data'    => [],
+    //         ], 400);
+    //     }
+
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Shipping cost fetched.',
+    //         'data'    => $response,
+    //     ]);
+    // }
 
     public function createOrder(Request $request)
     {
