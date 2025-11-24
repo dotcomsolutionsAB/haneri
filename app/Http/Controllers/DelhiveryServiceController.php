@@ -678,68 +678,87 @@ class DelhiveryServiceController extends Controller
 
     public function trackShipments(Request $request)
     {
-        $orderId     = $request->query('order_id');   // new
-        $waybillRaw  = $request->query('waybill');    // optional, keep for direct tracking
+        // From JSON/body: can be "6" or "6,8,10"
+        $orderIdRaw  = $request->input('order_id');   // optional
+        $waybillRaw  = $request->input('waybill');    // optional
 
-        // You must provide either order_id OR waybill
-        if (!$orderId && !$waybillRaw) {
+        if (empty($orderIdRaw) && empty($waybillRaw)) {
             return response()->json([
                 'code'    => 422,
                 'success' => false,
-                'message' => 'Either order_id or waybill parameter is required.',
+                'message' => 'Either order_id or waybill is required in the request body.',
                 'data'    => [],
             ], 422);
         }
 
         $waybillList = [];
 
-        // -----------------------------
-        // CASE 1: Track by order_id
-        // -----------------------------
-        if ($orderId) {
-            // Fetch all shipments for this order that have an AWB
-            $awbNumbers = OrderShipment::where('order_id', $orderId)
-                ->whereNotNull('awb_no')
-                ->pluck('awb_no')
-                ->filter()
-                ->unique()
-                ->values()
-                ->all();
-
-            if (empty($awbNumbers)) {
-                return response()->json([
-                    'code'    => 404,
-                    'success' => false,
-                    'message' => 'No AWB found for this order.',
-                    'data'    => [],
-                ], 404);
+        /* ---------------------------------------------
+         * 1. Collect AWBs from order_id(s)
+         * ------------------------------------------- */
+        if (!empty($orderIdRaw)) {
+            // Allow either string "6,8,10" or array [6,8,10]
+            $orderIds = [];
+            if (is_array($orderIdRaw)) {
+                $orderIds = $orderIdRaw;
+            } else {
+                // "6,8,10" -> [6,8,10]
+                $orderIds = array_filter(array_map('trim', explode(',', $orderIdRaw)));
             }
 
-            $waybillList = $awbNumbers;
-        }
+            // Keep only numeric IDs
+            $orderIds = array_values(array_filter($orderIds, function ($id) {
+                return is_numeric($id);
+            }));
 
-        // -----------------------------
-        // CASE 2: Track by waybill param
-        // -----------------------------
-        if (!$orderId && $waybillRaw) {
-            $waybillList = array_filter(array_map('trim', explode(',', $waybillRaw)));
-            if (empty($waybillList)) {
-                return response()->json([
-                    'code'    => 422,
-                    'success' => false,
-                    'message' => 'The waybill parameter is empty or invalid.',
-                    'data'    => [],
-                ], 422);
+            if (!empty($orderIds)) {
+                $awbNumbers = OrderShipment::whereIn('order_id', $orderIds)
+                    ->whereNotNull('awb_no')
+                    ->pluck('awb_no')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $waybillList = array_merge($waybillList, $awbNumbers);
             }
         }
 
-        // Manual service (no DI)
+        /* ---------------------------------------------
+         * 2. Collect direct waybills from "waybill"
+         * ------------------------------------------- */
+        if (!empty($waybillRaw)) {
+            // Allow string "awb1,awb2" or array
+            $waybillFromBody = [];
+            if (is_array($waybillRaw)) {
+                $waybillFromBody = $waybillRaw;
+            } else {
+                $waybillFromBody = array_filter(array_map('trim', explode(',', $waybillRaw)));
+            }
+
+            if (!empty($waybillFromBody)) {
+                $waybillList = array_merge($waybillList, $waybillFromBody);
+            }
+        }
+
+        // Clean & dedupe final list
+        $waybillList = array_values(array_unique(array_filter($waybillList)));
+
+        if (empty($waybillList)) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'No valid AWB/waybill numbers found for the given input.',
+                'data'    => [],
+            ], 404);
+        }
+
         $delhiveryService = new DelhiveryService();
 
         try {
             $response = $delhiveryService->trackShipments($waybillList);
         } catch (\Exception $e) {
-            \Log::error('Delhivery trackShipments exception: ' . $e->getMessage());
+            Log::error('Delhivery trackShipments exception: ' . $e->getMessage());
 
             return response()->json([
                 'code'    => 500,

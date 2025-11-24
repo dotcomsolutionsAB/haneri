@@ -143,7 +143,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/deliveryone/test', [DelhiveryServiceController::class, 'test']);
             Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); 
             //Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
-            Route::get('/track', [DelhiveryServiceController::class, 'trackShipments']);
+            Route::post('/track', [DelhiveryServiceController::class, 'trackShipments']);
             Route::get('/pincode-serviceability', [DelhiveryServiceController::class, 'checkPincodeServiceability']);
             Route::post('/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
             Route::get('/expected-time', [DelhiveryServiceController::class, 'getTat']);
