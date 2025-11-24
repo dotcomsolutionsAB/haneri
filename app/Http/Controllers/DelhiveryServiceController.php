@@ -164,48 +164,6 @@ class DelhiveryServiceController extends Controller
             'data'    => $response,
         ]);
     }
-    // public function getShippingCost(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'origin_pin'      => 'required|digits:6',
-    //         'destination_pin' => 'required|digits:6',
-    //         'cod_amount'      => 'required|numeric',
-    //         'weight'          => 'required|numeric',   // in kg
-    //         'payment_type'    => 'nullable|in:Pre-paid,COD',
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Validation error',
-    //             'data'    => $validator->errors(),
-    //         ], 422);
-    //     }
-
-    //     $originPin      = $request->input('origin_pin');
-    //     $destinationPin = $request->input('destination_pin');
-    //     $codAmount      = $request->input('cod_amount');
-    //     $weight         = $request->input('weight');
-    //     $paymentType    = $request->input('payment_type', 'Pre-paid');
-
-    //     // same pattern as pincode: manual service
-    //     $delhiveryService = new DelhiveryService();
-    //     $response = $delhiveryService->getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType);
-
-    //     if (isset($response['error'])) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => $response['error'],
-    //             'data'    => [],
-    //         ], 400);
-    //     }
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'Shipping cost fetched.',
-    //         'data'    => $response,
-    //     ]);
-    // }
 
     public function createOrder(Request $request)
     {
@@ -718,6 +676,96 @@ class DelhiveryServiceController extends Controller
         }
     }
 
+    public function trackShipments(Request $request)
+    {
+        $orderId     = $request->query('order_id');   // new
+        $waybillRaw  = $request->query('waybill');    // optional, keep for direct tracking
+
+        // You must provide either order_id OR waybill
+        if (!$orderId && !$waybillRaw) {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Either order_id or waybill parameter is required.',
+                'data'    => [],
+            ], 422);
+        }
+
+        $waybillList = [];
+
+        // -----------------------------
+        // CASE 1: Track by order_id
+        // -----------------------------
+        if ($orderId) {
+            // Fetch all shipments for this order that have an AWB
+            $awbNumbers = OrderShipment::where('order_id', $orderId)
+                ->whereNotNull('awb_no')
+                ->pluck('awb_no')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            if (empty($awbNumbers)) {
+                return response()->json([
+                    'code'    => 404,
+                    'success' => false,
+                    'message' => 'No AWB found for this order.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            $waybillList = $awbNumbers;
+        }
+
+        // -----------------------------
+        // CASE 2: Track by waybill param
+        // -----------------------------
+        if (!$orderId && $waybillRaw) {
+            $waybillList = array_filter(array_map('trim', explode(',', $waybillRaw)));
+            if (empty($waybillList)) {
+                return response()->json([
+                    'code'    => 422,
+                    'success' => false,
+                    'message' => 'The waybill parameter is empty or invalid.',
+                    'data'    => [],
+                ], 422);
+            }
+        }
+
+        // Manual service (no DI)
+        $delhiveryService = new DelhiveryService();
+
+        try {
+            $response = $delhiveryService->trackShipments($waybillList);
+        } catch (\Exception $e) {
+            \Log::error('Delhivery trackShipments exception: ' . $e->getMessage());
+
+            return response()->json([
+                'code'    => 500,
+                'success' => false,
+                'message' => 'Failed to fetch shipment tracking.',
+                'data'    => [],
+            ], 500);
+        }
+
+        if (isset($response['error'])) {
+            return response()->json([
+                'code'    => 400,
+                'success' => false,
+                'message' => $response['error'],
+                'data'    => [],
+            ], 400);
+        }
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Shipment tracking fetched.',
+            'data'    => $response,
+        ]);
+    }
+
     // auto ship once run it fetch order id
     public function autoShipSetup(Request $request, $orderId)
     {
@@ -763,41 +811,41 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
-    public function trackShipments(Request $request)
-    {
-        $waybill = $request->query('waybill');
-        $refIds  = $request->query('ref_ids'); // optional
+    // public function trackShipments(Request $request)
+    // {
+    //     $waybill = $request->query('waybill');
+    //     $refIds  = $request->query('ref_ids'); // optional
 
-        if (!$waybill) {
-            return response()->json([
-                'success' => false,
-                'message' => 'The waybill parameter is required.',
-                'data'    => [],
-            ], 422);
-        }
+    //     if (!$waybill) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'The waybill parameter is required.',
+    //             'data'    => [],
+    //         ], 422);
+    //     }
 
-        // Multiple comma-separated waybills supported by Delhivery
-        $waybillList = array_map('trim', explode(',', $waybill));
+    //     // Multiple comma-separated waybills supported by Delhivery
+    //     $waybillList = array_map('trim', explode(',', $waybill));
 
-        // Manual service (no DI)
-        $delhiveryService = new DelhiveryService();
+    //     // Manual service (no DI)
+    //     $delhiveryService = new DelhiveryService();
 
-        $response = $delhiveryService->trackShipments($waybillList);
+    //     $response = $delhiveryService->trackShipments($waybillList);
 
-        if (isset($response['error'])) {
-            return response()->json([
-                'success' => false,
-                'message' => $response['error'],
-                'data'    => [],
-            ], 400);
-        }
+    //     if (isset($response['error'])) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => $response['error'],
+    //             'data'    => [],
+    //         ], 400);
+    //     }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Shipment tracking fetched.',
-            'data'    => $response,
-        ]);
-    }
+    //     return response()->json([
+    //         'success' => true,
+    //         'message' => 'Shipment tracking fetched.',
+    //         'data'    => $response,
+    //     ]);
+    // }
 
     public function getTat(Request $request)
     {
@@ -1035,52 +1083,4 @@ class DelhiveryServiceController extends Controller
             'data'    => ['id' => $id],
         ]);
     }
-
-
-    // public function trackMultipleShipments(Request $request)
-    // {
-    //     // This method should receive the Request object
-    //     $validator = Validator::make($request->all(), [
-    //         'waybills' => 'required|array',
-    //         'waybills.*' => 'string', // Ensure each element is a string
-    //     ]);
-        
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-
-    //     $waybillNumbers = $request->input('waybills');
-    //     $response = $this->delhiveryService->trackMultipleShipments($waybillNumbers);
-
-    //     if (isset($response['Error'])) {
-    //         return response()->json(['error' => $response['Error']], 400);
-    //     }
-
-    //     return response()->json($response);
-    // }
-    // public function createOrder(Request $request)
-    // {
-    //     // 1. Validate the incoming request data for order creation
-    //     // You MUST validate the structure of the order data
-    //     $validator = Validator::make($request->all(), [
-    //         // Add validation rules for your order payload
-    //         'customer_name' => 'required',
-    //         'customer_address' => 'required',
-    //         // ... and so on
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return response()->json(['error' => $validator->errors()], 422);
-    //     }
-        
-    //     $orderData = $request->all();
-    //     $response = $this->delhiveryService->placeOrder($orderData);
-    //     // $response = $this->delhiveryService->debugPlaceOrder($orderData);
-
-    //     if (isset($response['Error'])) {
-    //         return response()->json(['error' => $response['Error']], 400);
-    //     }
-
-    //     return response()->json($response);
-    // }
 }
