@@ -220,8 +220,8 @@ class DelhiveryService
             }
 
             if (!empty($expectedPickupDate)) {
-                // Pass as-is; format depends on Delhivery’s spec
-                $query['expected_pickup_date'] = $expectedPickupDate;
+                // Delhivery expects "expected_pd" in 'Y-m-d H:i' format
+                $query['expected_pd'] = $expectedPickupDate;
             }
 
             $response = $this->client->get($endpoint, [

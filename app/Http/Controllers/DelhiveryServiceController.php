@@ -878,8 +878,8 @@ class DelhiveryServiceController extends Controller
 
             // order created_at as expected_pickup_date
             $expectedPickup = $order->created_at
-                ? $order->created_at->format('Y-m-d\TH:i:s')
-                : now()->format('Y-m-d\TH:i:s');
+                ? $order->created_at->format('Y-m-d H:i')
+                : now()->format('Y-m-d H:i');
 
         } elseif ($through === 'simple') {
             // ---------- MODE: simple ----------
@@ -887,7 +887,23 @@ class DelhiveryServiceController extends Controller
             $destinationPin = $request->input('destination_pin');
             $mot            = $request->input('mot', 'S');
             $pdt            = $request->input('pdt'); // optional (B2B/B2C)
-            $expectedPickup = $request->input('expected_pickup_date'); // optional
+            $expectedPickupRaw = $request->input('expected_pickup_date');
+
+            if (!empty($expectedPickupRaw)) {
+                try {
+                    $expectedPickup = \Carbon\Carbon::parse($expectedPickupRaw)->format('Y-m-d H:i');
+                } catch (\Exception $e) {
+                    return response()->json([
+                        'code'    => 422,
+                        'success' => false,
+                        'message' => "Invalid expected_pickup_date. Please send a parseable date/time.",
+                        'data'    => [],
+                    ], 422);
+                }
+            } else {
+                $expectedPickup = null;
+            }
+
 
         } else {
             // ---------- MODE: product ----------
@@ -899,7 +915,8 @@ class DelhiveryServiceController extends Controller
             $mot            = 'E';
             $pdt            = 'B2C';
             // expected_pickup_date = current fetch time
-            $expectedPickup = now()->format('Y-m-d\TH:i:s');
+            $expectedPickup = now()->format('Y-m-d H:i');
+
         }
 
         /* -------------------------------------------------
