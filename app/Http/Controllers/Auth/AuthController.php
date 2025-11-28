@@ -2,11 +2,16 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Services\GoogleAuthService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
 use App\Utils\sendWhatsAppUtility;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Mail\WelcomeUserMail;
 
 class AuthController extends Controller
 {
@@ -83,6 +88,12 @@ class AuthController extends Controller
     //     }
     // }
     
+    protected GoogleAuthService $googleAuthService;
+
+    public function __construct(GoogleAuthService $googleAuthService)
+    {
+        $this->googleAuthService = $googleAuthService;
+    }
     /**
      * Your existing random password helper
      */
@@ -99,62 +110,121 @@ class AuthController extends Controller
      *
      * Used by both /register and /login when auth_provider = 'google'
      */
-    protected function handleGoogleAuth(Request $request)
+    protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
     {
+        // Basic validation for extra fields
         $validated = $request->validate([
-            'google_id'     => 'required|string',
-            'email'         => 'required|email',
-            'name'          => 'required|string|max:255',
-            'mobile'        => 'nullable|string|min:10|max:15',
-            'gstin'         => [
+            'idToken' => 'required|string',
+            'mobile'  => 'nullable|string|min:10|max:15',
+            'role'    => 'nullable|in:customer,architect,dealer',
+            'gstin'   => [
                 'nullable',
                 'string',
                 'max:15',
                 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
             ],
-            'selected_type' => 'nullable|string',
-            'suppress_welcome_mail' => 'nullable|boolean',
+            // for Google login payload you want:
+            // { idToken, email }
+            // we'll enforce that only when $mustMatchEmail = true
+            'email'   => $mustMatchEmail ? 'required|email' : 'nullable|email',
         ]);
 
-        $user = User::where('google_id', $validated['google_id'])
-            ->orWhere('email', $validated['email'])
+        // 1️⃣ Verify ID token with Google
+        $payload = $this->googleAuthService->verifyIdToken($validated['idToken']);
+
+        if (! $payload) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired Google token.',
+            ], 422);
+        }
+
+        // 2️⃣ Extract details from token
+        $googleId = $payload['sub']   ?? null; // unique Google user ID
+        $email    = $payload['email'] ?? null;
+        $name     = $payload['name']
+            ?? trim(($payload['given_name'] ?? '').' '.($payload['family_name'] ?? ''))
+            ?: 'Google User';
+
+        if (! $googleId || ! $email) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Google token is missing required data (email or id).',
+            ], 422);
+        }
+
+        // 3️⃣ If login payload gave email, ensure it matches token email
+        if ($mustMatchEmail && isset($validated['email'])) {
+            if (strtolower($validated['email']) !== strtolower($email)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Email does not match Google account.',
+                ], 422);
+            }
+        }
+
+        // 4️⃣ Role / GSTIN logic
+        $role = $validated['role'] ?? 'customer';
+
+        // If architect or dealer, GSTIN can be enforced as required at UI or with required_if rule
+        if (in_array($role, ['architect', 'dealer']) && empty($validated['gstin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GSTIN is required for architect/dealer.',
+            ], 422);
+        }
+
+        // 5️⃣ Find existing user by google_id OR email
+        $user = User::where('google_id', $googleId)
+            ->orWhere('email', $email)
             ->first();
 
         if (! $user) {
             // First time: REGISTER via Google
             $user = User::create([
-                'name'          => $validated['name'],
-                'email'         => $validated['email'],
-                'mobile'        => $validated['mobile'] ?? null,
-                'gstin'         => $validated['gstin'] ?? null,
-                'selected_type' => $validated['selected_type'] ?? null,
-                'google_id'     => $validated['google_id'],
-                // Will be hashed because of casts()
-                'password'      => $this->generateRandomPassword(16),
+                'name'      => $name,
+                'email'     => $email,
+                'mobile'    => $validated['mobile'] ?? null,
+                'role'      => $role,
+                'gstin'     => $validated['gstin'] ?? null,
+                'google_id' => $googleId,
+                // Will be hashed because of your cast/mutator
+                'password'  => $this->generateRandomPassword(16),
             ]);
 
-            if (! ($validated['suppress_welcome_mail'] ?? false)) {
-                try {
-                    Log::info('Sending WelcomeUserMail (Google) to '.$user->email);
-                    Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
-                } catch (\Throwable $e) {
-                    Log::error('Welcome email failed (Google)', ['error' => $e->getMessage()]);
-                }
+            try {
+                Log::info('Sending WelcomeUserMail (Google) to '.$user->email);
+                Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
+            } catch (\Throwable $e) {
+                Log::error('Welcome email failed (Google)', ['error' => $e->getMessage()]);
             }
 
             $message    = 'User registered successfully with Google!';
             $statusCode = 201;
         } else {
-            // Existing user: just ensure google_id is set
+            // Existing user: make sure google_id is stored
             if (! $user->google_id) {
-                $user->google_id = $validated['google_id'];
+                $user->google_id = $googleId;
                 $user->save();
             }
+
+            // Update mobile / role / gstin if you want:
+            if ($validated['mobile'] ?? false) {
+                $user->mobile = $validated['mobile'];
+            }
+            if ($role && $user->role !== $role) {
+                $user->role = $role;
+            }
+            if (! empty($validated['gstin'])) {
+                $user->gstin = $validated['gstin'];
+            }
+            $user->save();
 
             $message    = 'User logged in successfully with Google!';
             $statusCode = 200;
         }
 
+        // 6️⃣ Generate Sanctum token
         $generated_token = $user->createToken('API TOKEN')->plainTextToken;
 
         return response()->json([
@@ -169,50 +239,51 @@ class AuthController extends Controller
         ], $statusCode);
     }
 
-    /**
-     * REGISTER – Email/Password OR Google (same endpoint)
-     * POST /api/register
-     */
     public function register(Request $request)
     {
-        // 1️⃣ Google register/login (same function)
+        // GOOGLE SIGNUP (via idToken)
         if ($request->input('auth_provider') === 'google') {
-            return $this->handleGoogleAuth($request);
+            // Here we treat as register+login; can be first time or existing
+            return $this->handleGoogleAuthFromIdToken($request, false);
         }
 
-        // 2️⃣ Normal email/password register (your original logic)
+        // NORMAL EMAIL + PASSWORD REGISTER
         $validated = $request->validate([
-            'name'          => 'required|string|max:255',
-            'email'         => 'required|email|unique:users,email',
-            'password'      => 'required|string|min:8',
-            'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
-            'gstin'         => [
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|string|min:8',
+            'mobile'   => 'required|string|unique:users,mobile|min:10|max:15',
+            'role'     => 'required|in:customer,architect,dealer',
+            'gstin'    => [
                 'nullable',
                 'string',
                 'max:15',
                 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
             ],
-            'selected_type' => 'nullable|string',
-            'suppress_welcome_mail' => 'nullable|boolean',
         ]);
 
-        // Cast will auto-hash password
+        // If architect/dealer & want GSTIN mandatory:
+        if (in_array($validated['role'], ['architect','dealer']) && empty($validated['gstin'])) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GSTIN is required for architect/dealer.',
+            ], 422);
+        }
+
         $user = User::create([
-            'name'          => $validated['name'],
-            'email'         => $validated['email'],
-            'password'      => $validated['password'],
-            'mobile'        => $validated['mobile'],
-            'gstin'         => $validated['gstin'] ?? null,
-            'selected_type' => $validated['selected_type'] ?? null,
+            'name'   => $validated['name'],
+            'email'  => $validated['email'],
+            'password' => $validated['password'], // auto hash via cast
+            'mobile' => $validated['mobile'],
+            'role'   => $validated['role'],
+            'gstin'  => $validated['gstin'] ?? null,
         ]);
 
-        if (! ($validated['suppress_welcome_mail'] ?? false)) {
-            try {
-                Log::info('Sending WelcomeUserMail to '.$user->email);
-                Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
-            } catch (\Throwable $e) {
-                Log::error('Welcome email failed', ['error' => $e->getMessage()]);
-            }
+        try {
+            Log::info('Sending WelcomeUserMail to '.$user->email);
+            Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
+        } catch (\Throwable $e) {
+            Log::error('Welcome email failed', ['error' => $e->getMessage()]);
         }
 
         $token = $user->createToken('authToken')->plainTextToken;
@@ -220,10 +291,11 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'User registered successfully!',
-            'data'    => $user->only(['name','email','mobile','role','gstin','selected_type']),
+            'data'    => $user->only(['name','email','mobile','role','gstin']),
             'token'   => $token,
         ], 201);
     }
+
 
     /**
      * Generate OTP and send to WhatsApp (your existing method)
@@ -294,18 +366,15 @@ class AuthController extends Controller
         ], 404);
     }
 
-    /**
-     * LOGIN – Email/Password OR OTP OR Google
-     * POST /api/login or POST /api/login/{otp?}
-     */
     public function login(Request $request, $otp = null)
     {
-        // 1️⃣ Google login (or auto-register if needed)
+        // 1️⃣ GOOGLE LOGIN (via idToken)
         if ($request->input('auth_provider') === 'google') {
-            return $this->handleGoogleAuth($request);
+            // Here we enforce: token email == payload email
+            return $this->handleGoogleAuthFromIdToken($request, true);
         }
 
-        // 2️⃣ OTP login
+        // 2️⃣ OTP LOGIN (unchanged)
         if ($otp) {
             $request->validate([
                 'mobile' => ['required', 'string'],
@@ -353,7 +422,7 @@ class AuthController extends Controller
             ], 200);
         }
 
-        // 3️⃣ Email + password login
+        // 3️⃣ EMAIL + PASSWORD LOGIN (unchanged)
         $request->validate([
             'email'    => ['required', 'string', 'email'],
             'password' => 'required',
