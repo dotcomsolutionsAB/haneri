@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Services\GoogleAuthService;
+use App\services\GoogleAuthService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
