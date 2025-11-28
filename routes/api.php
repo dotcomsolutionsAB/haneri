@@ -25,26 +25,15 @@ use App\Http\Controllers\UploadController;
 //     return $request->user();
 // })->middleware('auth:sanctum');
 
-// Route::group(['middleware' => ['cors']], function () {
-//     Route::post('/cart/set-cookie', function (Request $request) {
-//         $cartId = $request->input('cart_id');
 
-//         if (!$cartId) {
-//             return response()->json(['error' => 'Cart ID is required'], 400);
-//         }
+// Route::post('/register', [UserController::class, 'register']);
+// Route::post('/login/{otp?}', [AuthController::class, 'login']); // Log in a user
+// Route::post('/otp', [AuthController::class, 'generate_otp']);
 
-//         $cookie = cookie('cart_id', $cartId, 60 * 24 * 365) // Expire in 1 year
-//             ->withHttpOnly(true)  // Prevent access from JavaScript
-//             ->withSecure(true)    // Only send over HTTPS
-//             ->withSameSite('None'); // Required for cross-domain cookies
+Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
+Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
+Route::post('/generate-otp', [AuthController::class, 'generate_otp']); // Generate OTP for mobile login
 
-//         return response()->json(['success' => true])->cookie($cookie);
-//     });
-// });
-
-Route::post('/register', [UserController::class, 'register']);
-Route::post('/login/{otp?}', [AuthController::class, 'login']); // Log in a user
-Route::post('/otp', [AuthController::class, 'generate_otp']);
 Route::post('/make_user', [UserController::class, 'guest_register']);
 Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 

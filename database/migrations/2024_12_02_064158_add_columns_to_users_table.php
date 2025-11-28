@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             //
+            $table->string('google_id')->nullable()->unique()->after('email');
             $table->string('mobile')->unique()->after('password');
             $table->string('gstin')->nullable()->after('mobile');
             $table->enum('role', ['admin', 'customer', 'architect','dealer'])->default('customer')->after('gstin');

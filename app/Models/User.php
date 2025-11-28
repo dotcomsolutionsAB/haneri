@@ -26,7 +26,8 @@ class User extends Authenticatable
         'role',
         'selected_type',
         'gstin',
-        'otp'
+        'otp',
+        'google_id',
     ];
 
     /**
