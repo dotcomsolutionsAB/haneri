@@ -103,13 +103,6 @@ class AuthController extends Controller
         return substr(str_shuffle(str_repeat($chars, $length)), 0, $length);
     }
 
-    /**
-     * Shared GOOGLE handler
-     * - If user exists (by google_id or email) => LOGIN
-     * - Else => REGISTER + LOGIN
-     *
-     * Used by both /register and /login when auth_provider = 'google'
-     */
     protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
     {
         // Basic validation for extra fields
@@ -123,9 +116,6 @@ class AuthController extends Controller
                 'max:15',
                 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
             ],
-            // for Google login payload you want:
-            // { idToken, email }
-            // we'll enforce that only when $mustMatchEmail = true
             'email'   => $mustMatchEmail ? 'required|email' : 'nullable|email',
         ]);
 
@@ -134,8 +124,10 @@ class AuthController extends Controller
 
         if (! $payload) {
             return response()->json([
+                'code'    => 422,
                 'success' => false,
                 'message' => 'Invalid or expired Google token.',
+                'data'    => [],
             ], 422);
         }
 
@@ -148,8 +140,10 @@ class AuthController extends Controller
 
         if (! $googleId || ! $email) {
             return response()->json([
+                'code'    => 422,
                 'success' => false,
                 'message' => 'Google token is missing required data (email or id).',
+                'data'    => [],
             ], 422);
         }
 
@@ -157,8 +151,10 @@ class AuthController extends Controller
         if ($mustMatchEmail && isset($validated['email'])) {
             if (strtolower($validated['email']) !== strtolower($email)) {
                 return response()->json([
+                    'code'    => 422,
                     'success' => false,
                     'message' => 'Email does not match Google account.',
+                    'data'    => [],
                 ], 422);
             }
         }
@@ -166,11 +162,12 @@ class AuthController extends Controller
         // 4️⃣ Role / GSTIN logic
         $role = $validated['role'] ?? 'customer';
 
-        // If architect or dealer, GSTIN can be enforced as required at UI or with required_if rule
         if (in_array($role, ['architect', 'dealer']) && empty($validated['gstin'])) {
             return response()->json([
+                'code'    => 422,
                 'success' => false,
                 'message' => 'GSTIN is required for architect/dealer.',
+                'data'    => [],
             ], 422);
         }
 
@@ -184,7 +181,7 @@ class AuthController extends Controller
             $user = User::create([
                 'name'      => $name,
                 'email'     => $email,
-                'mobile'    => $validated['mobile'],
+                'mobile'    => $validated['mobile'] ?? null,
                 'role'      => $role,
                 'gstin'     => $validated['gstin'] ?? null,
                 'google_id' => $googleId,
@@ -205,14 +202,13 @@ class AuthController extends Controller
             // Existing user: make sure google_id is stored
             if (! $user->google_id) {
                 $user->google_id = $googleId;
-                $user->save();
             }
 
-            // Update mobile / role / gstin if you want:
-            if ($validated['mobile'] ?? false) {
+            // Update mobile / role / gstin if provided
+            if (! empty($validated['mobile'])) {
                 $user->mobile = $validated['mobile'];
             }
-            if ($role && $user->role !== $role) {
+            if (! empty($role) && $user->role !== $role) {
                 $user->role = $role;
             }
             if (! empty($validated['gstin'])) {
@@ -227,15 +223,24 @@ class AuthController extends Controller
         // 6️⃣ Generate Sanctum token
         $generated_token = $user->createToken('API TOKEN')->plainTextToken;
 
+        // Shape user object for frontend
+        $userData = [
+            'id'     => $user->id,
+            'name'   => $user->name,
+            'email'  => $user->email,
+            'mobile' => $user->mobile,
+            'role'   => $user->role,
+            'gstin'  => $user->gstin,
+        ];
+
         return response()->json([
+            'code'    => $statusCode,
             'success' => true,
+            'message' => $message,
             'data'    => [
                 'token' => $generated_token,
-                'name'  => $user->name,
-                'role'  => $user->role,
-                'id'    => $user->id,
+                'user'  => $userData,
             ],
-            'message' => $message,
         ], $statusCode);
     }
 
@@ -260,23 +265,27 @@ class AuthController extends Controller
                 'max:15',
                 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
             ],
+        ], [
+            'gstin.regex' => 'Invalid GSTIN format.',
         ]);
 
         // If architect/dealer & want GSTIN mandatory:
         if (in_array($validated['role'], ['architect','dealer']) && empty($validated['gstin'])) {
             return response()->json([
+                'code'    => 422,
                 'success' => false,
                 'message' => 'GSTIN is required for architect/dealer.',
+                'data'    => [],
             ], 422);
         }
 
         $user = User::create([
-            'name'   => $validated['name'],
-            'email'  => $validated['email'],
-            'password' => $validated['password'], // auto hash via cast
-            'mobile' => $validated['mobile'],
-            'role'   => $validated['role'],
-            'gstin'  => $validated['gstin'] ?? null,
+            'name'     => $validated['name'],
+            'email'    => $validated['email'],
+            'password' => $validated['password'], // auto hash via cast/mutator in User model
+            'mobile'   => $validated['mobile'],
+            'role'     => $validated['role'],
+            'gstin'    => $validated['gstin'] ?? null,
         ]);
 
         try {
@@ -288,22 +297,30 @@ class AuthController extends Controller
 
         $token = $user->createToken('authToken')->plainTextToken;
 
+        $userData = [
+            'id'     => $user->id,
+            'name'   => $user->name,
+            'email'  => $user->email,
+            'mobile' => $user->mobile,
+            'role'   => $user->role,
+            'gstin'  => $user->gstin,
+        ];
+
         return response()->json([
+            'code'    => 201,
             'success' => true,
             'message' => 'User registered successfully!',
-            'data'    => $user->only(['name','email','mobile','role','gstin']),
-            'token'   => $token,
+            'data'    => [
+                'token' => $token,
+                'user'  => $userData,
+            ],
         ], 201);
     }
 
-
-    /**
-     * Generate OTP and send to WhatsApp (your existing method)
-     */
     public function generate_otp(Request $request)
     {
         $request->validate([
-            'mobile' => ['required', 'string', 'min:12', 'max:14'],
+            'mobile' => ['required', 'string', 'min:10', 'max:15'],
         ]);
 
         $mobile = $request->input('mobile');
@@ -312,69 +329,92 @@ class AuthController extends Controller
                         ->where('mobile', $mobile)
                         ->first();
 
-        if ($get_user) {
-            $six_digit_otp = substr(bin2hex(random_bytes(3)), 0, 6);
-            $expiresAt = now()->addMinutes(10);
-
-            $store_otp = User::where('mobile', $mobile)
-                             ->update([
-                                'otp'        => $six_digit_otp,
-                                'expires_at' => $expiresAt,
-                            ]);
-
-            if ($store_otp) {
-                $templateParams = [
-                    'name' => 'ace_otp',
-                    'language' => ['code' => 'en'],
-                    'components' => [
-                        [
-                            'type' => 'body',
-                            'parameters' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => $six_digit_otp,
-                                ],
-                            ],
-                        ],
-                        [
-                            'type' => 'button',
-                            'sub_type' => 'url',
-                            "index" => "0",
-                            'parameters' => [
-                                [
-                                    'type' => 'text',
-                                    'text' => $six_digit_otp,
-                                ],
-                            ],
-                        ]
-                    ],
-                ];
-
-                $whatsappUtility = new sendWhatsAppUtility();
-                $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Otp send successfully!',
-                ], 200);
-            }
+        if (! $get_user) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'User has not registered!',
+                'data'    => [],
+            ], 404);
         }
 
+        $six_digit_otp = substr(bin2hex(random_bytes(3)), 0, 6);
+        $expiresAt     = now()->addMinutes(10);
+
+        $store_otp = User::where('mobile', $mobile)
+            ->update([
+                'otp'        => $six_digit_otp,
+                'expires_at' => $expiresAt,
+            ]);
+
+        if (! $store_otp) {
+            return response()->json([
+                'code'    => 500,
+                'success' => false,
+                'message' => 'Failed to generate OTP. Please try again.',
+                'data'    => [],
+            ], 500);
+        }
+
+        $templateParams = [
+            'name'      => 'ace_otp',
+            'language'  => ['code' => 'en'],
+            'components'=> [
+                [
+                    'type'       => 'body',
+                    'parameters' => [
+                        [
+                            'type' => 'text',
+                            'text' => $six_digit_otp,
+                        ],
+                    ],
+                ],
+                [
+                    'type'     => 'button',
+                    'sub_type' => 'url',
+                    'index'    => '0',
+                    'parameters' => [
+                        [
+                            'type' => 'text',
+                            'text' => $six_digit_otp,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $whatsappUtility = new sendWhatsAppUtility();
+        $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
+
         return response()->json([
-            'success' => false,
-            'message' => 'User has not registered!',
-        ], 404);
+            'code'    => 200,
+            'success' => true,
+            'message' => 'OTP sent successfully!',
+            'data'    => [],          // nothing extra to send back
+        ], 200);
     }
 
     public function login(Request $request, $otp = null)
     {
-        // 1️⃣ GOOGLE LOGIN (via idToken)
+        // 1️⃣ GOOGLE LOGIN (via idToken) – already standardized
         if ($request->input('auth_provider') === 'google') {
-            // Here we enforce: token email == payload email
+            // Enforce: token email == payload email (if you send email in body)
             return $this->handleGoogleAuthFromIdToken($request, true);
         }
 
-        // 2️⃣ OTP LOGIN (unchanged)
+        // Small helper to shape user data
+        $buildUserData = function (User $user) {
+            return [
+                'id'     => $user->id,
+                'name'   => $user->name,
+                'email'  => $user->email,
+                'mobile' => $user->mobile,
+                'role'   => $user->role,
+                'gstin'  => $user->gstin,
+            ];
+        };
+
+        // 2️⃣ OTP LOGIN
         if ($otp) {
             $request->validate([
                 'mobile' => ['required', 'string'],
@@ -384,71 +424,83 @@ class AuthController extends Controller
                 ->where('mobile', $request->mobile)
                 ->first();
 
-            if ($otpRecord) {
-                if ($otpRecord->otp != $otp) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Invalid OTP Entered',
-                    ], 200);
-                } elseif ($otpRecord->expires_at < now()) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'OTP has expired!',
-                    ], 200);
-                }
-
-                // Clear OTP
-                User::where('mobile', $request->mobile)
-                    ->update(['otp' => null, 'expires_at' => null]);
-
-                $user = User::where('mobile', $request->mobile)->first();
-                $generated_token = $user->createToken('API TOKEN')->plainTextToken;
-
+            if (! $otpRecord) {
                 return response()->json([
-                    'success' => true,
-                    'data'    => [
-                        'token' => $generated_token,
-                        'name'  => $user->name,
-                        'role'  => $user->role,
-                        'id'    => $user->id,
-                    ],
-                    'message' => 'User logged in successfully!',
-                ], 200);
+                    'code'    => 404,
+                    'success' => false,
+                    'message' => 'User not found for this mobile.',
+                    'data'    => [],
+                ], 404);
             }
 
+            if ($otpRecord->otp != $otp) {
+                return response()->json([
+                    'code'    => 400,
+                    'success' => false,
+                    'message' => 'Invalid OTP entered.',
+                    'data'    => [],
+                ], 400);
+            }
+
+            if ($otpRecord->expires_at < now()) {
+                return response()->json([
+                    'code'    => 400,
+                    'success' => false,
+                    'message' => 'OTP has expired!',
+                    'data'    => [],
+                ], 400);
+            }
+
+            // Clear OTP
+            User::where('mobile', $request->mobile)
+                ->update(['otp' => null, 'expires_at' => null]);
+
+            $user            = User::where('mobile', $request->mobile)->first();
+            $generated_token = $user->createToken('API TOKEN')->plainTextToken;
+            $userData        = $buildUserData($user);
+
             return response()->json([
-                'success' => false,
-                'message' => 'Username is not valid.',
+                'code'    => 200,
+                'success' => true,
+                'message' => 'User logged in successfully!',
+                'data'    => [
+                    'token' => $generated_token,
+                    'user'  => $userData,
+                ],
             ], 200);
         }
 
-        // 3️⃣ EMAIL + PASSWORD LOGIN (unchanged)
+        // 3️⃣ EMAIL + PASSWORD LOGIN
         $request->validate([
             'email'    => ['required', 'string', 'email'],
             'password' => 'required',
         ]);
 
-        if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
-            $user = Auth::user();
-            $generated_token = $user->createToken('API TOKEN')->plainTextToken;
-
+        if (! Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
             return response()->json([
-                'success' => true,
-                'data'    => [
-                    'token' => $generated_token,
-                    'name'  => $user->name,
-                    'role'  => $user->role,
-                    'id'    => $user->id,
-                ],
-                'message' => 'User logged in successfully!',
-            ], 200);
+                'code'    => 401,
+                'success' => false,
+                'message' => 'Invalid username or password.',
+                'data'    => [],
+            ], 401);
         }
 
+        /** @var User $user */
+        $user            = Auth::user();
+        $generated_token = $user->createToken('API TOKEN')->plainTextToken;
+        $userData        = $buildUserData($user);
+
         return response()->json([
-            'success' => false,
-            'message' => 'Invalid username or password.',
+            'code'    => 200,
+            'success' => true,
+            'message' => 'User logged in successfully!',
+            'data'    => [
+                'token' => $generated_token,
+                'user'  => $userData,
+            ],
         ], 200);
     }
+
 
     // user `login`
     // public function login(Request $request, $otp = null)

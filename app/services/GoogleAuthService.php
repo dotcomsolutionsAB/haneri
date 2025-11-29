@@ -2,54 +2,38 @@
 
 namespace App\services;
 
+use Google_Client;
 use Illuminate\Support\Facades\Log;
-use Kreait\Firebase\Auth as FirebaseAuth;
-use Kreait\Firebase\Exception\Auth\FailedToVerifyToken;
 
 class GoogleAuthService
 {
-    protected FirebaseAuth $auth;
+    protected Google_Client $client;
 
-    public function __construct(FirebaseAuth $auth)
+    public function __construct()
     {
-        // Firebase Auth instance from Kreait
-        $this->auth = $auth;
+        $this->client = new Google_Client([
+            // This comes from config/services.php → env('GOOGLE_CLIENT_ID')
+            'client_id' => config('services.google.client_id'),
+        ]);
     }
 
     /**
-     * Verify Firebase ID token & return normalized payload
-     * (sub, email, name)
+     * Verify ID token from frontend and return payload array or null.
      */
     public function verifyIdToken(string $idToken): ?array
     {
         try {
-            $verifiedToken = $this->auth->verifyIdToken($idToken);
-            $claims = $verifiedToken->claims();
+            $payload = $this->client->verifyIdToken($idToken);
 
-            $sub   = $claims->get('sub');   // uid
-            $email = $claims->get('email'); // email
-            $name  = $claims->get('name')
-                ?? trim(($claims->get('given_name') ?? '').' '.($claims->get('family_name') ?? ''))
-                ?? $email;
-
-            if (! $sub || ! $email) {
-                Log::warning('Firebase token missing sub or email', [
-                    'sub'   => $sub,
-                    'email' => $email,
-                ]);
-                return null;
+            if ($payload) {
+                return $payload; // e.g. ['sub' => '...', 'email' => '...', 'name' => '...']
             }
 
-            return [
-                'sub'   => $sub,
-                'email' => $email,
-                'name'  => $name,
-            ];
-        } catch (FailedToVerifyToken $e) {
-            Log::warning('Firebase: FailedToVerifyToken', ['error' => $e->getMessage()]);
             return null;
         } catch (\Throwable $e) {
-            Log::error('Firebase verifyIdToken failed', ['error' => $e->getMessage()]);
+            Log::error('Google ID token verification failed', [
+                'error' => $e->getMessage(),
+            ]);
             return null;
         }
     }
