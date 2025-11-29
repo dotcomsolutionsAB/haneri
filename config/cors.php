@@ -6,13 +6,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'https://haneri.com',
-        'https://www.haneri.com',
-        'http://localhost',
-        'http://localhost:8000',
-        'http://127.0.0.1:8000',
-    ],
+    'allowed_origins' => ['*'],
     // During testing, you can even do:
     // 'allowed_origins' => ['*'],
 
