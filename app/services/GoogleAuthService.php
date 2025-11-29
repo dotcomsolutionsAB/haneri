@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\services;
 
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Auth as FirebaseAuth;
