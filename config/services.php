@@ -43,6 +43,10 @@ return [
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
     ],
+    
+    'firebase' => [
+        'api_key' => env('FIREBASE_API_KEY'),
+    ],
 
 
 ];
