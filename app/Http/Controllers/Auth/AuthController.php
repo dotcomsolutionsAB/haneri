@@ -355,7 +355,8 @@ class AuthController extends Controller
             ], 404);
         }
 
-        $six_digit_otp = substr(bin2hex(random_bytes(3)), 0, 6);
+        // $six_digit_otp = substr(bin2hex(random_bytes(3)), 0, 6);
+        $six_digit_otp = random_int(100000, 999999); // 6 digit numeric OTP only
         $expiresAt     = now()->addMinutes(10);
 
         $store_otp = User::where('mobile', $mobile)
