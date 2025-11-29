@@ -159,10 +159,11 @@ class AuthController extends Controller
             }
         }
 
-        // 4️⃣ Role / GSTIN logic
-        $role = $validated['role'] ?? 'customer';
+        // 4️⃣ Role / GSTIN logic – only based on REQUEST role
+        $selectedTypeFromRequest = $validated['role'] ?? null;  // may be null
+        $role                    = 'customer';                  // DB role ALWAYS customer
 
-        if (in_array($role, ['architect', 'dealer']) && empty($validated['gstin'])) {
+        if ($selectedTypeFromRequest && in_array($selectedTypeFromRequest, ['architect', 'dealer']) && empty($validated['gstin'])) {
             return response()->json([
                 'code'    => 422,
                 'success' => false,
@@ -178,15 +179,18 @@ class AuthController extends Controller
 
         if (! $user) {
             // First time: REGISTER via Google
+            $selectedType = $selectedTypeFromRequest ?? 'customer';
+
             $user = User::create([
-                'name'      => $name,
-                'email'     => $email,
-                'mobile'    => $validated['mobile'] ?? null,
-                'role'      => $role,
-                'gstin'     => $validated['gstin'] ?? null,
-                'google_id' => $googleId,
+                'name'          => $name,
+                'email'         => $email,
+                'mobile'        => $validated['mobile'] ?? null,
+                'role'          => $role,              // always 'customer'
+                'selected_type' => $selectedType,      // store front choice
+                'gstin'         => $validated['gstin'] ?? null,
+                'google_id'     => $googleId,
                 // Will be hashed because of your cast/mutator
-                'password'  => $this->generateRandomPassword(16),
+                'password'      => $this->generateRandomPassword(16),
             ]);
 
             try {
@@ -204,16 +208,24 @@ class AuthController extends Controller
                 $user->google_id = $googleId;
             }
 
-            // Update mobile / role / gstin if provided
+            // Update mobile if provided
             if (! empty($validated['mobile'])) {
                 $user->mobile = $validated['mobile'];
             }
-            if (! empty($role) && $user->role !== $role) {
-                $user->role = $role;
+
+            // role column ALWAYS customer
+            $user->role = 'customer';
+
+            // 🔹 Only change selected_type if frontend sent a role
+            if ($selectedTypeFromRequest && $user->selected_type !== $selectedTypeFromRequest) {
+                $user->selected_type = $selectedTypeFromRequest;
             }
+
+            // Update GSTIN if provided
             if (! empty($validated['gstin'])) {
                 $user->gstin = $validated['gstin'];
             }
+
             $user->save();
 
             $message    = 'User logged in successfully with Google!';
@@ -225,12 +237,13 @@ class AuthController extends Controller
 
         // Shape user object for frontend
         $userData = [
-            'id'     => $user->id,
-            'name'   => $user->name,
-            'email'  => $user->email,
-            'mobile' => $user->mobile,
-            'role'   => $user->role,
-            'gstin'  => $user->gstin,
+            'id'            => $user->id,
+            'name'          => $user->name,
+            'email'         => $user->email,
+            'mobile'        => $user->mobile,
+            'role'          => $user->role,
+            'selected_type' => $user->selected_type,
+            'gstin'         => $user->gstin,
         ];
 
         return response()->json([
@@ -269,8 +282,10 @@ class AuthController extends Controller
             'gstin.regex' => 'Invalid GSTIN format.',
         ]);
 
-        // If architect/dealer & want GSTIN mandatory:
-        if (in_array($validated['role'], ['architect','dealer']) && empty($validated['gstin'])) {
+        $selectedType = $validated['role'];          // ⭐ store frontend choice
+        $role         = 'customer';                 // ⭐ DB role always customer
+
+        if (in_array($selectedType, ['architect','dealer']) && empty($validated['gstin'])) {  // ⭐
             return response()->json([
                 'code'    => 422,
                 'success' => false,
@@ -284,7 +299,8 @@ class AuthController extends Controller
             'email'    => $validated['email'],
             'password' => $validated['password'], // auto hash via cast/mutator in User model
             'mobile'   => $validated['mobile'],
-            'role'     => $validated['role'],
+            'role'          => $role,                 // ⭐ always customer
+            'selected_type' => $selectedType,         // ⭐ save here
             'gstin'    => $validated['gstin'] ?? null,
         ]);
 
@@ -303,6 +319,7 @@ class AuthController extends Controller
             'email'  => $user->email,
             'mobile' => $user->mobile,
             'role'   => $user->role,
+            'selected_type' => $user->selected_type,   // ⭐ return too
             'gstin'  => $user->gstin,
         ];
 
@@ -410,6 +427,7 @@ class AuthController extends Controller
                 'email'  => $user->email,
                 'mobile' => $user->mobile,
                 'role'   => $user->role,
+                'selected_type' => $user->selected_type,   // ✅ add this
                 'gstin'  => $user->gstin,
             ];
         };
