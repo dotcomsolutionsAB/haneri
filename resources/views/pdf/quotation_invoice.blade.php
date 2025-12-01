@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quotation - {{ $quotation_no }}</title>
+    <title>Quotation - {{ $q_name }}</title>
     <style>
         @page {
             margin: 0;
