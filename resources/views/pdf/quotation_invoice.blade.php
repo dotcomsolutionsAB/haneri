@@ -209,7 +209,7 @@
         }
 
         .footer-signature-line {
-            border-top: 1px solid #315858; /* white line on green */
+            border-top: 2px solid #315858; /* white line on green */
             width: 200px;
             margin-left: auto;
             margin-bottom: 4px;
@@ -218,6 +218,7 @@
         .footer-text {
             text-align: center;
             font-size: 10px;
+            line-height: 1.5;
             background-color: #315858;
             color: #ffffff;
         }
