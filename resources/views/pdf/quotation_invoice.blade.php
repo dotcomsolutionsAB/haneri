@@ -114,7 +114,6 @@
 
         .product-inner-table {
             width: 100%;
-            /* border-collapse: collapse; */
         }
 
         .product-img-td {
