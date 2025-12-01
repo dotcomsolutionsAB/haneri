@@ -78,7 +78,7 @@ class InvoiceController extends Controller
     //         return null;
     //     }
     // }
-    
+
     public function generateQuotationInvoice(QuotationModel $quotation, float $subTotal, float $taxAmount)
     {
         // 1. Customer info
@@ -87,6 +87,8 @@ class InvoiceController extends Controller
         $q_mobile  = $quotation->q_mobile;
         $q_address = $quotation->q_address;
         $q_total   = $quotation->total_amount;   // total
+        $shipping = $quotation->shipping_amount ?? 0;
+        $discount = $quotation->discount_amount ?? 0;
 
         // 2. Quotation items
         $q_items = QuotationItemModel::with([
@@ -123,7 +125,7 @@ class InvoiceController extends Controller
             // ⬇ Pass tax + subtotal + total into view
             $html = view('pdf.quotation_invoice', compact(
                 'q_name','q_email','q_mobile','q_address',
-                'q_items','quotation','subTotal','taxAmount','q_total'
+                'q_items','quotation','subTotal','taxAmount','q_total','discount','shipping'
             ))->render();
 
             $mpdf->WriteHTML($html);

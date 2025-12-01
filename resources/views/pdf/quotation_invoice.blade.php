@@ -213,7 +213,7 @@
         }
 
         .footer-signature-line {
-            border-top: 1px solid #ffffff; /* white line on green */
+            border-top: 2px solid #315858; /* white line on green */
             width: 200px;
             margin-left: auto;
             margin-bottom: 4px;
@@ -319,25 +319,38 @@
         <div class="summary-wrap">
             <div class="summary-inner">
                 <table class="summary-table">
+
                     <tr>
                         <td class="summary-label">SUBTOTAL:</td>
-                        <td class="summary-value">
-                            ₹{{ number_format($subTotal, 2) }}
-                        </td>
+                        <td class="summary-value">₹{{ number_format($subTotal ?? 0, 2) }}</td>
                     </tr>
+
                     <tr>
-                        <td class="summary-label">TAX (₹):</td>
-                        <td class="summary-value">
-                            ₹{{ number_format($taxAmount, 2) }}
-                        </td>
+                        <td class="summary-label">TAX:</td>
+                        <td class="summary-value">₹{{ number_format($taxAmount ?? 0, 2) }}</td>
                     </tr>
+
+                    <tr>
+                        <td class="summary-label">SHIPPING:</td>
+                        <td class="summary-value">₹{{ number_format($shipping ?? 0, 2) }}</td>
+                    </tr>
+
+                    <tr>
+                        <td class="summary-label">DISCOUNT:</td>
+                        <td class="summary-value">₹{{ number_format($discount ?? 0, 2) }}</td>
+                    </tr>
+
                 </table>
             </div>
         </div>
 
         {{-- FULL-WIDTH GRAND TOTAL BAR --}}
+        @php
+            $finalTotal = ($subTotal ?? 0) + ($taxAmount ?? 0) + ($shipping ?? 0) - ($discount ?? 0);
+        @endphp
+
         <div class="grand-total-bar">
-            GRAND TOTAL: ₹{{ number_format($q_total, 2) }}
+            GRAND TOTAL: ₹{{ number_format($finalTotal, 2) }}
         </div>
 
         {{-- NOTE: Signature is now handled inside the footer --}}
