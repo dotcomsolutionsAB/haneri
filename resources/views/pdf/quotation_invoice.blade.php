@@ -25,9 +25,9 @@
         .header-bar {
             background-color: #ffffff;    /* no green background */
             color: #333333;
-            /* increased vertical padding for more height */
-            padding: 20px 40px 18px 40px;
-            border-bottom: 4px solid #315858;  /* green bottom layer/strip */
+            /* more height via padding, logo unchanged */
+            padding: 24px 40px 20px 40px;
+            border-bottom: 4px solid #315858;  /* green bottom strip */
         }
 
         .header-table {
@@ -184,36 +184,41 @@
             text-align: right;
         }
 
-        /* ========= SIGNATURE ========= */
-        .signature-block {
-            /* fixed just above footer */
-            position: fixed;
-            bottom: 60px;         /* adjust if footer height changes */
-            left: 0;
-            right: 0;
-            padding: 0 40px;
-            width: 100%;
-        }
-
-        .signature-right {
-            width: 50%;
-            margin-left: auto;
-            text-align: right;
-            font-size: 11px;
-        }
-
-        /* ========= FOOTER ========= */
+        /* ========= FOOTER + SIGNATURE ========= */
         .footer {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 8px 40px;
+            padding: 10px 40px 10px 40px;
             background-color: #315858;
             color: #ffffff;
             font-size: 10px;
-            text-align: center;
             line-height: 1.5;
+            box-sizing: border-box;
+        }
+
+        .footer-signature-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 6px;
+        }
+
+        .footer-signature-block {
+            text-align: right;
+            font-size: 11px;
+        }
+
+        .footer-signature-line {
+            border-top: 1px solid #ffffff; /* white line on green */
+            width: 200px;
+            margin-left: auto;
+            margin-bottom: 4px;
+        }
+
+        .footer-text {
+            text-align: center;
+            font-size: 10px;
         }
 
         .footer a {
@@ -335,24 +340,26 @@
             GRAND TOTAL: ₹{{ number_format($grand, 2) }}
         </div>
 
-        {{-- SIGNATURE BLOCK FIXED JUST ABOVE FOOTER --}}
-        <div class="signature-block">
-            <div class="signature-right">
-                <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
-                <div style="margin-bottom: 6px;">Authorized Signatory</div>
+        {{-- NOTE: Signature is now handled inside the footer --}}
+    </div>
+
+    {{-- FOOTER STRIP (WITH SIGNATURE INSIDE, JUST ABOVE CONTACT DETAILS) --}}
+    <div class="footer">
+        <div class="footer-signature-row">
+            <div class="footer-signature-block">
+                <div class="footer-signature-line"></div>
+                <div style="margin-bottom: 4px;">Authorized Signatory</div>
                 <div><strong>HANERI ELECTRICALS LLP</strong></div>
             </div>
         </div>
-    </div>
-
-    {{-- FOOTER STRIP --}}
-    <div class="footer">
-        <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
-        Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
-        Email:
-        <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">customercare@haneri.com</a>
-        &nbsp; | &nbsp;
-        Phone: +91 8377826826
+        <div class="footer-text">
+            <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
+            Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
+            Email:
+            <a href="mailto:customercare@haneri.com">customercare@haneri.com</a>
+            &nbsp; | &nbsp;
+            Phone: +91 8377826826
+        </div>
     </div>
 
 </body>

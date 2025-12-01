@@ -129,7 +129,7 @@ class QuotationController extends Controller
 
             // Generate the PDF invoice and store the path
             $generator  = new InvoiceController();
-            $invoiceUrl = $generator->generateQuotationInvoice($quotation);
+            $invoiceUrl = $generator->generateQuotationInvoice($quotation, $subTotal, $taxAmount);
 
             // Save URL on quotation
             $quotation->update(['invoice_quotation' => $invoiceUrl]);

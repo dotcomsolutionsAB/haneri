@@ -13,13 +13,80 @@ use Illuminate\Support\Facades\Storage;
 class InvoiceController extends Controller
 {
 
-    public function generateQuotationInvoice(QuotationModel $quotation)
+    // public function generateQuotationInvoice(QuotationModel $quotation)
+    // {
+    //     // 1. Customer info
+    //     $q_name    = $quotation->q_user;
+    //     $q_email   = $quotation->q_email;
+    //     $q_mobile  = $quotation->q_mobile;
+    //     $q_address = $quotation->q_address;
+
+    //     // 2. Quotation items
+    //     $q_items = QuotationItemModel::with([
+    //             'product:id,name',
+    //             'variant:id,product_id,variant_value'
+    //         ])
+    //         ->where('quotation_id', $quotation->id)
+    //         ->get()
+    //         ->map(function ($item) {
+    //             $item->product_name  = $item->product->name ?? '';
+    //             $item->variant_value = $item->variant->variant_value ?? '';
+    //             $item->rate          = $item->price;
+    //             $item->total         = $item->price * $item->quantity;
+    //             return $item;
+    //         });
+
+    //     // 3. Build safe file name
+    //     $sanitizedOrderId = trim(preg_replace('/[^A-Za-z0-9]+/', '-', $quotation->id), '-');
+    //     $publicPath       = 'upload/invoice_quotations/';
+    //     $fileName         = 'invoice_' . $sanitizedOrderId. '.pdf';
+    //     $filePath         = storage_path('app/public/' . $publicPath . $fileName);
+
+    //     // 4. Ensure directory exists
+    //     if (!File::isDirectory(dirname($filePath))) {
+    //         File::makeDirectory(dirname($filePath), 0755, true, true);
+    //     }
+
+    //     // 5. Remove old file if present
+    //     if (File::exists($filePath)) {
+    //         File::delete($filePath);
+    //     }
+
+    //     try {
+    //         $mpdf = new Mpdf(['format' => 'A4']);
+
+    //         // 6. Render the single Blade view into mPDF
+    //         $html = view('pdf.quotation_invoice', compact(
+    //             'q_name',
+    //             'q_email',
+    //             'q_mobile',
+    //             'q_address',
+    //             'q_items',
+    //             'quotation'
+    //         ))->render();
+
+    //         $mpdf->WriteHTML($html);
+
+    //         // 7. Save PDF
+    //         $mpdf->Output($filePath, 'F');
+
+    //         // 8. Return public URL
+    //         return asset('storage/' . $publicPath . $fileName);
+
+    //     } catch (\Mpdf\MpdfException $e) {
+    //         \Log::error('mPDF error: ' . $e->getMessage());
+    //         return null;
+    //     }
+    // }
+    
+    public function generateQuotationInvoice(QuotationModel $quotation, float $subTotal, float $taxAmount)
     {
         // 1. Customer info
         $q_name    = $quotation->q_user;
         $q_email   = $quotation->q_email;
         $q_mobile  = $quotation->q_mobile;
         $q_address = $quotation->q_address;
+        $q_total   = $quotation->total_amount;   // total
 
         // 2. Quotation items
         $q_items = QuotationItemModel::with([
@@ -36,45 +103,36 @@ class InvoiceController extends Controller
                 return $item;
             });
 
-        // 3. Build safe file name
-        $sanitizedOrderId = trim(preg_replace('/[^A-Za-z0-9]+/', '-', $quotation->id), '-');
-        $publicPath       = 'upload/invoice_quotations/';
-        $fileName         = 'invoice_' . $sanitizedOrderId. '.pdf';
-        $filePath         = storage_path('app/public/' . $publicPath . $fileName);
+        // PDF file storage location
+        $sanitizedId = trim(preg_replace('/[^A-Za-z0-9]+/', '-', $quotation->id), '-');
+        $publicPath  = 'upload/invoice_quotations/';
+        $fileName    = 'invoice_' . $sanitizedId . '.pdf';
+        $filePath    = storage_path('app/public/' . $publicPath . $fileName);
 
-        // 4. Ensure directory exists
+        // Ensure directory
         if (!File::isDirectory(dirname($filePath))) {
             File::makeDirectory(dirname($filePath), 0755, true, true);
         }
 
-        // 5. Remove old file if present
-        if (File::exists($filePath)) {
-            File::delete($filePath);
-        }
+        // Remove old file
+        if (File::exists($filePath)) File::delete($filePath);
 
         try {
-            $mpdf = new Mpdf(['format' => 'A4']);
+            $mpdf = new \Mpdf\Mpdf(['format' => 'A4']);
 
-            // 6. Render the single Blade view into mPDF
+            // ⬇ Pass tax + subtotal + total into view
             $html = view('pdf.quotation_invoice', compact(
-                'q_name',
-                'q_email',
-                'q_mobile',
-                'q_address',
-                'q_items',
-                'quotation'
+                'q_name','q_email','q_mobile','q_address',
+                'q_items','quotation','subTotal','taxAmount','q_total'
             ))->render();
 
             $mpdf->WriteHTML($html);
-
-            // 7. Save PDF
             $mpdf->Output($filePath, 'F');
 
-            // 8. Return public URL
             return asset('storage/' . $publicPath . $fileName);
 
-        } catch (\Mpdf\MpdfException $e) {
-            \Log::error('mPDF error: ' . $e->getMessage());
+        } catch (\Exception $e) {
+            \Log::error('PDF Gen Error: '.$e->getMessage());
             return null;
         }
     }
