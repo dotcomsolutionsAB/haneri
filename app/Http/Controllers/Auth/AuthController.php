@@ -103,13 +103,167 @@ class AuthController extends Controller
         return substr(str_shuffle(str_repeat($chars, $length)), 0, $length);
     }
 
+    // protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
+    // {
+    //     // Basic validation for extra fields
+    //     $validated = $request->validate([
+    //         'idToken' => 'required|string',
+    //         'mobile'  => 'nullable|string|min:10|max:15',
+    //         'role'    => 'nullable|in:customer,architect,dealer',
+    //         'gstin'   => [
+    //             'nullable',
+    //             'string',
+    //             'max:15',
+    //             'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
+    //         ],
+    //         'email'   => $mustMatchEmail ? 'required|email' : 'nullable|email',
+    //     ]);
+
+    //     // 1️⃣ Verify ID token with Google
+    //     $payload = $this->googleAuthService->verifyIdToken($validated['idToken']);
+
+    //     if (! $payload) {
+    //         return response()->json([
+    //             'code'    => 422,
+    //             'success' => false,
+    //             'message' => 'Invalid or expired Google token.',
+    //             'data'    => [],
+    //         ], 422);
+    //     }
+
+    //     // 2️⃣ Extract details from token
+    //     $googleId = $payload['sub']   ?? null; // unique Google user ID
+    //     $email    = $payload['email'] ?? null;
+    //     $name     = $payload['name']
+    //         ?? trim(($payload['given_name'] ?? '').' '.($payload['family_name'] ?? ''))
+    //         ?: 'Google User';
+
+    //     if (! $googleId || ! $email) {
+    //         return response()->json([
+    //             'code'    => 422,
+    //             'success' => false,
+    //             'message' => 'Google token is missing required data (email or id).',
+    //             'data'    => [],
+    //         ], 422);
+    //     }
+
+    //     // 3️⃣ If login payload gave email, ensure it matches token email
+    //     if ($mustMatchEmail && isset($validated['email'])) {
+    //         if (strtolower($validated['email']) !== strtolower($email)) {
+    //             return response()->json([
+    //                 'code'    => 422,
+    //                 'success' => false,
+    //                 'message' => 'Email does not match Google account.',
+    //                 'data'    => [],
+    //             ], 422);
+    //         }
+    //     }
+
+    //     // 4️⃣ Role / GSTIN logic – only based on REQUEST role
+    //     $selectedTypeFromRequest = $validated['role'] ?? null;  // may be null
+    //     $role                    = 'customer';                  // DB role ALWAYS customer
+
+    //     if ($selectedTypeFromRequest && in_array($selectedTypeFromRequest, ['architect', 'dealer']) && empty($validated['gstin'])) {
+    //         return response()->json([
+    //             'code'    => 422,
+    //             'success' => false,
+    //             'message' => 'GSTIN is required for architect/dealer.',
+    //             'data'    => [],
+    //         ], 422);
+    //     }
+
+    //     // 5️⃣ Find existing user by google_id OR email
+    //     $user = User::where('google_id', $googleId)
+    //         ->orWhere('email', $email)
+    //         ->first();
+
+    //     if (! $user) {
+    //         // First time: REGISTER via Google
+    //         $selectedType = $selectedTypeFromRequest ?? 'customer';
+
+    //         $user = User::create([
+    //             'name'          => $name,
+    //             'email'         => $email,
+    //             'mobile'        => $validated['mobile'] ?? null,
+    //             'role'          => $role,              // always 'customer'
+    //             'selected_type' => $selectedType,      // store front choice
+    //             'gstin'         => $validated['gstin'] ?? null,
+    //             'google_id'     => $googleId,
+    //             // Will be hashed because of your cast/mutator
+    //             'password'      => $this->generateRandomPassword(16),
+    //         ]);
+
+    //         try {
+    //             Log::info('Sending WelcomeUserMail (Google) to '.$user->email);
+    //             Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
+    //         } catch (\Throwable $e) {
+    //             Log::error('Welcome email failed (Google)', ['error' => $e->getMessage()]);
+    //         }
+
+    //         $message    = 'User registered successfully with Google!';
+    //         $statusCode = 201;
+    //     } else {
+    //         // Existing user: make sure google_id is stored
+    //         if (! $user->google_id) {
+    //             $user->google_id = $googleId;
+    //         }
+
+    //         // Update mobile if provided
+    //         if (! empty($validated['mobile'])) {
+    //             $user->mobile = $validated['mobile'];
+    //         }
+
+    //         // role column ALWAYS customer
+    //         $user->role = 'customer';
+
+    //         // 🔹 Only change selected_type if frontend sent a role
+    //         if ($selectedTypeFromRequest && $user->selected_type !== $selectedTypeFromRequest) {
+    //             $user->selected_type = $selectedTypeFromRequest;
+    //         }
+
+    //         // Update GSTIN if provided
+    //         if (! empty($validated['gstin'])) {
+    //             $user->gstin = $validated['gstin'];
+    //         }
+
+    //         $user->save();
+
+    //         $message    = 'User logged in successfully with Google!';
+    //         $statusCode = 200;
+    //     }
+
+    //     // 6️⃣ Generate Sanctum token
+    //     $generated_token = $user->createToken('API TOKEN')->plainTextToken;
+
+    //     // Shape user object for frontend
+    //     $userData = [
+    //         'id'            => $user->id,
+    //         'name'          => $user->name,
+    //         'email'         => $user->email,
+    //         'mobile'        => $user->mobile,
+    //         'role'          => $user->role,
+    //         'selected_type' => $user->selected_type,
+    //         'gstin'         => $user->gstin,
+    //     ];
+
+    //     return response()->json([
+    //         'code'    => $statusCode,
+    //         'success' => true,
+    //         'message' => $message,
+    //         'data'    => [
+    //             'token' => $generated_token,
+    //             'user'  => $userData,
+    //         ],
+    //     ], $statusCode);
+    // }
+
     protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
     {
-        // Basic validation for extra fields
+        // 1️⃣ Basic validation for extra fields
         $validated = $request->validate([
             'idToken' => 'required|string',
             'mobile'  => 'nullable|string|min:10|max:15',
-            'role'    => 'nullable|in:customer,architect,dealer',
+            'role'    => 'nullable|in:customer,architect,dealer',   // used ONLY on first-time register
             'gstin'   => [
                 'nullable',
                 'string',
@@ -119,7 +273,7 @@ class AuthController extends Controller
             'email'   => $mustMatchEmail ? 'required|email' : 'nullable|email',
         ]);
 
-        // 1️⃣ Verify ID token with Google
+        // 2️⃣ Verify ID token with Google
         $payload = $this->googleAuthService->verifyIdToken($validated['idToken']);
 
         if (! $payload) {
@@ -131,7 +285,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // 2️⃣ Extract details from token
+        // 3️⃣ Extract details from token
         $googleId = $payload['sub']   ?? null; // unique Google user ID
         $email    = $payload['email'] ?? null;
         $name     = $payload['name']
@@ -147,7 +301,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // 3️⃣ If login payload gave email, ensure it matches token email
+        // 4️⃣ If login payload gave email, ensure it matches token email
         if ($mustMatchEmail && isset($validated['email'])) {
             if (strtolower($validated['email']) !== strtolower($email)) {
                 return response()->json([
@@ -159,37 +313,39 @@ class AuthController extends Controller
             }
         }
 
-        // 4️⃣ Role / GSTIN logic – only based on REQUEST role
-        $selectedTypeFromRequest = $validated['role'] ?? null;  // may be null
-        $role                    = 'customer';                  // DB role ALWAYS customer
-
-        if ($selectedTypeFromRequest && in_array($selectedTypeFromRequest, ['architect', 'dealer']) && empty($validated['gstin'])) {
-            return response()->json([
-                'code'    => 422,
-                'success' => false,
-                'message' => 'GSTIN is required for architect/dealer.',
-                'data'    => [],
-            ], 422);
-        }
-
         // 5️⃣ Find existing user by google_id OR email
         $user = User::where('google_id', $googleId)
             ->orWhere('email', $email)
             ->first();
 
+        // ─────────────────────────────────────────
+        // 🚀 CASE A: NEW USER → REGISTER via Google
+        // ─────────────────────────────────────────
         if (! $user) {
-            // First time: REGISTER via Google
-            $selectedType = $selectedTypeFromRequest ?? 'customer';
+            // frontend selection (customer/architect/dealer) – OPTIONAL
+            $selectedType = $validated['role'] ?? 'customer';
+
+            // DB role ALWAYS 'customer' for self-register
+            $role = 'customer';
+
+            // For first-time register, enforce GSTIN only if selectedType is architect/dealer
+            if (in_array($selectedType, ['architect', 'dealer']) && empty($validated['gstin'])) {
+                return response()->json([
+                    'code'    => 422,
+                    'success' => false,
+                    'message' => 'GSTIN is required for architect/dealer.',
+                    'data'    => [],
+                ], 422);
+            }
 
             $user = User::create([
                 'name'          => $name,
                 'email'         => $email,
                 'mobile'        => $validated['mobile'] ?? null,
-                'role'          => $role,              // always 'customer'
+                'role'          => $role,              // ALWAYS 'customer' here
                 'selected_type' => $selectedType,      // store front choice
                 'gstin'         => $validated['gstin'] ?? null,
                 'google_id'     => $googleId,
-                // Will be hashed because of your cast/mutator
                 'password'      => $this->generateRandomPassword(16),
             ]);
 
@@ -202,26 +358,26 @@ class AuthController extends Controller
 
             $message    = 'User registered successfully with Google!';
             $statusCode = 201;
-        } else {
-            // Existing user: make sure google_id is stored
+        }
+
+        // ─────────────────────────────────────────
+        // 🚀 CASE B: EXISTING USER → JUST LOGIN
+        // ─────────────────────────────────────────
+        else {
+            // Make sure google_id is stored
             if (! $user->google_id) {
                 $user->google_id = $googleId;
             }
 
-            // Update mobile if provided
+            // ✅ UPDATE ONLY SAFE FIELDS
             if (! empty($validated['mobile'])) {
                 $user->mobile = $validated['mobile'];
             }
 
-            // role column ALWAYS customer
-            $user->role = 'customer';
+            // ❌ DO NOT TOUCH $user->role (might be set by admin to architect/dealer)
+            // ❌ DO NOT TOUCH $user->selected_type (keep existing preference)
 
-            // 🔹 Only change selected_type if frontend sent a role
-            if ($selectedTypeFromRequest && $user->selected_type !== $selectedTypeFromRequest) {
-                $user->selected_type = $selectedTypeFromRequest;
-            }
-
-            // Update GSTIN if provided
+            // Optionally update GSTIN if passed
             if (! empty($validated['gstin'])) {
                 $user->gstin = $validated['gstin'];
             }
@@ -241,8 +397,8 @@ class AuthController extends Controller
             'name'          => $user->name,
             'email'         => $user->email,
             'mobile'        => $user->mobile,
-            'role'          => $user->role,
-            'selected_type' => $user->selected_type,
+            'role'          => $user->role,          // stays as architect if admin changed it
+            'selected_type' => $user->selected_type, // whatever is in DB, not overwritten
             'gstin'         => $user->gstin,
         ];
 
