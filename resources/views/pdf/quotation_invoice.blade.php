@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Quotation - {{ $q_name }}</title>
+    <title>Quotation - {{ $quotation_no }}</title>
     <style>
         @page {
             margin: 0;
@@ -114,7 +114,7 @@
 
         .product-inner-table {
             width: 100%;
-            border-collapse: collapse;
+            /* border-collapse: collapse; */
         }
 
         .product-img-td {
@@ -269,15 +269,6 @@
                 </td>
             </tr>
         </table>
-
-        {{-- ITEMS TABLE --}}
-        <!-- @php
-            $subtotal = $q_items->sum('total');
-            $tax      = 0;   // update later if you have tax field
-            $shipping = 0;   // update later if you have shipping
-            $discount = 0;   // update later if you have discount
-            $grand    = $subtotal + $tax + $shipping - $discount;
-        @endphp -->
 
         <table class="item-table">
             <thead>
