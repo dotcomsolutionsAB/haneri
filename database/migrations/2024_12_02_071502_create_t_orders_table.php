@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('t_orders', function (Blueprint $table) {
             $table->id();
-            $table->integer('user_id'); // User ID
+            $table->integer('user_id'); // User ID invoice_id
+            $table->string('invoice_id');
             $table->decimal('total_amount', 10, 2); // Total order amount
             $table->enum('status', ['pending', 'completed', 'cancelled', 'refunded'])->default('pending'); // Order status
             $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending'); // Payment status

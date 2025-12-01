@@ -181,14 +181,11 @@
 </head>
 <body>
 
-   
-
     <!-- {{-- Header --}} -->
     <div class="header">
         <table width="100%">
             <tr>
                 <td class="w-50">
-                    
                     <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Logo" class="logo">
                 </td>
                 <td class="w-50 text-right">
@@ -257,7 +254,7 @@
                         <table width="100%">
                             <tr>
                                 <td style="width: 40px;">
-                                        <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" class="product-image">
+                                        <img src="{{ asset('storage/upload/logo/Haneri_Favicon.png') }}" class="product-image">
                                     
                                 </td>
                                 <td class="product-info" style="text-align: left;">
@@ -303,11 +300,9 @@
     <div class="footer" style="font-size: 11px; line-height: 1.5;">
         <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
         Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
-        Email: <a href="mailto:support@liwaas.com" style="color: #fff; text-decoration: underline;">info@haneri.in</a> &nbsp; | &nbsp;
-        Phone: +91 9876543210
+        Email: <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">customercare@haneri.com</a> &nbsp; | &nbsp;
+        Phone: +91 8377826826
     </div>
-
-
 
 </body>
 </html>

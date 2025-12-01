@@ -9,7 +9,7 @@ class OrderModel extends Model
     //
     protected $table = 't_orders';
 
-    protected $fillable = ['user_id', 'total_amount', 'status', 'payment_status', 'delivery_status', 'shipping_address', 'razorpay_order_id'];
+    protected $fillable = ['user_id', 'invoice_id', 'total_amount', 'status', 'payment_status', 'delivery_status', 'shipping_address', 'razorpay_order_id'];
 
      /**
      * Relation to the User table
@@ -29,6 +29,11 @@ class OrderModel extends Model
     public function items()
     {
         return $this->hasMany(OrderItemModel::class, 'order_id', 'id'); // order_id references id in Order table
+    }
+    
+    public function invoiceUpload()
+    {
+        return $this->belongsTo(UploadModel::class, 'invoice_id', 'id');
     }
 
     // Relationship: Each order has many payments
