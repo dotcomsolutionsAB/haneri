@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Order Invoice - HAN-INV-{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</title>
+    <title>Order Invoice - {{ $invoiceNumber }}</title>
     <style>
         @page {
             margin: 0;
@@ -243,7 +243,7 @@
                 <td style="width: 50%;" class="header-right">
                     <div>
                         <strong>INVOICE NUMBER:</strong>
-                        #HAN-INV-{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}
+                        #{{ $invoiceNumber }}
                     </div>
                     <div>
                         <strong>INVOICE DATE:</strong>
@@ -305,16 +305,11 @@
                 </tr>
             </thead>
             <tbody>
-                @php
-                    $grandTotal = 0;
-                @endphp
-
                 @foreach($items as $item)
                     @php
-                        $rate = $item->price ?? 0;
-                        $qty = $item->quantity ?? 0;
+                        $rate      = $item->price ?? 0;
+                        $qty       = $item->quantity ?? 0;
                         $lineTotal = $rate * $qty;
-                        $grandTotal += $lineTotal;
                     @endphp
                     <tr>
                         <td class="text-center">{{ $loop->iteration }}</td>
@@ -331,7 +326,11 @@
                                 </tr>
                             </table>
                         </td>
-                        <td>{{ optional($item->variant)->value ?? '-' }}</td>
+                        <td>
+                            {{ optional($item->variant)->variant_value
+                               ?? optional($item->variant)->value
+                               ?? '-' }}
+                        </td>
                         <td>{{ number_format($rate, 2) }}</td>
                         <td>{{ $qty }}</td>
                         <td class="text-right">₹{{ number_format($lineTotal, 2) }}</td>
@@ -341,35 +340,20 @@
         </table>
 
         {{-- SUMMARY BLOCK (RIGHT) --}}
-        @php
-            // These can be passed from controller like in quotation
-            $subTotal  = $subTotal  ?? $grandTotal;
-            $taxAmount = $taxAmount ?? 0;
-            $shipping  = $shipping  ?? 0;
-            $discount  = $discount  ?? 0;
-
-            $calcTotal = $subTotal + $taxAmount + $shipping - $discount;
-            $finalTotal = $order->total_amount ?? $calcTotal;
-        @endphp
-
         <div class="summary-wrap">
             <div class="summary-inner">
                 <table class="summary-table">
                     <tr>
-                        <td class="summary-label">SUBTOTAL:</td>
+                        <td class="summary-label">SUBTOTAL (Excl. GST):</td>
                         <td class="summary-value">₹{{ number_format($subTotal, 2) }}</td>
                     </tr>
                     <tr>
-                        <td class="summary-label">TAX:</td>
+                        <td class="summary-label">GST @ 18%:</td>
                         <td class="summary-value">₹{{ number_format($taxAmount, 2) }}</td>
                     </tr>
                     <tr>
-                        <td class="summary-label">SHIPPING:</td>
-                        <td class="summary-value">₹{{ number_format($shipping, 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td class="summary-label">DISCOUNT:</td>
-                        <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
+                        <td class="summary-label"><strong>GRAND TOTAL:</strong></td>
+                        <td class="summary-value"><strong>₹{{ number_format($total, 2) }}</strong></td>
                     </tr>
                 </table>
             </div>
@@ -377,7 +361,7 @@
 
         {{-- FULL-WIDTH GRAND TOTAL BAR --}}
         <div class="grand-total-bar">
-            GRAND TOTAL: ₹{{ number_format($finalTotal, 2) }}
+            GRAND TOTAL: ₹{{ number_format($total, 2) }}
         </div>
 
         {{-- Any additional notes / terms can go here above footer, if needed --}}

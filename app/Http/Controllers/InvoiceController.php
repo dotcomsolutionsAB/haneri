@@ -236,13 +236,25 @@ class InvoiceController extends Controller
         $relativePath  = 'upload/order_invoice/' . $fileName;
         $fullPath      = storage_path('app/public/' . $relativePath);
 
+        // ✅ Assume total_amount is tax-inclusive @ 18%
+        $total    = (float) $order->total_amount;
+        $taxRate  = 0.18;
+
+        if ($total > 0) {
+            $subTotal  = round($total / (1 + $taxRate), 2);
+            $taxAmount = round($total - $subTotal, 2);
+        } else {
+            $subTotal  = 0.0;
+            $taxAmount = 0.0;
+        }
+
         // Ensure directory exists
-        if (!File::isDirectory(dirname($fullPath))) {
-            File::makeDirectory(dirname($fullPath), 0755, true, true);
+        if (!\Illuminate\Support\Facades\File::isDirectory(dirname($fullPath))) {
+            \Illuminate\Support\Facades\File::makeDirectory(dirname($fullPath), 0755, true, true);
         }
 
         try {
-            $mpdf = new Mpdf([
+            $mpdf = new \Mpdf\Mpdf([
                 'format'        => 'A4',
                 'default_font'  => 'dejavusans',
                 'margin_top'    => 0,
@@ -250,10 +262,13 @@ class InvoiceController extends Controller
             ]);
 
             $html = view('pdf.order_invoice', [
-                'order' => $order,
-                'user'  => $order->user,
-                'items' => $order->items,
-                'invoiceNumber' => $invoiceNumber, // 👈 you can use this inside Blade
+                'order'         => $order,
+                'user'          => $order->user,
+                'items'         => $order->items,
+                'invoiceNumber' => $invoiceNumber, // 👈 use in Blade
+                'subTotal'      => $subTotal,      // 👈 subtotal (without tax)
+                'taxAmount'     => $taxAmount,     // 👈 GST amount
+                'total'         => $total,         // 👈 grand total
             ])->render();
 
             $mpdf->WriteHTML($html);
@@ -265,7 +280,9 @@ class InvoiceController extends Controller
             return; // don’t set invoice_id if PDF failed
         }
 
-        $size = File::exists($fullPath) ? File::size($fullPath) : 0;
+        $size = \Illuminate\Support\Facades\File::exists($fullPath)
+            ? \Illuminate\Support\Facades\File::size($fullPath)
+            : 0;
 
         $upload = UploadModel::create([
             'file_path' => $relativePath,
@@ -277,5 +294,73 @@ class InvoiceController extends Controller
         $order->invoice_id = $upload->id;
         $order->save();
     }
+
+    
+    // private function generateOrderInvoice(OrderModel $order): void
+    // {
+    //     // Don't create duplicate invoice
+    //     if ($order->invoice_id) return;
+
+    //     $order->loadMissing(['user', 'items.product', 'items.variant']);
+
+    //     // Use order created_at for year & month (fallback to now if null)
+    //     $dt    = $order->created_at ?? now();
+    //     $year  = $dt->format('Y');
+    //     $month = $dt->format('m');
+
+    //     // Series: minimum 4 digits (left-pad with zeros if needed)
+    //     $orderIdStr = (string) $order->id;
+    //     if (strlen($orderIdStr) < 4) {
+    //         $series = str_pad($orderIdStr, 4, '0', STR_PAD_LEFT);
+    //     } else {
+    //         $series = $orderIdStr; // already >= 4 digits
+    //     }
+
+    //     $invoiceNumber = "HAN-INV-{$year}-{$month}-{$series}";
+    //     $fileName      = $invoiceNumber . '.pdf';
+    //     $relativePath  = 'upload/order_invoice/' . $fileName;
+    //     $fullPath      = storage_path('app/public/' . $relativePath);
+
+    //     // Ensure directory exists
+    //     if (!File::isDirectory(dirname($fullPath))) {
+    //         File::makeDirectory(dirname($fullPath), 0755, true, true);
+    //     }
+
+    //     try {
+    //         $mpdf = new Mpdf([
+    //             'format'        => 'A4',
+    //             'default_font'  => 'dejavusans',
+    //             'margin_top'    => 0,
+    //             'margin_bottom' => 0,
+    //         ]);
+
+    //         $html = view('pdf.order_invoice', [
+    //             'order' => $order,
+    //             'user'  => $order->user,
+    //             'items' => $order->items,
+    //             'invoiceNumber' => $invoiceNumber, // 👈 you can use this inside Blade
+    //         ])->render();
+
+    //         $mpdf->WriteHTML($html);
+    //         $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
+    //     } catch (\Mpdf\MpdfException $e) {
+    //         \Log::error('mPDF order invoice error: ' . $e->getMessage(), [
+    //             'order_id' => $order->id,
+    //         ]);
+    //         return; // don’t set invoice_id if PDF failed
+    //     }
+
+    //     $size = File::exists($fullPath) ? File::size($fullPath) : 0;
+
+    //     $upload = UploadModel::create([
+    //         'file_path' => $relativePath,
+    //         'type'      => 'order_invoice',  // or 'pdf' if you prefer
+    //         'size'      => $size,
+    //         'alt_text'  => $invoiceNumber,
+    //     ]);
+
+    //     $order->invoice_id = $upload->id;
+    //     $order->save();
+    // }
 
 }
