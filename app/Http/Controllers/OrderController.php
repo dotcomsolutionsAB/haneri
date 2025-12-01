@@ -287,37 +287,37 @@ class OrderController extends Controller
 
         // Fetch all orders for the user
         $orders = OrderModel::with(['items', 'user', 'invoiceFile'])
-                            -> where('user_id', $user_id)
-                            ->get()
-                            ->map(function ($order) {
+            -> where('user_id', $user_id)
+            ->get()
+            ->map(function ($order) {
 
-                            // Build invoice data if exists
-                            $invoiceId  = $order->invoice_id;
-                            $invoiceUrl = null;
+                // Build invoice data if exists
+                $invoiceId  = $order->invoice_id;
+                $invoiceUrl = null;
 
-                            if ($invoiceId && $order->invoiceFile) {
-                                // file_path is like: upload/order_invoice/HAN-INV-000001.pdf
-                                $invoiceUrl = asset('storage/' . $order->invoiceFile->file_path);
-                            }
+                if ($invoiceId && $order->invoiceFile) {
+                    // file_path is like: upload/order_invoice/HAN-INV-000001.pdf
+                    $invoiceUrl = asset('storage/' . $order->invoiceFile->file_path);
+                }
 
-                            // Make sure to hide the unwanted fields from the user and items
-                            if ($order->items) {
-                                $order->items->makeHidden(['id', 'created_at', 'updated_at']);
-                            }
-                            if ($order->user) {
-                                $order->user->makeHidden(['id', 'created_at', 'updated_at']);
-                            }
-                            // Optionally hide fields from the order
-                            $order->makeHidden(['id', 'created_at', 'updated_at']);
+                // Make sure to hide the unwanted fields from the user and items
+                if ($order->items) {
+                    $order->items->makeHidden(['id', 'created_at', 'updated_at']);
+                }
+                if ($order->user) {
+                    $order->user->makeHidden(['id', 'created_at', 'updated_at']);
+                }
+                // Optionally hide fields from the order
+                $order->makeHidden(['id', 'created_at', 'updated_at']);
 
-                            // 🔹 Attach invoice info in a clean way
-                            $order->invoice = [
-                                'id'  => $invoiceId,
-                                'url' => $invoiceUrl,
-                            ];
+                // 🔹 Attach invoice info in a clean way
+                $order->invoice = [
+                    'id'  => $invoiceId,
+                    'url' => $invoiceUrl,
+                ];
 
-                            return $order;
-                        });
+                return $order;
+            });
 
         return $orders->isNotEmpty()
             ? response()->json(['message' => 'Orders fetched successfully!', 'data' => $orders, 'count' => count($orders)], 200)
