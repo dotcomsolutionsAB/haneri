@@ -145,36 +145,44 @@ class InvoiceController extends Controller
         $relativePath  = 'upload/order_invoice/' . $fileName;
         $fullPath      = storage_path('app/public/' . $relativePath);
 
+        // ✅ 1) Ensure directory exists
+        if (!\Illuminate\Support\Facades\File::isDirectory(dirname($fullPath))) {
+            \Illuminate\Support\Facades\File::makeDirectory(dirname($fullPath), 0755, true, true);
+        }
+
         // 🔥 Generate PDF using mPDF
-        $mpdf = new Mpdf([
-            'format'         => 'A4',
-            'default_font'   => 'dejavusans',
-            'margin_top'     => 0,
-            'margin_bottom'  => 0
+        $mpdf = new \Mpdf\Mpdf([
+            'format'        => 'A4',
+            'default_font'  => 'dejavusans',
+            'margin_top'    => 0,
+            'margin_bottom' => 0,
         ]);
 
         $html = view('pdf.order_invoice', [
             'order' => $order,
             'user'  => $order->user,
-            'items' => $order->items
+            'items' => $order->items,
         ])->render();
 
         $mpdf->WriteHTML($html);
         $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
 
-        // File size
-        $size = filesize($fullPath);
+        // ✅ 2) Get file size safely (only if file exists)
+        $size = \Illuminate\Support\Facades\File::exists($fullPath)
+            ? \Illuminate\Support\Facades\File::size($fullPath)
+            : 0;
 
-        // Save upload entry
+        // ✅ 3) Save upload entry
         $upload = UploadModel::create([
             'file_path' => $relativePath,
             'type'      => 'order_invoice',
             'size'      => $size,
-            'alt_text'  => "Order Invoice $invoiceNumber"
+            'alt_text'  => "Order Invoice $invoiceNumber",
         ]);
 
         $order->invoice_id = $upload->id;
         $order->save();
     }
+
 
 }
