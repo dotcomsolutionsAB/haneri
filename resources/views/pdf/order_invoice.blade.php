@@ -352,6 +352,14 @@
                         <td class="summary-value">₹{{ number_format($taxAmount, 2) }}</td>
                     </tr>
                     <tr>
+                        <td class="summary-label">Shipping Charges:</td>
+                        <td class="summary-value">₹{{ number_format($shippingCharge, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">Discount:</td>
+                        <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
+                    </tr>
+                    <tr>
                         <td class="summary-label"><strong>GRAND TOTAL:</strong></td>
                         <td class="summary-value"><strong>₹{{ number_format($total, 2) }}</strong></td>
                     </tr>
