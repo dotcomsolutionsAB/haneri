@@ -112,6 +112,9 @@
             text-align: left;
         }
 
+        .product-inner-table td {
+            border-bottom: 0px solid #e5e7eb;
+        }
         .product-inner-table {
             width: 100%;
         }
