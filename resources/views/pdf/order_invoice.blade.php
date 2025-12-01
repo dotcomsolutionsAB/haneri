@@ -359,17 +359,13 @@
                         <td class="summary-label">Discount:</td>
                         <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
                     </tr>
-                    <tr>
-                        <td class="summary-label"><strong>GRAND TOTAL:</strong></td>
-                        <td class="summary-value"><strong>₹{{ number_format($total, 2) }}</strong></td>
-                    </tr>
                 </table>
             </div>
         </div>
 
         {{-- FULL-WIDTH GRAND TOTAL BAR --}}
         <div class="grand-total-bar">
-            GRAND TOTAL: ₹{{ number_format($total, 2) }}
+            GRAND TOTAL: ₹{{ number_format($totalAmount, 2) }}
         </div>
 
         {{-- Any additional notes / terms can go here above footer, if needed --}}
