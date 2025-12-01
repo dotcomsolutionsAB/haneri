@@ -78,7 +78,7 @@
         }
 
         .item_table th {
-            border: 2px solid #eee;
+            border: 2px solid #a7a7a7a7;
             background-color: #315858;
             color: white;
         }
@@ -171,6 +171,7 @@
 
         .logo {
             height: 100px;
+            width:300px;
         }
 
         .w-50 {

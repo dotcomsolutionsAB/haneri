@@ -98,24 +98,42 @@ class InvoiceController extends Controller
             ], 404);
         }
 
-        // Keep track of old status to detect  transition
-        $oldStatus = $order->status;
+        $oldStatus        = $order->status;
+        $oldPaymentStatus = $order->payment_status;
 
-        // Update only provided fields
+        // Update fields
         $order->update(array_filter([
             'status'          => $validated['status'] ?? $order->status,
             'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
             'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
         ]));
 
-        // 🔥 Generate invoice when order moves from pending → completed (and no invoice yet)
-        if ($oldStatus === 'pending'
-            && $order->status === 'completed'
-            && !$order->invoice_id) {
-
+        /**
+         * 🔥 Invoice Generation Condition Updated
+         * - Status changed from PENDING → COMPLETED
+         * - Payment status is NOT 'pending'   (means paid/failed/whatever next)
+         * - Invoice not already generated
+         */
+        if (
+            $oldStatus === 'pending' &&
+            $order->status === 'completed' &&
+            $order->payment_status !== 'pending' &&
+            !$order->invoice_id
+        ) {
             $this->generateOrderInvoice($order);
-            // refresh to get invoice_id if changed
             $order->refresh();
+        }
+
+        /** 🔹 Find invoice file URL if exists */
+        $invoice = null;
+        if ($order->invoice_id) {
+            $upload = UploadModel::find($order->invoice_id);
+            if ($upload) {
+                $invoice = [
+                    'id'  => $upload->id,
+                    'url' => asset('storage/' . $upload->file_path),
+                ];
+            }
         }
 
         return response()->json([
@@ -127,7 +145,7 @@ class InvoiceController extends Controller
                 'status'          => $order->status,
                 'payment_status'  => $order->payment_status,
                 'delivery_status' => $order->delivery_status,
-                'invoice_id'      => $order->invoice_id,   // ✅ return it
+                'invoice'         => $invoice,  // 🔥 Full URL returned
                 'updated_at'      => $order->updated_at->toIso8601String(),
             ],
         ], 200);
@@ -135,11 +153,25 @@ class InvoiceController extends Controller
 
     private function generateOrderInvoice(OrderModel $order): void
     {
+        // Don't create duplicate invoice
         if ($order->invoice_id) return;
 
-        $order->loadMissing(['user','items.product','items.variant']);
+        $order->loadMissing(['user', 'items.product', 'items.variant']);
 
-        $invoiceNumber = 'HAN-INV-' . str_pad($order->id, 6, '0', STR_PAD_LEFT);
+        // Use order created_at for year & month (fallback to now if null)
+        $dt    = $order->created_at ?? now();
+        $year  = $dt->format('Y');
+        $month = $dt->format('m');
+
+        // Series: minimum 4 digits (left-pad with zeros if needed)
+        $orderIdStr = (string) $order->id;
+        if (strlen($orderIdStr) < 4) {
+            $series = str_pad($orderIdStr, 4, '0', STR_PAD_LEFT);
+        } else {
+            $series = $orderIdStr; // already >= 4 digits
+        }
+
+        $invoiceNumber = "HAN-INV-{$year}-{$month}-{$series}";
         $fileName      = $invoiceNumber . '.pdf';
         $relativePath  = 'upload/order_invoice/' . $fileName;
         $fullPath      = storage_path('app/public/' . $relativePath);
@@ -161,6 +193,7 @@ class InvoiceController extends Controller
                 'order' => $order,
                 'user'  => $order->user,
                 'items' => $order->items,
+                'invoiceNumber' => $invoiceNumber, // 👈 you can use this inside Blade
             ])->render();
 
             $mpdf->WriteHTML($html);
@@ -176,15 +209,13 @@ class InvoiceController extends Controller
 
         $upload = UploadModel::create([
             'file_path' => $relativePath,
-            'type'      => 'pdf',
+            'type'      => 'order_invoice',  // or 'pdf' if you prefer
             'size'      => $size,
-            'alt_text'  => "$invoiceNumber",
+            'alt_text'  => $invoiceNumber,
         ]);
 
         $order->invoice_id = $upload->id;
         $order->save();
     }
-
-
 
 }

@@ -75,7 +75,7 @@
             text-align: center;
         }
         .item_table th{
-            border: 2px solid #eee;
+            border: 2px solid #a7a7a7a7;
         }
 
         .item_table th {
@@ -172,6 +172,7 @@
 
         .logo {
             height: 100px;
+            width:300px;
         }
 
         .w-50 {
@@ -254,7 +255,7 @@
                         <table width="100%">
                             <tr>
                                 <td style="width: 40px;">
-                                        <img src="{{ asset('storage/upload/logo/Haneri_Favicon.png') }}" class="product-image">
+                                        <img src="{{ asset('storage/upload/logo/Haneri_Favicon.jpg') }}" class="product-image">
                                     
                                 </td>
                                 <td class="product-info" style="text-align: left;">
@@ -290,7 +291,6 @@
             <td style="width: 50%; text-align: right; vertical-align: bottom;">
                 <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
                 <div style="margin-bottom: 10px; font-size: 12px;">Authorized Signatory</div>
-                <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Signature Logo" style="height: 40px;"><br>
                 <div style="font-size: 11px; margin-top: 2px;"><strong>HANERI ELECTRICALS LLP</strong></div>
             </td>
         </tr>
