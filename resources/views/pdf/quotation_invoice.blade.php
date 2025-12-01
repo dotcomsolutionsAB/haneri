@@ -25,7 +25,8 @@
         .header-bar {
             background-color: #ffffff;    /* no green background */
             color: #333333;
-            padding: 12px 40px;
+            /* increased vertical padding for more height */
+            padding: 20px 40px 18px 40px;
             border-bottom: 4px solid #315858;  /* green bottom layer/strip */
         }
 
@@ -35,7 +36,7 @@
         }
 
         .header-logo {
-            height: 40px;
+            height: 40px; /* same size as before */
         }
 
         .header-right {
@@ -185,8 +186,13 @@
 
         /* ========= SIGNATURE ========= */
         .signature-block {
+            /* fixed just above footer */
+            position: fixed;
+            bottom: 60px;         /* adjust if footer height changes */
+            left: 0;
+            right: 0;
+            padding: 0 40px;
             width: 100%;
-            margin-top: 40px;  /* push it towards bottom */
         }
 
         .signature-right {
@@ -329,7 +335,7 @@
             GRAND TOTAL: ₹{{ number_format($grand, 2) }}
         </div>
 
-        {{-- SIGNATURE BLOCK JUST ABOVE FOOTER --}}
+        {{-- SIGNATURE BLOCK FIXED JUST ABOVE FOOTER --}}
         <div class="signature-block">
             <div class="signature-right">
                 <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
