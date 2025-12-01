@@ -198,7 +198,7 @@
         .footer-signature-row {
             color: #315858;
             display: flex;
-            padding: 10px 40px 10px 40px;
+            padding: 20px 40px 20px 40px;
             justify-content: flex-end;
             margin-bottom: 6px;
         }
@@ -209,7 +209,7 @@
         }
 
         .footer-signature-line {
-            border-top: 1px solid #ffffff; /* white line on green */
+            border-top: 1px solid #315858; /* white line on green */
             width: 200px;
             margin-left: auto;
             margin-bottom: 4px;
@@ -353,7 +353,7 @@
                 <div><strong>HANERI ELECTRICALS LLP</strong></div>
             </div>
         </div>
-        <br><br><br>
+        <br><br>
         <div class="footer-text">
             <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
             Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
