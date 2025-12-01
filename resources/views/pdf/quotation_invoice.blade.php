@@ -190,15 +190,16 @@
             bottom: 0;
             left: 0;
             right: 0;
+            padding: 20px 40px 20px 40px;
             font-size: 10px;
             line-height: 1.5;
             box-sizing: border-box;
         }
 
         .footer-signature-row {
+            background: #fff;
             color: #315858;
             display: flex;
-            padding: 20px 40px 20px 40px;
             justify-content: flex-end;
             margin-bottom: 6px;
         }
@@ -218,7 +219,6 @@
         .footer-text {
             text-align: center;
             font-size: 10px;
-            line-height: 1.5;
             background-color: #315858;
             color: #ffffff;
         }
