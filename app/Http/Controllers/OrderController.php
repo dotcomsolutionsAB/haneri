@@ -271,46 +271,109 @@ class OrderController extends Controller
     }
 
     // View all orders for a user
+    // public function index(Request $request)
+    // {
+    //     $user = Auth::user(); 
+
+    //     // If the user is an admin, validate user_id in the request
+    //     if ($user->role == 'admin') {
+    //         $request->validate([
+    //             'user_id' => 'required|integer|exists:users,id',
+    //         ]);
+    //         $user_id =  $request->input('user_id');
+    //     } else {
+    //         $user_id =  $user->id;
+    //     }
+
+    //     // Fetch all orders for the user
+    //     $orders = OrderModel::with(['items', 'user', 'invoiceFile'])
+    //         -> where('user_id', $user_id)
+    //         ->get()
+    //         ->map(function ($order) {
+
+    //             // Build invoice data if exists
+    //             $invoiceId  = $order->invoice_id;
+    //             $invoiceUrl = null;
+
+    //             if ($invoiceId && $order->invoiceFile) {
+    //                 // file_path is like: upload/order_invoice/HAN-INV-000001.pdf
+    //                 $invoiceUrl = asset('storage/' . $order->invoiceFile->file_path);
+    //             }
+
+    //             // Make sure to hide the unwanted fields from the user and items
+    //             if ($order->items) {
+    //                 $order->items->makeHidden(['id', 'created_at', 'updated_at']);
+    //             }
+    //             if ($order->user) {
+    //                 $order->user->makeHidden(['id', 'created_at', 'updated_at']);
+    //             }
+    //             // Optionally hide fields from the order
+    //             $order->makeHidden(['id', 'created_at', 'updated_at']);
+
+    //             // 🔹 Attach invoice info in a clean way
+    //             $order->invoice = [
+    //                 'id'  => $invoiceId,
+    //                 'url' => $invoiceUrl,
+    //             ];
+
+    //             return $order;
+    //         });
+
+    //     return $orders->isNotEmpty()
+    //         ? response()->json(['message' => 'Orders fetched successfully!', 'data' => $orders, 'count' => count($orders)], 200)
+    //         : response()->json(['message' => 'No orders found.'], 200);
+    // }
+    
     public function index(Request $request)
     {
         $user = Auth::user(); 
 
         // If the user is an admin, validate user_id in the request
-        if ($user->role == 'admin') {
+        if ($user->role === 'admin') {
             $request->validate([
                 'user_id' => 'required|integer|exists:users,id',
             ]);
-            $user_id =  $request->input('user_id');
+            $user_id = $request->input('user_id');
         } else {
-            $user_id =  $user->id;
+            $user_id = $user->id;
         }
 
-        // Fetch all orders for the user
         $orders = OrderModel::with(['items', 'user', 'invoiceFile'])
-            -> where('user_id', $user_id)
+            ->where('user_id', $user_id)
             ->get()
             ->map(function ($order) {
-
-                // Build invoice data if exists
+                // 🔹 1) Build invoice URL (prefer DB row, fallback to pattern)
                 $invoiceId  = $order->invoice_id;
                 $invoiceUrl = null;
 
-                if ($invoiceId && $order->invoiceFile) {
-                    // file_path is like: upload/order_invoice/HAN-INV-000001.pdf
+                if ($order->invoiceFile && $order->invoiceFile->file_path) {
+                    // from t_uploads.file_path
                     $invoiceUrl = asset('storage/' . $order->invoiceFile->file_path);
+                } elseif ($invoiceId) {
+                    // fallback: build by convention HAN-INV-{order_id}.pdf
+                    $invoiceNumber = 'HAN-INV-' . str_pad($order->id, 6, '0', STR_PAD_LEFT);
+                    $relativePath  = 'upload/order_invoice/' . $invoiceNumber . '.pdf';
+                    $invoiceUrl    = asset('storage/' . $relativePath);
                 }
 
-                // Make sure to hide the unwanted fields from the user and items
+                // 🔹 2) Hide unwanted fields from items
                 if ($order->items) {
                     $order->items->makeHidden(['id', 'created_at', 'updated_at']);
                 }
+
+                // 🔹 3) Hide unwanted fields from user
                 if ($order->user) {
                     $order->user->makeHidden(['id', 'created_at', 'updated_at']);
                 }
-                // Optionally hide fields from the order
-                $order->makeHidden(['id', 'created_at', 'updated_at']);
 
-                // 🔹 Attach invoice info in a clean way
+                // 🔹 4) Hide internal fields from order (but KEEP invoice_id)
+                $order->makeHidden([
+                    'created_at',
+                    'updated_at',
+                    'invoiceFile',   // hide relation completely
+                ]);
+
+                // 🔹 5) Attach clean invoice data
                 $order->invoice = [
                     'id'  => $invoiceId,
                     'url' => $invoiceUrl,
@@ -319,10 +382,15 @@ class OrderController extends Controller
                 return $order;
             });
 
-        return $orders->isNotEmpty()
-            ? response()->json(['message' => 'Orders fetched successfully!', 'data' => $orders, 'count' => count($orders)], 200)
-            : response()->json(['message' => 'No orders found.'], 200);
+        return response()->json([
+            'message' => $orders->isNotEmpty()
+                ? 'Orders fetched successfully!'
+                : 'No orders found.',
+            'data'  => $orders,
+            'count' => $orders->count(),
+        ], 200);
     }
+
 
     // View details of a single order
     public function show($id)
