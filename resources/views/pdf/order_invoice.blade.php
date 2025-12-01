@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Order Invoice - HAN-INV-{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}</title>
@@ -17,148 +16,123 @@
             color: #333;
         }
 
-        .bg-image {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 400px;
-            height: 550px;
-            transform: translate(-50%, -50%);
-            z-index: -1;
-            opacity: 0.1;
-        }
-
-        .content {
-            padding: 20px 40px;
+        .page-wrap {
+            padding: 20px 40px 80px 40px; /* bottom space for footer */
             box-sizing: border-box;
         }
 
-        .header {
-            /* background-color: #231f20; */
-            color: white;
-            padding: 10px 40px;
+        /* ========= HEADER ========= */
+        .header-bar {
+            background-color: #ffffff;    /* white header */
+            color: #333333;
+            padding: 24px 40px 20px 40px;
+            border-bottom: 4px solid #315858;  /* green bottom strip */
         }
 
-        .invoice-title {
+        .header-table {
             width: 100%;
             border-collapse: collapse;
+        }
+
+        .header-logo {
+            height: 40px;
+        }
+
+        .header-right {
+            text-align: right;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .header-right strong {
+            font-size: 11px;
+        }
+
+        /* ========= TITLE ========= */
+        .title-row {
+            margin-top: 12px;
             margin-bottom: 10px;
-            padding: 0px 10px;
         }
 
-        .invoice-box {
-            width: 48%;
-            border: 1px solid #eee;
-            padding: 5px;
-            box-sizing: border-box;
+        .title-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #315858;
+        }
+
+        /* ========= BILLING BLOCK ========= */
+        .bill-table {
+            width: 100%;
+            table-layout: fixed;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+
+        .bill-box {
             vertical-align: top;
+            padding: 4px 0;
+            line-height: 1.5;
         }
 
-        .invoice-box h4 {
-            font-size: 12px;
-            color: #3b3b3b;
+        .bill-label {
+            font-weight: bold;
+            margin-bottom: 2px;
         }
 
-        .invoice-box p {
-            margin: 0 0 6px;
-            font-size: 12px;
-        }
-
-        .item_table {
+        /* ========= ITEMS TABLE ========= */
+        .item-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 12px;
         }
 
-        .item_table th,
-        .item_table td {
-            font-size: 12px;
+        .item-table th,
+        .item-table td {
+            font-size: 11px;
             padding: 6px 5px;
             text-align: center;
         }
 
-        .item_table th {
-            border: 2px solid #a7a7a7a7;
+        .item-table thead th {
             background-color: #315858;
-            color: white;
+            color: #ffffff;
+            border: 1px solid #d1d5db;
         }
 
-        .summary {
-            text-align: right;
-            margin-top: 20px;
+        .item-table tbody td {
+            border-bottom: 1px solid #e5e7eb;
         }
 
-        .summary h4 {
-            margin: 5px 0;
-            font-size: 12px;
+        .item-table tbody tr:last-child td {
+            border-bottom: 0;
         }
 
-        .grand-total {
-            font-size: 14px;
-            font-weight: bold;
-            background-color: #315858;
-            color: white;
-            padding: 10px;
+        .item-name-cell {
+            text-align: left;
         }
 
-        .footer {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 10px 60px;
-            background-color: #315858;
-            color: #fff;
-            font-size: 12px;
-            text-align: center;
+        .product-inner-table td {
+            border-bottom: 0px solid #e5e7eb;
         }
-
-        .folded-corner {
-            position: relative;
-            height: 40px;
+        .product-inner-table {
             width: 100%;
-            vertical-align: middle !important;
         }
 
-        .folded-corner .top {
-            width: 0;
-            height: 0;
-            border-top: 40px solid #9d9c9c;
-            border-right: 40px solid transparent;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        .folded-corner .label {
-            height: 50px;
-            line-height: 40px;
-            padding-left: 50px;
-            color: #3b3b3b;
-            font-size: 20px;
-            font-weight: bold;
-            font-family: Arial, sans-serif;
-        }
-
-        .folded-corner .bottom {
-            width: 0;
-            height: 0;
-            border-bottom: 40px solid #3b3b3b;
-            border-right: 40px solid transparent;
-            position: absolute;
-            top: 0;
-            left: 0;
+        .product-img-td {
+            width: 30px;
         }
 
         .product-image {
-            width: 40px;
-            height: auto;
+            width: 26px;
+            height: 26px;
+            object-fit: contain;
         }
 
         .product-info {
-            vertical-align: top;
-            padding-left: 10px;
-            line-height: 1.5;
+            padding-left: 8px;
+            vertical-align: middle;
+            line-height: 1.4;
+            font-size: 11px;
         }
 
         .text-right {
@@ -169,158 +143,267 @@
             text-align: center;
         }
 
-        .logo {
-            height: 100px;
-            width:300px;
+        /* ========= SUMMARY ========= */
+        .summary-wrap {
+            margin-top: 15px;
+            width: 100%;
         }
 
-        .w-50 {
-            width: 50%;
+        .summary-inner {
+            width: 40%;
+            margin-left: auto;
+            font-size: 11px;
+        }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .summary-table td {
+            padding: 4px 4px;
+        }
+
+        .summary-label {
+            text-align: right;
+            color: #444;
+        }
+
+        .summary-value {
+            text-align: right;
+            width: 140px;
+        }
+
+        /* FULL-WIDTH GRAND TOTAL BAR */
+        .grand-total-bar {
+            margin-top: 10px;
+            background-color: #315858;
+            color: #ffffff;
+            padding: 10px 12px;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: right;
+        }
+
+        /* ========= FOOTER + SIGNATURE ========= */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #315858;
+            color: #ffffff;
+            font-size: 10px;
+            line-height: 1.5;
+            box-sizing: border-box;
+        }
+
+        .footer-signature-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 6px;
+            background-color:#fff;
+            color:#000;
+            padding: 10px 40px 10px 40px;
+        }
+
+        .footer-signature-block {
+            text-align: right;
+            font-size: 11px;
+        }
+
+        .footer-signature-line {
+            border-top: 2px solid #315858;
+            width: 200px;
+            margin-left: auto;
+            margin-bottom: 4px;
+        }
+
+        .footer-text {
+            text-align: center;
+            font-size: 10px;
+            padding: 10px 40px 10px 40px;
+        }
+
+        .footer a {
+            color: #ffffff;
+            text-decoration: underline;
         }
     </style>
 </head>
-
 <body>
 
-    {{-- Header --}}
-    <div class="header">
-        <table width="100%">
+    {{-- HEADER STRIP (white with green bottom line) --}}
+    <div class="header-bar">
+        <table class="header-table">
             <tr>
-                <td class="w-50">
-                    <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Logo" class="logo">
+                <td style="width: 50%; vertical-align: middle;">
+                    <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Logo" class="header-logo">
                 </td>
-                <td class="w-50 text-right">
-                    <strong>INVOICE NUMBER:</strong> #HAN-INV-{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}<br>
-                    <strong>INVOICE DATE:</strong> {{ optional($order->created_at)->format('M d, Y, h:i A') ??
-                    now()->format('M d, Y, h:i A') }}
+                <td style="width: 50%;" class="header-right">
+                    <div>
+                        <strong>INVOICE NUMBER:</strong>
+                        #HAN-INV-{{ str_pad($order->id, 6, '0', STR_PAD_LEFT) }}
+                    </div>
+                    <div>
+                        <strong>INVOICE DATE:</strong>
+                        {{ optional($order->created_at)->format('M d, Y, h:i A') ?? now()->format('M d, Y, h:i A') }}
+                    </div>
                 </td>
             </tr>
         </table>
     </div>
 
-    {{-- Invoice Label --}}
-    <div class="content">
-        <table class="invoice-title">
+    <div class="page-wrap">
+        {{-- TITLE ROW --}}
+        <div class="title-row">
+            <span class="title-text">Tax Invoice</span>
+        </div>
+
+        {{-- BILLED TO (LEFT) & SHIP TO (RIGHT) --}}
+        <table class="bill-table">
             <tr>
-                <td>
-                    <div class="folded-corner">
-                        <div class="top"></div>
-                        <div class="label">Tax Invoice</div>
-                        <div class="bottom"></div>
-                    </div>
+                <td class="bill-box" style="width: 50%;">
+                    <div class="bill-label">Billed To:</div>
+                    <strong>{{ $user->name ?? '-' }}</strong><br>
+                    {{ $user->email ?? '-' }}<br>
+                    Tel: {{ $user->mobile ?? '+91 xxxxx-xxxxx' }}<br>
+                </td>
+                <td class="bill-box" style="width: 50%; text-align:right;">
+                    <div class="bill-label">Ship To:</div>
+                    {{ $order->shipping_address ?? 'INDIA' }}<br>
                 </td>
             </tr>
         </table>
 
-        {{-- Bill Details --}}
-        <table width="100%"
-            style="table-layout: fixed; margin-top: 5px; font-family: 'DejaVu Sans', sans-serif; font-size: 12px;">
+        {{-- ORDER DETAILS ROW (under billing) --}}
+        <table class="bill-table" style="margin-top: 3px;">
             <tr>
-                {{-- Left Box --}}
-                <td style="width: 50%; vertical-align: top; padding-right: 10px;">
-                    <div style="border: 0px solid #ccc; padding: 10px; line-height: 1.4;">
-                        <strong>Billed To:</strong><br>
-                        <strong>{{ $user->name ?? '-' }}</strong><br>
-                        {{ $user->email ?? '-' }}<br>
-                        Tel: {{ $user->mobile ?? '+91 xxxxx-xxxxx' }}<br>
-
-                        <strong>Ship To:</strong><br>
-                        {{ $order->shipping_address ?? 'INDIA' }}<br>
-                    </div>
+                <td class="bill-box" style="width: 50%;">
+                    <div class="bill-label">Order Details:</div>
+                    <div><strong>Order ID:</strong> {{ $order->id }}</div>
+                    <div><strong>Payment Status:</strong> {{ strtoupper($order->payment_status ?? 'PENDING') }}</div>
                 </td>
-
-                {{-- Right Box – summary --}}
-                <td style="width: 50%; vertical-align: top; padding-left: 10px;">
-                    <div style="border: 0px solid #ccc; padding: 10px; line-height: 1.4;">
-                        <strong>Order ID:</strong> {{ $order->id }}<br>
-                        <strong>Payment Status:</strong> {{ strtoupper($order->payment_status ?? 'PENDING') }}<br>
-                        <strong>Delivery Status:</strong> {{ strtoupper($order->delivery_status ?? 'PENDING') }}<br>
-                        <strong>Order Status:</strong> {{ strtoupper($order->status ?? 'PENDING') }}<br>
-                    </div>
+                <td class="bill-box" style="width: 50%; text-align:right;">
+                    <div class="bill-label">&nbsp;</div>
+                    <div><strong>Delivery Status:</strong> {{ strtoupper($order->delivery_status ?? 'PENDING') }}</div>
+                    <div><strong>Order Status:</strong> {{ strtoupper($order->status ?? 'PENDING') }}</div>
                 </td>
             </tr>
         </table>
 
-        {{-- Items --}}
-        <table class="item_table">
+        {{-- ITEMS TABLE --}}
+        <table class="item-table">
             <thead>
                 <tr>
-                    <th>ITEM</th>
-                    <th>VARIATION</th>
-                    <th>RATE (₹)</th>
-                    <th>QTY</th>
-                    <th class="text-right">SUBTOTAL (₹)</th>
+                    <th style="width: 35px;">#</th>
+                    <th style="text-align:left;">ITEM</th>
+                    <th style="width: 100px;">VARIATION</th>
+                    <th style="width: 70px;">RATE (₹)</th>
+                    <th style="width: 50px;">QTY</th>
+                    <th style="width: 90px;" class="text-right">SUBTOTAL (₹)</th>
                 </tr>
             </thead>
             <tbody>
-                @php $grandTotal = 0; @endphp
+                @php
+                    $grandTotal = 0;
+                @endphp
 
                 @foreach($items as $item)
-                @php
-                $rate = $item->price ?? 0;
-                $qty = $item->quantity ?? 0;
-                $lineTotal = $rate * $qty;
-                $grandTotal += $lineTotal;
-                @endphp
-                <tr>
-                    <td>
-                        <table width="100%">
-                            <tr>
-                                <td style="width: 40px;">
-                                    {{-- If you have product image, replace src below --}}
-                                    <img src="{{ asset('storage/upload/logo/Haneri_Favicon.jpg') }}" class="product-image">
-                                </td>
-                                <td class="product-info" style="text-align: left;">
-                                    <strong>{{ optional($item->product)->name ?? 'Product #'.$item->product_id
-                                        }}</strong>
-                                </td>
-                            </tr>
-                        </table>
-                    </td>
-                    <td>
-                        {{ optional($item->variant)->value ?? '-' }}
-                    </td>
-                    <td>
-                        ₹{{ number_format($rate, 2) }}
-                    </td>
-                    <td>{{ $qty }}</td>
-                    <td class="text-right">₹{{ number_format($lineTotal, 2) }}</td>
-                </tr>
+                    @php
+                        $rate = $item->price ?? 0;
+                        $qty = $item->quantity ?? 0;
+                        $lineTotal = $rate * $qty;
+                        $grandTotal += $lineTotal;
+                    @endphp
+                    <tr>
+                        <td class="text-center">{{ $loop->iteration }}</td>
+                        <td class="item-name-cell">
+                            <table class="product-inner-table">
+                                <tr>
+                                    <td class="product-img-td">
+                                        <img src="{{ asset('storage/upload/logo/Haneri_Favicon.jpg') }}"
+                                             class="product-image" alt="H">
+                                    </td>
+                                    <td class="product-info">
+                                        <strong>{{ optional($item->product)->name ?? 'Product #'.$item->product_id }}</strong>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                        <td>{{ optional($item->variant)->value ?? '-' }}</td>
+                        <td>{{ number_format($rate, 2) }}</td>
+                        <td>{{ $qty }}</td>
+                        <td class="text-right">₹{{ number_format($lineTotal, 2) }}</td>
+                    </tr>
                 @endforeach
             </tbody>
         </table>
 
-        {{-- Summary --}}
-        <div class="summary">
-            {{-- If you later add tax / shipping, extend here --}}
-            <h4><strong>Grand Total:</strong> ₹{{ number_format($order->total_amount ?? $grandTotal, 2) }}</h4>
+        {{-- SUMMARY BLOCK (RIGHT) --}}
+        @php
+            // These can be passed from controller like in quotation
+            $subTotal  = $subTotal  ?? $grandTotal;
+            $taxAmount = $taxAmount ?? 0;
+            $shipping  = $shipping  ?? 0;
+            $discount  = $discount  ?? 0;
+
+            $calcTotal = $subTotal + $taxAmount + $shipping - $discount;
+            $finalTotal = $order->total_amount ?? $calcTotal;
+        @endphp
+
+        <div class="summary-wrap">
+            <div class="summary-inner">
+                <table class="summary-table">
+                    <tr>
+                        <td class="summary-label">SUBTOTAL:</td>
+                        <td class="summary-value">₹{{ number_format($subTotal, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">TAX:</td>
+                        <td class="summary-value">₹{{ number_format($taxAmount, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">SHIPPING:</td>
+                        <td class="summary-value">₹{{ number_format($shipping, 2) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="summary-label">DISCOUNT:</td>
+                        <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        {{-- FULL-WIDTH GRAND TOTAL BAR --}}
+        <div class="grand-total-bar">
+            GRAND TOTAL: ₹{{ number_format($finalTotal, 2) }}
+        </div>
+
+        {{-- Any additional notes / terms can go here above footer, if needed --}}
+    </div>
+
+    {{-- FOOTER STRIP (WITH SIGNATURE INSIDE, JUST ABOVE CONTACT DETAILS) --}}
+    <div class="footer">
+        <div class="footer-signature-row">
+            <div class="footer-signature-block">
+                <div class="footer-signature-line"></div>
+                <div style="margin-bottom: 4px;">Authorized Signatory</div>
+                <div><strong>HANERI ELECTRICALS LLP</strong></div>
+            </div>
+        </div>
+        <div style="height:30px; background-color:#fff;"></div>
+        <div class="footer-text">
+            <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
+            Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
+            Email:
+            <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">
+                customercare@haneri.com
+            </a>
+            &nbsp; | &nbsp;
+            Phone: +91 8377826826
         </div>
     </div>
 
-    {{-- Signature --}}
-    <table width="100%" style="margin-top: 40px; padding: 20px 40px;">
-        <tr>
-            <td style="width: 50%; text-align: left;">
-                {{-- Any terms & conditions or notes --}}
-            </td>
-
-            <td style="width: 50%; text-align: right; vertical-align: bottom;">
-                <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
-                <div style="margin-bottom: 10px; font-size: 12px;">Authorized Signatory</div>
-                <div style="font-size: 11px; margin-top: 2px;"><strong>HANERI ELECTRICALS LLP</strong></div>
-            </td>
-        </tr>
-    </table>
-
-    {{-- Footer Area --}}
-    <div class="footer" style="font-size: 11px; line-height: 1.5;">
-        <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
-        Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
-        Email: <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">customercare@haneri.com</a>
-        &nbsp; | &nbsp;
-        Phone: +91 8377826826
-    </div>
-
 </body>
-
 </html>
