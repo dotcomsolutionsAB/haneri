@@ -190,7 +190,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 10px 40px 10px 40px;
+            
             background-color: #315858;
             color: #ffffff;
             font-size: 10px;
@@ -204,6 +204,7 @@
             margin-bottom: 6px;
             background-color:#fff;
             color:#000;
+            padding: 10px 40px 10px 40px;
         }
 
         .footer-signature-block {
@@ -221,6 +222,7 @@
         .footer-text {
             text-align: center;
             font-size: 10px;
+            padding: 10px 40px 10px 40px;
         }
 
         .footer a {
@@ -269,13 +271,13 @@
         </table>
 
         {{-- ITEMS TABLE --}}
-        @php
+        <!-- @php
             $subtotal = $q_items->sum('total');
             $tax      = 0;   // update later if you have tax field
             $shipping = 0;   // update later if you have shipping
             $discount = 0;   // update later if you have discount
             $grand    = $subtotal + $tax + $shipping - $discount;
-        @endphp
+        @endphp -->
 
         <table class="item-table">
             <thead>
@@ -319,19 +321,11 @@
                 <table class="summary-table">
                     <tr>
                         <td class="summary-label">SUBTOTAL:</td>
-                        <td class="summary-value">₹{{ number_format($subtotal, 2) }}</td>
+                        <td class="summary-value">₹{{ number_format({{ $subTotal }}, 2) }}</td>
                     </tr>
                     <tr>
                         <td class="summary-label">TAX (₹):</td>
-                        <td class="summary-value">₹{{ number_format($tax, 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td class="summary-label">SHIPPING &amp; HANDLING:</td>
-                        <td class="summary-value">₹{{ number_format($shipping, 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td class="summary-label">DISCOUNT:</td>
-                        <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
+                        <td class="summary-value">₹{{ number_format({{ $taxAmount }}, 2) }}</td>
                     </tr>
                 </table>
             </div>
@@ -339,7 +333,7 @@
 
         {{-- FULL-WIDTH GRAND TOTAL BAR --}}
         <div class="grand-total-bar">
-            GRAND TOTAL: ₹{{ number_format($grand, 2) }}
+            GRAND TOTAL: ₹{{ number_format({{ $q_total }}, 2) }}
         </div>
 
         {{-- NOTE: Signature is now handled inside the footer --}}
@@ -354,7 +348,7 @@
                 <div><strong>HANERI ELECTRICALS LLP</strong></div>
             </div>
         </div>
-        <br><br><br>
+        <div class="div" style="height:30px; background-color:#fff;"></div>
         <div class="footer-text">
             <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
             Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
