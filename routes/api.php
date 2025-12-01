@@ -19,6 +19,7 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\UsersDiscountController;
 use App\Http\Controllers\DelhiveryServiceController;
 use App\Http\Controllers\UploadController;
+use App\Http\Controllers\InvoiceController;
 
 
 // Route::get('/user', function (Request $request) {
