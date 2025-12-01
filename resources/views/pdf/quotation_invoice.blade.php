@@ -321,11 +321,15 @@
                 <table class="summary-table">
                     <tr>
                         <td class="summary-label">SUBTOTAL:</td>
-                        <td class="summary-value">₹{{ number_format({{ $subTotal }}, 2) }}</td>
+                        <td class="summary-value">
+                            ₹{{ number_format($subTotal, 2) }}
+                        </td>
                     </tr>
                     <tr>
                         <td class="summary-label">TAX (₹):</td>
-                        <td class="summary-value">₹{{ number_format({{ $taxAmount }}, 2) }}</td>
+                        <td class="summary-value">
+                            ₹{{ number_format($taxAmount, 2) }}
+                        </td>
                     </tr>
                 </table>
             </div>
@@ -333,7 +337,7 @@
 
         {{-- FULL-WIDTH GRAND TOTAL BAR --}}
         <div class="grand-total-bar">
-            GRAND TOTAL: ₹{{ number_format({{ $q_total }}, 2) }}
+            GRAND TOTAL: ₹{{ number_format($q_total, 2) }}
         </div>
 
         {{-- NOTE: Signature is now handled inside the footer --}}
