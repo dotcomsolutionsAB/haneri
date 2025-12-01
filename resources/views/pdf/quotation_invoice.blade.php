@@ -191,14 +191,13 @@
             left: 0;
             right: 0;
             padding: 10px 40px 10px 40px;
-            background-color: #315858;
-            color: #ffffff;
             font-size: 10px;
             line-height: 1.5;
             box-sizing: border-box;
         }
 
         .footer-signature-row {
+            color:#315858;
             display: flex;
             justify-content: flex-end;
             margin-bottom: 6px;
@@ -219,6 +218,8 @@
         .footer-text {
             text-align: center;
             font-size: 10px;
+            background-color: #315858;
+            color: #ffffff;
         }
 
         .footer a {
@@ -352,11 +353,12 @@
                 <div><strong>HANERI ELECTRICALS LLP</strong></div>
             </div>
         </div>
+        <br><br><br>
         <div class="footer-text">
             <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
             Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
             Email:
-            <a href="mailto:customercare@haneri.com">customercare@haneri.com</a>
+            <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">customercare@haneri.com</a>
             &nbsp; | &nbsp;
             Phone: +91 8377826826
         </div>
