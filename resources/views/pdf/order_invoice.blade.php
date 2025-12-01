@@ -34,7 +34,7 @@
         }
 
         .header {
-            background-color: #231f20;
+            /* background-color: #231f20; */
             color: white;
             padding: 10px 40px;
         }
@@ -306,8 +306,6 @@
             <td style="width: 50%; text-align: right; vertical-align: bottom;">
                 <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
                 <div style="margin-bottom: 10px; font-size: 12px;">Authorized Signatory</div>
-                <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Signature Logo"
-                    style="height: 40px;"><br>
                 <div style="font-size: 11px; margin-top: 2px;"><strong>HANERI ELECTRICALS LLP</strong></div>
             </td>
         </tr>

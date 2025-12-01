@@ -135,7 +135,6 @@ class InvoiceController extends Controller
 
     private function generateOrderInvoice(OrderModel $order): void
     {
-        // Don't create duplicate invoice
         if ($order->invoice_id) return;
 
         $order->loadMissing(['user','items.product','items.variant']);
@@ -145,44 +144,47 @@ class InvoiceController extends Controller
         $relativePath  = 'upload/order_invoice/' . $fileName;
         $fullPath      = storage_path('app/public/' . $relativePath);
 
-        // ✅ 1) Ensure directory exists
-        if (!\Illuminate\Support\Facades\File::isDirectory(dirname($fullPath))) {
-            \Illuminate\Support\Facades\File::makeDirectory(dirname($fullPath), 0755, true, true);
+        // Ensure directory exists
+        if (!File::isDirectory(dirname($fullPath))) {
+            File::makeDirectory(dirname($fullPath), 0755, true, true);
         }
 
-        // 🔥 Generate PDF using mPDF
-        $mpdf = new \Mpdf\Mpdf([
-            'format'        => 'A4',
-            'default_font'  => 'dejavusans',
-            'margin_top'    => 0,
-            'margin_bottom' => 0,
-        ]);
+        try {
+            $mpdf = new Mpdf([
+                'format'        => 'A4',
+                'default_font'  => 'dejavusans',
+                'margin_top'    => 0,
+                'margin_bottom' => 0,
+            ]);
 
-        $html = view('pdf.order_invoice', [
-            'order' => $order,
-            'user'  => $order->user,
-            'items' => $order->items,
-        ])->render();
+            $html = view('pdf.order_invoice', [
+                'order' => $order,
+                'user'  => $order->user,
+                'items' => $order->items,
+            ])->render();
 
-        $mpdf->WriteHTML($html);
-        $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
+            $mpdf->WriteHTML($html);
+            $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
+        } catch (\Mpdf\MpdfException $e) {
+            \Log::error('mPDF order invoice error: ' . $e->getMessage(), [
+                'order_id' => $order->id,
+            ]);
+            return; // don’t set invoice_id if PDF failed
+        }
 
-        // ✅ 2) Get file size safely (only if file exists)
-        $size = \Illuminate\Support\Facades\File::exists($fullPath)
-            ? \Illuminate\Support\Facades\File::size($fullPath)
-            : 0;
+        $size = File::exists($fullPath) ? File::size($fullPath) : 0;
 
-        // ✅ 3) Save upload entry
         $upload = UploadModel::create([
             'file_path' => $relativePath,
-            'type'      => 'order_invoice',
+            'type'      => 'pdf',
             'size'      => $size,
-            'alt_text'  => "Order Invoice $invoiceNumber",
+            'alt_text'  => "$invoiceNumber",
         ]);
 
         $order->invoice_id = $upload->id;
         $order->save();
     }
+
 
 
 }

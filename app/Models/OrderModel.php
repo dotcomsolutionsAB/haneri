@@ -31,7 +31,13 @@ class OrderModel extends Model
         return $this->hasMany(OrderItemModel::class, 'order_id', 'id'); // order_id references id in Order table
     }
     
-    public function invoiceUpload()
+    // public function invoiceUpload()
+    // {
+    //     return $this->belongsTo(UploadModel::class, 'invoice_id', 'id');
+    // }
+    
+    // 🔹 NEW: link to t_uploads (invoice file)
+    public function invoiceFile()
     {
         return $this->belongsTo(UploadModel::class, 'invoice_id', 'id');
     }

@@ -286,10 +286,20 @@ class OrderController extends Controller
         }
 
         // Fetch all orders for the user
-        $orders = OrderModel::with(['items', 'user'])
+        $orders = OrderModel::with(['items', 'user', 'invoiceFile'])
                             -> where('user_id', $user_id)
                             ->get()
                             ->map(function ($order) {
+
+                            // Build invoice data if exists
+                            $invoiceId  = $order->invoice_id;
+                            $invoiceUrl = null;
+
+                            if ($invoiceId && $order->invoiceFile) {
+                                // file_path is like: upload/order_invoice/HAN-INV-000001.pdf
+                                $invoiceUrl = asset('storage/' . $order->invoiceFile->file_path);
+                            }
+
                             // Make sure to hide the unwanted fields from the user and items
                             if ($order->items) {
                                 $order->items->makeHidden(['id', 'created_at', 'updated_at']);
@@ -299,6 +309,13 @@ class OrderController extends Controller
                             }
                             // Optionally hide fields from the order
                             $order->makeHidden(['id', 'created_at', 'updated_at']);
+
+                            // 🔹 Attach invoice info in a clean way
+                            $order->invoice = [
+                                'id'  => $invoiceId,
+                                'url' => $invoiceUrl,
+                            ];
+
                             return $order;
                         });
 
