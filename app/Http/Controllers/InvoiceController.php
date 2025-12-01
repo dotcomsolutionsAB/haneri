@@ -99,7 +99,7 @@ class InvoiceController extends Controller
             ], 404);
         }
 
-        // Keep track of old status to detect transition
+        // Keep track of old status to detect  transition
         $oldStatus = $order->status;
 
         // Update only provided fields
