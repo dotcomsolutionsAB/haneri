@@ -184,7 +184,7 @@ class QuotationController extends Controller
 
         return $quotations->isNotEmpty()
             ? response()->json(['message' => 'Quotations fetched successfully!', 'data' => $quotations, 'count' => count($quotations)], 200)
-            : response()->json(['message' => 'No quotations found.'], 400);
+            : response()->json(['message' => 'No quotations found.'], 200);
     }
 
     // View details of a single quotation

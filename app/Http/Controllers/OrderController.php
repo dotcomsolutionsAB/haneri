@@ -496,7 +496,7 @@ class OrderController extends Controller
 
         return $orders->isNotEmpty()
             ? response()->json(['message' => 'Orders fetched successfully!', 'data' => $orders, 'count' => count($orders)], 200)
-            : response()->json(['message' => 'No orders found.'], 400);
+            : response()->json(['message' => 'No orders found.'], 200);
     }
 
     // View details of a single order
