@@ -23,9 +23,10 @@
 
         /* ========= HEADER ========= */
         .header-bar {
-            background-color: #315858; /* HANERI green */
-            color: #ffffff;
+            background-color: #ffffff;    /* no green background */
+            color: #333333;
             padding: 12px 40px;
+            border-bottom: 4px solid #315858;  /* green bottom layer/strip */
         }
 
         .header-table {
@@ -69,7 +70,7 @@
 
         .bill-box {
             vertical-align: top;
-            padding: 8px 0;
+            padding: 4px 0;
             line-height: 1.5;
         }
 
@@ -146,7 +147,7 @@
             width: 100%;
         }
 
-        .summary-right {
+        .summary-inner {
             width: 40%;
             margin-left: auto;
             font-size: 11px;
@@ -171,16 +172,28 @@
             width: 120px;
         }
 
-        .grand-row td {
-            padding-top: 8px;
-        }
-
-        .grand-bar {
+        /* FULL-WIDTH GRAND TOTAL BAR */
+        .grand-total-bar {
+            margin-top: 10px;
             background-color: #315858;
             color: #ffffff;
-            padding: 8px 6px;
+            padding: 10px 12px;
             font-weight: bold;
-            font-size: 12px;
+            font-size: 16px;  /* bigger font */
+            text-align: right;
+        }
+
+        /* ========= SIGNATURE ========= */
+        .signature-block {
+            width: 100%;
+            margin-top: 40px;  /* push it towards bottom */
+        }
+
+        .signature-right {
+            width: 50%;
+            margin-left: auto;
+            text-align: right;
+            font-size: 11px;
         }
 
         /* ========= FOOTER ========= */
@@ -205,7 +218,7 @@
 </head>
 <body>
 
-    {{-- HEADER STRIP --}}
+    {{-- HEADER STRIP (white with green bottom line) --}}
     <div class="header-bar">
         <table class="header-table">
             <tr>
@@ -226,20 +239,18 @@
             <span class="title-text">Quotation</span>
         </div>
 
-        {{-- BILL TO / SHIP TO --}}
+        {{-- BILLED TO (LEFT) & SHIP TO (RIGHT) IN SAME ROW --}}
         <table class="bill-table">
             <tr>
-                <td class="bill-box" style="width: 60%;">
+                <td class="bill-box" style="width: 50%;">
                     <div class="bill-label">Billed To:</div>
                     <strong>{{ $q_name }}</strong><br>
                     {{ $q_email }}<br>
                     Tel: {{ $q_mobile ?? '+91 xxxxx-xxxxx' }}<br>
-                    <br>
-                    <span class="bill-label">Ship To:</span><br>
-                    {{ $q_address }} , INDIA
                 </td>
-                <td class="bill-box" style="width: 40%; text-align:right;">
-                    {{-- Keep empty OR add extra info later (e.g. GST, terms) --}}
+                <td class="bill-box" style="width: 50%; text-align:right;">
+                    <div class="bill-label">Ship To:</div>
+                    {{ $q_address }} , INDIA
                 </td>
             </tr>
         </table>
@@ -289,9 +300,9 @@
             </tbody>
         </table>
 
-        {{-- SUMMARY BLOCK --}}
+        {{-- SUMMARY BLOCK (RIGHT) --}}
         <div class="summary-wrap">
-            <div class="summary-right">
+            <div class="summary-inner">
                 <table class="summary-table">
                     <tr>
                         <td class="summary-label">SUBTOTAL:</td>
@@ -309,36 +320,31 @@
                         <td class="summary-label">DISCOUNT:</td>
                         <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
                     </tr>
-                    <tr class="grand-row">
-                        <td colspan="2">
-                            <div class="grand-bar">
-                                GRAND TOTAL: ₹{{ number_format($grand, 2) }}
-                            </div>
-                        </td>
-                    </tr>
                 </table>
             </div>
         </div>
 
-        {{-- SIGNATURE --}}
-        <table width="100%" style="margin-top: 35px;">
-            <tr>
-                <td style="width: 50%;"></td>
-                <td style="width: 50%; text-align: right;">
-                    <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
-                    <div style="margin-bottom: 6px; font-size: 11px;">Authorized Signatory</div>
-                    <div style="font-size: 11px;"><strong>HANERI ELECTRICALS LLP</strong></div>
-                </td>
-            </tr>
-        </table>
+        {{-- FULL-WIDTH GRAND TOTAL BAR --}}
+        <div class="grand-total-bar">
+            GRAND TOTAL: ₹{{ number_format($grand, 2) }}
+        </div>
+
+        {{-- SIGNATURE BLOCK JUST ABOVE FOOTER --}}
+        <div class="signature-block">
+            <div class="signature-right">
+                <div style="border-top: 1px solid #333; width: 200px; margin-left: auto; margin-bottom: 5px;"></div>
+                <div style="margin-bottom: 6px;">Authorized Signatory</div>
+                <div><strong>HANERI ELECTRICALS LLP</strong></div>
+            </div>
+        </div>
     </div>
 
-    {{-- FOOTER --}}
+    {{-- FOOTER STRIP --}}
     <div class="footer">
         <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
         Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
         Email:
-        <a href="mailto:customercare@haneri.com">customercare@haneri.com</a>
+        <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">customercare@haneri.com</a>
         &nbsp; | &nbsp;
         Phone: +91 8377826826
     </div>
