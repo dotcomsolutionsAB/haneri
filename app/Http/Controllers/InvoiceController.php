@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use App\Models\OrderModel;
 use App\Models\UploadModel;
 use Illuminate\Support\Facades\Storage;
-use Barryvdh\DomPDF\Facade\Pdf; // or use PDF; depending how you use DomPDF
 
 class InvoiceController extends Controller
 {
@@ -136,42 +135,44 @@ class InvoiceController extends Controller
 
     private function generateOrderInvoice(OrderModel $order): void
     {
-        // Don't create duplicate invoices
-        if ($order->invoice_id) {
-            return;
-        }
+        // Don't create duplicate invoice
+        if ($order->invoice_id) return;
 
-        // Load relations needed for PDF
-        $order->loadMissing(['user', 'items.product', 'items.variant']);
+        $order->loadMissing(['user','items.product','items.variant']);
 
-        // File name & path
         $invoiceNumber = 'HAN-INV-' . str_pad($order->id, 6, '0', STR_PAD_LEFT);
         $fileName      = $invoiceNumber . '.pdf';
-        $relativePath  = 'upload/order_invoice/' . $fileName; // stored in DB
-        $storagePath   = $relativePath; // on 'public' disk
+        $relativePath  = 'upload/order_invoice/' . $fileName;
+        $fullPath      = storage_path('app/public/' . $relativePath);
 
-        // Generate PDF from Blade
-        $pdf = Pdf::loadView('pdf.order_invoice', [
-            'order' => $order,
-            'user'  => $order->user,
-            'items' => $order->items,
-        ])->setPaper('a4', 'portrait');
-
-        // Save to storage/app/public/upload/order_invoice/
-        Storage::disk('public')->put($storagePath, $pdf->output());
-
-        // Get file size
-        $size = Storage::disk('public')->size($storagePath);
-
-        // Create upload record
-        $upload = UploadModel::create([
-            'file_path' => $relativePath,          // keep relative path
-            'type'      => 'order_invoice',
-            'size'      => $size,
-            'alt_text'  => 'Order invoice ' . $invoiceNumber,
+        // 🔥 Generate PDF using mPDF
+        $mpdf = new Mpdf([
+            'format'         => 'A4',
+            'default_font'   => 'dejavusans',
+            'margin_top'     => 0,
+            'margin_bottom'  => 0
         ]);
 
-        // Attach upload to order
+        $html = view('pdf.order_invoice', [
+            'order' => $order,
+            'user'  => $order->user,
+            'items' => $order->items
+        ])->render();
+
+        $mpdf->WriteHTML($html);
+        $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
+
+        // File size
+        $size = filesize($fullPath);
+
+        // Save upload entry
+        $upload = UploadModel::create([
+            'file_path' => $relativePath,
+            'type'      => 'order_invoice',
+            'size'      => $size,
+            'alt_text'  => "Order Invoice $invoiceNumber"
+        ]);
+
         $order->invoice_id = $upload->id;
         $order->save();
     }
