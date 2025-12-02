@@ -26,46 +26,6 @@ class UserController extends Controller
 {
     //
     // Register a new user
-    // public function register(Request $request)
-    // {
-    //     $request->validate([
-    //         'name'          => 'required|string|max:255',
-    //         'email'         => 'required|email|unique:users,email',
-    //         'password'      => 'required|string|min:8',
-    //         'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
-    //         'selected_type' => 'nullable|string',
-    //     ]);
-
-    //     $user = User::create([
-    //         'name'          => $request->input('name'),
-    //         'email'         => $request->input('email'),
-    //         'password'      => Hash::make($request->input('password')),
-    //         'mobile'        => $request->input('mobile'),
-    //         'role'          => 'customer',
-    //         'selected_type' => $request->input('selected_type'),
-    //     ]);
-
-    //     // Send immediately (debugging). Later you can queue it.
-    //     try {
-    //         Log::info('Sending WelcomeUserMail to '.$user->email);
-    //         Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
-    //         Log::info('WelcomeUserMail sent');
-    //     } catch (\Throwable $e) {
-    //         Log::error('Welcome email failed', [
-    //             'error' => $e->getMessage(),
-    //             'trace' => $e->getTraceAsString(),
-    //         ]);
-    //     }
-
-    //     $token = $user->createToken('authToken')->plainTextToken;
-
-    //     return response()->json([
-    //         'message' => 'User registered successfully!',
-    //         'data'    => $user->only(['name','email','mobile','role','selected_type']),
-    //         'token'   => $token,
-    //     ], 201);
-    // }
-
     public function register(Request $request)
     {
         $validated = $request->validate([

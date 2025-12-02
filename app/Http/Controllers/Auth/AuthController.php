@@ -15,79 +15,7 @@ use App\Mail\WelcomeUserMail;
 
 class AuthController extends Controller
 {
-    //
-    // genearate otp and send to `whatsapp`
-    // public function generate_otp(Request $request)
-    // {
-    //     $request->validate([
-    //         'mobile' => ['required', 'string', 'min:12', 'max:14'],
-    //     ]);
 
-    //     $mobile = $request->input('mobile');
-
-    //     $get_user = User::select('id')
-    //                     ->where('mobile', $mobile)
-    //                     ->first();
-
-    //     if(!$get_user == null)
-    //     {
-    //         // $six_digit_otp = random_int(100000, 999999);
-    //         $six_digit_otp = substr(bin2hex(random_bytes(3)), 0, 6);
-
-    //         $expiresAt = now()->addMinutes(10);
-
-    //         $store_otp = User::where('mobile', $mobile)
-    //                          ->update([
-    //                             'otp' => $six_digit_otp,
-    //                             'expires_at' => $expiresAt,
-    //                         ]);
-
-    //         if($store_otp)
-    //         {
-    //             $templateParams = [
-    //                 'name' => 'ace_otp', // Replace with your WhatsApp template name
-    //                 'language' => ['code' => 'en'],
-    //                 'components' => [
-    //                     [
-    //                         'type' => 'body',
-    //                         'parameters' => [
-    //                             [
-    //                                 'type' => 'text',
-    //                                 'text' => $six_digit_otp,
-    //                             ],
-    //                         ],
-    //                     ],
-    //                     [
-    //                         'type' => 'button',
-    //                         'sub_type' => 'url',
-    //                         "index" => "0",
-    //                         'parameters' => [
-    //                             [
-    //                                 'type' => 'text',
-    //                                 'text' => $six_digit_otp,
-    //                             ],
-    //                         ],
-    //                     ]
-    //                 ],
-    //             ];
-
-    //             $whatsappUtility = new sendWhatsAppUtility();
-
-    //             $response = $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
-
-    //             return response()->json([
-    //                 'message' => 'Otp send successfully!',
-    //                 'data' => $store_otp
-    //             ], 200);
-    //         }
-    //     }
-    //     else {
-    //         return response()->json([
-    //             'message' => 'User has not registered!',
-    //         ], 404);
-    //     }
-    // }
-    
     protected GoogleAuthService $googleAuthService;
 
     public function __construct(GoogleAuthService $googleAuthService)
@@ -102,161 +30,15 @@ class AuthController extends Controller
         $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-=+';
         return substr(str_shuffle(str_repeat($chars, $length)), 0, $length);
     }
-
-    // protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
-    // {
-    //     // Basic validation for extra fields
-    //     $validated = $request->validate([
-    //         'idToken' => 'required|string',
-    //         'mobile'  => 'nullable|string|min:10|max:15',
-    //         'role'    => 'nullable|in:customer,architect,dealer',
-    //         'gstin'   => [
-    //             'nullable',
-    //             'string',
-    //             'max:15',
-    //             'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
-    //         ],
-    //         'email'   => $mustMatchEmail ? 'required|email' : 'nullable|email',
-    //     ]);
-
-    //     // 1️⃣ Verify ID token with Google
-    //     $payload = $this->googleAuthService->verifyIdToken($validated['idToken']);
-
-    //     if (! $payload) {
-    //         return response()->json([
-    //             'code'    => 422,
-    //             'success' => false,
-    //             'message' => 'Invalid or expired Google token.',
-    //             'data'    => [],
-    //         ], 422);
-    //     }
-
-    //     // 2️⃣ Extract details from token
-    //     $googleId = $payload['sub']   ?? null; // unique Google user ID
-    //     $email    = $payload['email'] ?? null;
-    //     $name     = $payload['name']
-    //         ?? trim(($payload['given_name'] ?? '').' '.($payload['family_name'] ?? ''))
-    //         ?: 'Google User';
-
-    //     if (! $googleId || ! $email) {
-    //         return response()->json([
-    //             'code'    => 422,
-    //             'success' => false,
-    //             'message' => 'Google token is missing required data (email or id).',
-    //             'data'    => [],
-    //         ], 422);
-    //     }
-
-    //     // 3️⃣ If login payload gave email, ensure it matches token email
-    //     if ($mustMatchEmail && isset($validated['email'])) {
-    //         if (strtolower($validated['email']) !== strtolower($email)) {
-    //             return response()->json([
-    //                 'code'    => 422,
-    //                 'success' => false,
-    //                 'message' => 'Email does not match Google account.',
-    //                 'data'    => [],
-    //             ], 422);
-    //         }
-    //     }
-
-    //     // 4️⃣ Role / GSTIN logic – only based on REQUEST role
-    //     $selectedTypeFromRequest = $validated['role'] ?? null;  // may be null
-    //     $role                    = 'customer';                  // DB role ALWAYS customer
-
-    //     if ($selectedTypeFromRequest && in_array($selectedTypeFromRequest, ['architect', 'dealer']) && empty($validated['gstin'])) {
-    //         return response()->json([
-    //             'code'    => 422,
-    //             'success' => false,
-    //             'message' => 'GSTIN is required for architect/dealer.',
-    //             'data'    => [],
-    //         ], 422);
-    //     }
-
-    //     // 5️⃣ Find existing user by google_id OR email
-    //     $user = User::where('google_id', $googleId)
-    //         ->orWhere('email', $email)
-    //         ->first();
-
-    //     if (! $user) {
-    //         // First time: REGISTER via Google
-    //         $selectedType = $selectedTypeFromRequest ?? 'customer';
-
-    //         $user = User::create([
-    //             'name'          => $name,
-    //             'email'         => $email,
-    //             'mobile'        => $validated['mobile'] ?? null,
-    //             'role'          => $role,              // always 'customer'
-    //             'selected_type' => $selectedType,      // store front choice
-    //             'gstin'         => $validated['gstin'] ?? null,
-    //             'google_id'     => $googleId,
-    //             // Will be hashed because of your cast/mutator
-    //             'password'      => $this->generateRandomPassword(16),
-    //         ]);
-
-    //         try {
-    //             Log::info('Sending WelcomeUserMail (Google) to '.$user->email);
-    //             Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
-    //         } catch (\Throwable $e) {
-    //             Log::error('Welcome email failed (Google)', ['error' => $e->getMessage()]);
-    //         }
-
-    //         $message    = 'User registered successfully with Google!';
-    //         $statusCode = 201;
-    //     } else {
-    //         // Existing user: make sure google_id is stored
-    //         if (! $user->google_id) {
-    //             $user->google_id = $googleId;
-    //         }
-
-    //         // Update mobile if provided
-    //         if (! empty($validated['mobile'])) {
-    //             $user->mobile = $validated['mobile'];
-    //         }
-
-    //         // role column ALWAYS customer
-    //         $user->role = 'customer';
-
-    //         // 🔹 Only change selected_type if frontend sent a role
-    //         if ($selectedTypeFromRequest && $user->selected_type !== $selectedTypeFromRequest) {
-    //             $user->selected_type = $selectedTypeFromRequest;
-    //         }
-
-    //         // Update GSTIN if provided
-    //         if (! empty($validated['gstin'])) {
-    //             $user->gstin = $validated['gstin'];
-    //         }
-
-    //         $user->save();
-
-    //         $message    = 'User logged in successfully with Google!';
-    //         $statusCode = 200;
-    //     }
-
-    //     // 6️⃣ Generate Sanctum token
-    //     $generated_token = $user->createToken('API TOKEN')->plainTextToken;
-
-    //     // Shape user object for frontend
-    //     $userData = [
-    //         'id'            => $user->id,
-    //         'name'          => $user->name,
-    //         'email'         => $user->email,
-    //         'mobile'        => $user->mobile,
-    //         'role'          => $user->role,
-    //         'selected_type' => $user->selected_type,
-    //         'gstin'         => $user->gstin,
-    //     ];
-
-    //     return response()->json([
-    //         'code'    => $statusCode,
-    //         'success' => true,
-    //         'message' => $message,
-    //         'data'    => [
-    //             'token' => $generated_token,
-    //             'user'  => $userData,
-    //         ],
-    //     ], $statusCode);
-    // }
-
+    private function sendWelcomeMail(User $user, string $appName = 'Haneri'): void
+    {
+        try {
+            Log::info('Sending WelcomeUserMail to '.$user->email);
+            Mail::to($user->email)->send(new WelcomeUserMail($user, $appName));
+        } catch (\Throwable $e) {
+            Log::error('Welcome email failed', ['error' => $e->getMessage()]);
+        }
+    }
     protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
     {
         // 1️⃣ Basic validation for extra fields
@@ -349,12 +131,7 @@ class AuthController extends Controller
                 'password'      => $this->generateRandomPassword(16),
             ]);
 
-            try {
-                Log::info('Sending WelcomeUserMail (Google) to '.$user->email);
-                Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
-            } catch (\Throwable $e) {
-                Log::error('Welcome email failed (Google)', ['error' => $e->getMessage()]);
-            }
+            $this->sendWelcomeMail($user, 'Haneri');
 
             $message    = 'User registered successfully with Google!';
             $statusCode = 201;
@@ -460,11 +237,9 @@ class AuthController extends Controller
             'gstin'    => $validated['gstin'] ?? null,
         ]);
 
-        try {
-            Log::info('Sending WelcomeUserMail to '.$user->email);
-            Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
-        } catch (\Throwable $e) {
-            Log::error('Welcome email failed', ['error' => $e->getMessage()]);
+        // ✅ Optional: mimic old behaviour and allow suppressing email
+        if (! $request->boolean('suppress_welcome_mail')) {
+            $this->sendWelcomeMail($user, 'Haneri');
         }
 
         $token = $user->createToken('authToken')->plainTextToken;
@@ -675,7 +450,6 @@ class AuthController extends Controller
             ],
         ], 200);
     }
-
 
     // user `login`
     // public function login(Request $request, $otp = null)
