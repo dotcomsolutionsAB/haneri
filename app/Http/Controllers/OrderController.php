@@ -497,13 +497,13 @@ class OrderController extends Controller
     public function delete($orderId)
     {
         try {
-            // Start transaction
             DB::beginTransaction();
 
-            // Fetch the order
-            $order = OrderModel::find($orderId);
+            // Fetch the order with relations (optional but nice)
+            $order = OrderModel::with(['items', 'payments', 'shipments'])->find($orderId);
 
             if (!$order) {
+                DB::rollBack(); // rollback before returning
                 return response()->json([
                     'success' => false,
                     'message' => 'Order not found!',
@@ -511,29 +511,75 @@ class OrderController extends Controller
             }
 
             // Delete related order items
-            OrderItemModel::where('order_id', $orderId)->delete();
+            $order->items()->delete();
 
-            // Delete the order
+            // Delete related payments
+            $order->payments()->delete();
+
+            // Delete related shipments
+            $order->shipments()->delete();
+
+            // Finally delete the order
             $order->delete();
 
-            // Commit transaction
             DB::commit();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Order and corresponding items deleted successfully!',
+                'message' => 'Order, items, payments and shipments deleted successfully!',
             ], 200);
+
         } catch (\Exception $e) {
-            // Rollback transaction in case of failure
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete order.',
-                'error' => $e->getMessage(),
+                'error'   => $e->getMessage(),
             ], 500);
         }
     }
+
+    // public function delete($orderId)
+    // {
+    //     try {
+    //         // Start transaction
+    //         DB::beginTransaction();
+
+    //         // Fetch the order
+    //         $order = OrderModel::find($orderId);
+
+    //         if (!$order) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Order not found!',
+    //             ], 404);
+    //         }
+
+    //         // Delete related order items
+    //         OrderItemModel::where('order_id', $orderId)->delete();
+
+    //         // Delete the order
+    //         $order->delete();
+
+    //         // Commit transaction
+    //         DB::commit();
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Order and corresponding items deleted successfully!',
+    //         ], 200);
+    //     } catch (\Exception $e) {
+    //         // Rollback transaction in case of failure
+    //         DB::rollBack();
+
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Failed to delete order.',
+    //             'error' => $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     // for all orders
     public function fetchOrders(Request $request)
