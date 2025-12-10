@@ -425,55 +425,73 @@ class OrderController extends Controller
     //     return response()->json(['message' => 'Order details fetched successfully!', 'data' => $get_order], 200);
     // }
     // View details of a single order
-public function show($id)
-{
-    $user = Auth::user();
+    public function show($id)
+    {
+        $user = Auth::user();
 
-    // Fetch the specific order for the logged-in user
-    $order = OrderModel::with(['items', 'user'])
-        ->where('user_id', $user->id)
-        ->where('id', $id)
-        ->first(); // or ->firstOrFail() with a try/catch if you prefer
+        // Fetch the specific order for the logged-in user
+        $order = OrderModel::with([
+                'items.product',   // make sure relation exists on OrderItemModel
+                'items.variant',   // make sure relation exists on OrderItemModel
+                'user'
+            ])
+            ->where('user_id', $user->id)
+            ->where('id', $id)
+            ->first();
 
-    if (!$order) {
-        return response()->json([
-            'code'    => 404,
-            'success' => false,
-            'message' => 'Order not found.',
-            'data'    => [],
-        ], 404);
-    }
+        if (!$order) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'Order not found.',
+                'data'    => [],
+            ], 404);
+        }
 
-    // Hide fields on related items
-    if ($order->relationLoaded('items') && $order->items) {
-        $order->items->each(function ($item) {
-            $item->makeHidden(['id', 'created_at', 'updated_at', 'order_id']);
+        // Transform items list
+        $items = $order->items->map(function ($item) {
+            return [
+                'product_id'    => $item->product_id,
+                'product_name'  => optional($item->product)->name,      // change if your column is different
+                'variant value' => optional($item->variant)->value,     // if you prefer key "variant_value", rename here
+                'variant_id'    => $item->variant_id,
+                'quantity'      => $item->quantity,
+                'price'         => $item->price,
+            ];
         });
+
+        // Transform user (remove gstin and other unwanted stuff)
+        $userData = null;
+        if ($order->user) {
+            $userData = [
+                'name'   => $order->user->name,
+                'email'  => $order->user->email,
+                'mobile' => $order->user->mobile,
+                'role'   => $order->user->role,
+                // no gstin here 👍
+            ];
+        }
+
+        // Build final response data (only required fields)
+        $data = [
+            'invoice_id'        => $order->invoice_id,
+            'total_amount'      => $order->total_amount,
+            'status'            => $order->status,
+            'payment_status'    => $order->payment_status,
+            'delivery_status'   => $order->delivery_status,
+            'shipping_address'  => $order->shipping_address,
+            'razorpay_order_id' => $order->razorpay_order_id,
+            'items'             => $items,
+            'user'              => $userData,
+        ];
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Order details fetched successfully!',
+            'data'    => $data,
+        ], 200);
     }
-
-    // Hide fields on related user
-    if ($order->relationLoaded('user') && $order->user) {
-        $order->user->makeHidden([
-            'id',
-            'password',
-            'remember_token',
-            'email_verified_at',
-            'created_at',
-            'updated_at',
-        ]);
-    }
-
-    // Hide fields on the order itself
-    $order->makeHidden(['id', 'user_id', 'created_at', 'updated_at']);
-
-    return response()->json([
-        'code'    => 200,
-        'success' => true,
-        'message' => 'Order details fetched successfully!',
-        'data'    => $order,
-    ], 200);
-}
-
 
     // delete an order
     public function delete($orderId)
