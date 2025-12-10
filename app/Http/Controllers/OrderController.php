@@ -14,6 +14,8 @@ use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OrderPlacedMail;
+use App\Models\PaymentModel;
+
 
 class OrderController extends Controller
 {
@@ -25,6 +27,7 @@ class OrderController extends Controller
             'status' => 'required|in:pending,completed,cancelled,refunded',
             'payment_status' => 'required|in:pending,paid,failed',
             'shipping_address' => 'required|string',
+            'payment_mode'    => 'nullable|in:Prepaid,COD', // optional, but helpful
         ]);
 
         $user = Auth::user(); 
@@ -61,6 +64,7 @@ class OrderController extends Controller
 
             // Check if the cart is empty
             if ($cartItems->isEmpty()) {
+                DB::rollBack(); // 🔴 this was missing
                 return response()->json(['message' => 'Sorry, cart is empty.'], 400);
             }
 
@@ -82,7 +86,8 @@ class OrderController extends Controller
 
             // Decode Razorpay response
             $razorpayData = json_decode($razorpayResponse->getContent(), true);
-            if (!$razorpayData['success']) {
+
+            if (!($razorpayData['success'] ?? false) || empty($razorpayData['order']['id'])) {
                 DB::rollBack();
                 return response()->json(['message' => 'Failed to create Razorpay order.'], 500);
             }
@@ -152,6 +157,21 @@ class OrderController extends Controller
             // After successfully adding order items, delete the cart items
             // CartModel::where('user_id', $user_id)->delete();
             CartModel::where('user_id', (string)$user_id)->delete();
+            /**
+             * 🔹 Create initial payment record (in t_payment_records)
+             * - status = same as order payment_status (usually "pending" here)
+             * - method = Razorpay (or COD / Prepaid based on your logic)
+             * - razorpay_payment_id will be filled later from webhook / callback
+             */
+            PaymentModel::create([
+                'method'             => $request->input('payment_mode', 'razorpay'),
+                'razorpay_payment_id'=> null,  // will be updated after successful payment
+                'amount'             => $totalAmount,
+                'status'             => $request->input('payment_status', 'pending'),
+                'order_id'           => $order->id,
+                'razorpay_order_id'  => $order->razorpay_order_id,
+                'user'               => $user_id, // assuming this column stores user_id
+            ]);
 
             // Commit the transaction
             DB::commit();
@@ -392,6 +412,100 @@ class OrderController extends Controller
         ], 200);
     }
 
+    // Update order & payment statuses (user side)
+    public function statusUpdate(Request $request, $orderId)
+    {
+        // Validate what can be updated from user side
+        $validated = $request->validate([
+            'status'          => 'nullable|string|in:pending,confirmed,cancelled',
+            'payment_status'  => 'nullable|string|in:pending,paid,failed,refunded',
+            'delivery_status' => 'nullable|string|in:pending,shipped,out_for_delivery,delivered,cancelled',
+        ]);
+
+        // If nothing came, no point in processing
+        if (
+            !array_key_exists('status', $validated) &&
+            !array_key_exists('payment_status', $validated) &&
+            !array_key_exists('delivery_status', $validated)
+        ) {
+            return response()->json([
+                'code'    => 400,
+                'success' => false,
+                'message' => 'No status fields provided to update.',
+                'data'    => [],
+            ], 400);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $user = Auth::user();
+
+            // Fetch order which belongs to this user
+            $order = OrderModel::with('payments')
+                ->where('id', $orderId)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$order) {
+                DB::rollBack();
+                return response()->json([
+                    'code'    => 404,
+                    'success' => false,
+                    'message' => 'Order not found for this user.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            // 🔹 Update order fields if present
+            if (array_key_exists('status', $validated)) {
+                $order->status = $validated['status'];
+            }
+
+            if (array_key_exists('payment_status', $validated)) {
+                $order->payment_status = $validated['payment_status'];
+            }
+
+            if (array_key_exists('delivery_status', $validated)) {
+                $order->delivery_status = $validated['delivery_status'];
+            }
+
+            $order->save();
+
+            // 🔹 Also update payment records when payment_status is provided
+            if (array_key_exists('payment_status', $validated)) {
+                // Adjust column name as per your PaymentModel
+                // e.g. if the column is `status` or `payment_status`
+                PaymentModel::where('order_id', $order->id)->update([
+                    'status' => $validated['payment_status'], // or 'payment_status' => ...
+                ]);
+            }
+
+            DB::commit();
+
+            // Optional: hide some fields before returning
+            $order->makeHidden(['created_at', 'updated_at']);
+
+            return response()->json([
+                'code'    => 200,
+                'success' => true,
+                'message' => 'Order status updated successfully!',
+                'data'    => $order,
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'code'    => 500,
+                'success' => false,
+                'message' => 'Failed to update order status.',
+                'data'    => [
+                    'error' => $e->getMessage(),
+                ],
+            ], 500);
+        }
+    }
 
     // View details of a single order
     // public function show($id)
@@ -539,6 +653,8 @@ class OrderController extends Controller
             ], 500);
         }
     }
+
+    
 
     // public function delete($orderId)
     // {

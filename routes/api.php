@@ -185,6 +185,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('/{id}', [OrderController::class, 'show']);         // Get details of a single order
         Route::post('/', [OrderController::class, 'store']);           // Create a new order
         Route::delete('/{id}', [OrderController::class, 'delete']);           // Create a new order
+        Route::post('/{id}/update-status', [OrderController::class, 'statusUpdate']);
     });
 
     // Setting Routes
