@@ -171,6 +171,62 @@ class UserController extends Controller
     /**
      * Fetch All Users with Search & Role Filter (Admin Only)
      */
+    public function fetchUsers(Request $request)
+    {
+        try {
+            // Ensure the user is an admin
+            $admin = Auth::user();
+            if ($admin->role !== 'admin') {
+                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+            }
+
+            // Read limit & offset (limit can be null)
+            $limit = $request->input('limit');   // ❗ no default here
+            $offset = $request->input('offset', 0);
+
+            // Query Users
+            $query = User::query();
+
+            // Search by name
+            if ($request->filled('user_name')) {
+                $query->where('name', 'like', '%' . $request->user_name . '%');
+            }
+
+            // Filter by role
+            if ($request->filled('role')) {
+                $query->where('role', $request->role);
+            }
+
+            // Count total (before pagination)
+            $totalUsers = $query->count();
+
+            // Apply pagination ONLY if limit is given
+            if (!empty($limit)) {
+                $query->offset($offset)->limit($limit);
+            }
+
+            $users = $query->get();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Users fetched successfully!',
+                'total_users' => $totalUsers,
+                'data' => $users->makeHidden([
+                    'email_verified_at',
+                    'otp',
+                    'expires_at',
+                    'created_at',
+                    'updated_at'
+                ]),
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching users: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
     // public function fetchUsers(Request $request)
     // {
     //     try {
@@ -219,55 +275,7 @@ class UserController extends Controller
     //         ], 500);
     //     }
     // }
-    public function fetchUsers(Request $request)
-    {
-        try {
-            // Ensure only admin can access
-            $admin = Auth::user();
-            if ($admin->role !== 'admin') {
-                return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-            }
 
-            // Pagination defaults
-            $limit = $request->input('limit', 10);
-            $offset = $request->input('offset', 0);
-
-            // Base query
-            $query = User::query();
-
-            // Search filter
-            if ($request->filled('user_name')) {
-                $query->where('name', 'like', '%' . $request->user_name . '%');
-            }
-
-            // Role filter
-            if ($request->filled('role')) {
-                $query->where('role', $request->role);
-            }
-
-            // Clone BEFORE pagination (so count is correct)
-            $countQuery = clone $query;
-
-            // Apply pagination
-            $users = $query->offset($offset)->limit($limit)->get();
-
-            // Get total count WITH filters, WITHOUT limit/offset
-            $totalUsers = $countQuery->count();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Users fetched successfully!',
-                'total_users' => $totalUsers,
-                'data' => $users->makeHidden(['email_verified_at', 'otp', 'expires_at', 'created_at', 'updated_at']),
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching users: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
 
 
     /**
