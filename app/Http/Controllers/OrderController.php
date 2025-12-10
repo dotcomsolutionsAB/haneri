@@ -453,7 +453,7 @@ class OrderController extends Controller
             return [
                 'product_id'    => $item->product_id,
                 'product_name'  => optional($item->product)->name,      // change if your column is different
-                'variant value' => optional($item->variant)->value,     // if you prefer key "variant_value", rename here
+                'variant value' => optional($item->variant)->variant_value,     // if you prefer key "variant_value", rename here
                 'variant_id'    => $item->variant_id,
                 'quantity'      => $item->quantity,
                 'price'         => $item->price,
