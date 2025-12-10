@@ -415,14 +415,12 @@ class OrderController extends Controller
     // Update order & payment statuses (user side)
     public function statusUpdate(Request $request, $orderId)
     {
-        // Validate what can be updated from user side
         $validated = $request->validate([
-            'status'          => 'nullable|string|in:pending,confirmed,cancelled',
+            'status'          => 'nullable|string|in:pending,confirmed,processing,completed,cancelled',
             'payment_status'  => 'nullable|string|in:pending,paid,failed,refunded',
             'delivery_status' => 'nullable|string|in:pending,shipped,out_for_delivery,delivered,cancelled',
         ]);
 
-        // If nothing came, no point in processing
         if (
             !array_key_exists('status', $validated) &&
             !array_key_exists('payment_status', $validated) &&
@@ -441,7 +439,7 @@ class OrderController extends Controller
 
             $user = Auth::user();
 
-            // Fetch order which belongs to this user
+            // Fetch order belonging to logged-in user
             $order = OrderModel::with('payments')
                 ->where('id', $orderId)
                 ->where('user_id', $user->id)
@@ -457,7 +455,7 @@ class OrderController extends Controller
                 ], 404);
             }
 
-            // 🔹 Update order fields if present
+            // 🔹 Update order fields
             if (array_key_exists('status', $validated)) {
                 $order->status = $validated['status'];
             }
@@ -472,19 +470,26 @@ class OrderController extends Controller
 
             $order->save();
 
-            // 🔹 Also update payment records when payment_status is provided
+            // 🔹 Update payment records IF payment_status sent
             if (array_key_exists('payment_status', $validated)) {
-                // Adjust column name as per your PaymentModel
-                // e.g. if the column is `status` or `payment_status`
-                PaymentModel::where('order_id', $order->id)->update([
-                    'status' => $validated['payment_status'], // or 'payment_status' => ...
+                // adjust 'status' to your actual column name if needed
+                $order->payments()->update([
+                    'status' => $validated['payment_status'],
                 ]);
             }
 
             DB::commit();
 
-            // Optional: hide some fields before returning
+            // ⬇️ VERY IMPORTANT: reload payments so response is fresh
+            $order->load('payments');
+
+            // Optional: hide unwanted fields
             $order->makeHidden(['created_at', 'updated_at']);
+            if ($order->relationLoaded('payments')) {
+                $order->payments->each(function ($p) {
+                    $p->makeHidden(['created_at', 'updated_at']);
+                });
+            }
 
             return response()->json([
                 'code'    => 200,
@@ -506,6 +511,7 @@ class OrderController extends Controller
             ], 500);
         }
     }
+
 
     // View details of a single order
     // public function show($id)
