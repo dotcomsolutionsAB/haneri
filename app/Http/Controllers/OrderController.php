@@ -127,6 +127,7 @@ class OrderController extends Controller
                 'products_description' => 'Order #'.$order->id.' items',
 
                 // Pickup info – if you have configured somewhere, you can fill from config
+                'pickup_location_id' => config('shipping.default_pickup.location_id', 1),
                 'pickup_name'     => config('shipping.default_pickup.name', 'Default Pickup'),
                 'pickup_address'  => config('shipping.default_pickup.address', ''),
                 'pickup_pin'      => config('shipping.default_pickup.pin', ''),
