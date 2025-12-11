@@ -81,16 +81,20 @@ class OrderController extends Controller
             // -----------------------------------------
             $shippingCharge = ($totalAmount < 5000) ? 0 : 1;
 
-            // Final payable amount
+            // Final payable amount in rupees
             $finalAmount = $totalAmount + $shippingCharge;
 
-            // Call Razorpay Order API Before Saving Order in DB**
+            // Convert to paise for Razorpay (must be integer)
+            $amountInPaise = (int) round($finalAmount * 100);
+
+            // Call Razorpay Order API Before Saving Order in DB
             $razorpayController = new RazorpayController(); 
             $razorpayRequest = new Request([
-                'amount' => $finalAmount,
+                'amount'   => $amountInPaise, // paise
                 'currency' => 'INR'
             ]);
             $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
+
 
             // Decode Razorpay response
             $razorpayData = json_decode($razorpayResponse->getContent(), true);

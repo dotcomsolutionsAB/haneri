@@ -29,17 +29,18 @@ class RazorpayController extends Controller
      */
     public function createOrder(Request $request)
     {
+        // amount is expected in paise here (integer)
         $request->validate([
-            'amount' => 'required|numeric|min:1',
+            'amount'   => 'required|integer|min:100', // min ₹1.00
             'currency' => 'required|string|in:INR',
-            'receipt' => 'nullable|string',
+            'receipt'  => 'nullable|string',
         ]);
 
         try {
             $orderData = [
-                'amount' => $request->amount * 100, // Amount in paise
-                'currency' => $request->currency,
-                'receipt' => $request->receipt ?? 'order_receipt_' . time(),
+                'amount'          => $request->amount, // already in paise
+                'currency'        => $request->currency,
+                'receipt'         => $request->receipt ?? ('order_receipt_' . time()),
                 'payment_capture' => 1, // Auto capture payment
             ];
 
@@ -56,20 +57,64 @@ class RazorpayController extends Controller
             \Log::info('Razorpay Order Created:', ['order' => $orderArray]);
 
             return response()->json([
-                'success' => true,
-                'message' => 'Razorpay order created successfully.',
-                'order_id' => $orderId, // Return Order ID separately
-                'order' => $orderArray,
+                'success'   => true,
+                'message'   => 'Razorpay order created successfully.',
+                'order_id'  => $orderId,
+                'order'     => $orderArray,
             ], 201);
         } catch (Exception $e) {
             \Log::error('Razorpay Order Error:', ['error' => $e->getMessage()]);
-    
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating Razorpay order: ' . $e->getMessage(),
             ], 500);
         }
     }
+
+    // public function createOrder(Request $request)
+    // {
+    //     $request->validate([
+    //         'amount' => 'required|numeric|min:1',
+    //         'currency' => 'required|string|in:INR',
+    //         'receipt' => 'nullable|string',
+    //     ]);
+
+    //     try {
+    //         $orderData = [
+    //             'amount' => $request->amount * 100, // Amount in paise
+    //             'currency' => $request->currency,
+    //             'receipt' => $request->receipt ?? 'order_receipt_' . time(),
+    //             'payment_capture' => 1, // Auto capture payment
+    //         ];
+
+    //         // ✅ Create Order in Razorpay
+    //         $order = $this->razorpay->order->create($orderData);
+
+    //         // ✅ Extract Order ID
+    //         $orderId = $order['id'];
+
+    //         // ✅ Convert Razorpay Order Object to Array Properly
+    //         $orderArray = $order->toArray();
+
+    //         // ✅ Log Response
+    //         \Log::info('Razorpay Order Created:', ['order' => $orderArray]);
+
+    //         return response()->json([
+    //             'success' => true,
+    //             'message' => 'Razorpay order created successfully.',
+    //             'order_id' => $orderId, // Return Order ID separately
+    //             'order' => $orderArray,
+    //         ], 201);
+    //     } catch (Exception $e) {
+    //         \Log::error('Razorpay Order Error:', ['error' => $e->getMessage()]);
+    
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Error creating Razorpay order: ' . $e->getMessage(),
+    //         ], 500);
+    //     }
+    // }
 
     /**
      * Verify Razorpay Payment Signature
