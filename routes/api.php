@@ -216,6 +216,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/register', [RazorpayController::class, 'createOrder']);         // Add a new address
         Route::get('/payment-status/{paymentId}', [RazorpayController::class, 'fetchPaymentStatus']);
         Route::get('/order-status/{orderId}', [RazorpayController::class, 'fetchOrderStatus']);
+        Route::post('/callback', [RazorpayController::class, 'handleCallback']);
     });
 
     Route::post('/payments', [PaymentController::class, 'store']);

@@ -71,6 +71,33 @@ class RazorpayController extends Controller
             ], 500);
         }
     }
+    
+    public function handleCallback(Request $request)
+    {
+        // From query string
+        $orderId = $request->query('order_id');          // 43
+        $shippingAddress = $request->query('shipping_address');
+
+        // From Razorpay POST body
+        $razorpayPaymentId = $request->input('razorpay_payment_id');
+        $razorpayOrderId   = $request->input('razorpay_order_id');
+        $razorpaySignature = $request->input('razorpay_signature');
+
+        // TODO:
+        // 1. Verify signature
+        // 2. Mark payment as paid in DB
+        // 3. Update order status, etc.
+
+        // Finally, redirect user to your frontend success page:
+        $redirectUrl = 'https://haneri.com/order-complete.php'
+            . '?status=success'
+            . '&order_id=' . urlencode($orderId)
+            . '&payment_id=' . urlencode($razorpayPaymentId)
+            . '&amount=' . urlencode($request->input('amount') / 100 ?? 0)
+            . '&shipping_address=' . urlencode($shippingAddress);
+
+        return redirect()->away($redirectUrl);
+    }
 
     // public function createOrder(Request $request)
     // {
