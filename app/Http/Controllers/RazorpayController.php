@@ -4,8 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Razorpay\Api\Api;
-use App\Models\Order;
+use App\Models\OrderModel;
+use App\Models\PaymentModel;
 use Exception;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+
 
 class RazorpayController extends Controller
 {
@@ -71,11 +75,11 @@ class RazorpayController extends Controller
             ], 500);
         }
     }
-    
+
     public function handleCallback(Request $request)
     {
-        // From query string
-        $orderId = $request->query('order_id');          // 43
+        // From query string (sent by your frontend in callback_url)
+        $orderId         = $request->query('order_id');          // local order ID
         $shippingAddress = $request->query('shipping_address');
 
         // From Razorpay POST body
@@ -83,17 +87,138 @@ class RazorpayController extends Controller
         $razorpayOrderId   = $request->input('razorpay_order_id');
         $razorpaySignature = $request->input('razorpay_signature');
 
-        // TODO:
-        // 1. Verify signature
-        // 2. Mark payment as paid in DB
-        // 3. Update order status, etc.
+        Log::info('Razorpay callback received', [
+            'order_id'            => $orderId,
+            'shipping_address'    => $shippingAddress,
+            'razorpay_payment_id' => $razorpayPaymentId,
+            'razorpay_order_id'   => $razorpayOrderId,
+            'razorpay_signature'  => $razorpaySignature,
+        ]);
 
-        // Finally, redirect user to your frontend success page:
+        // 🔴 Basic validation – if anything critical is missing, mark as failed
+        if (!$orderId || !$razorpayPaymentId || !$razorpayOrderId || !$razorpaySignature) {
+            Log::warning('Razorpay callback missing params');
+
+            // Try to mark order/payment as failed, but don't crash if not found
+            DB::transaction(function () use ($orderId, $razorpayOrderId, $razorpayPaymentId) {
+                if ($orderId) {
+                    $order = OrderModel::where('id', $orderId)
+                        ->where('razorpay_order_id', $razorpayOrderId)
+                        ->first();
+
+                    if ($order) {
+                        $order->payment_status = 'failed';   // ENUM: pending, paid, failed, refunded
+                        $order->save();
+
+                        $payment = PaymentModel::where('order_id', $order->id)
+                            ->where('razorpay_order_id', $razorpayOrderId)
+                            ->first();
+
+                        if ($payment) {
+                            $payment->status = 'failed';
+                            $payment->razorpay_payment_id = $razorpayPaymentId;
+                            $payment->save();
+                        }
+                    }
+                }
+            });
+
+            return redirect()->away(
+                'https://haneri.com/order-complete.php'
+                . '?status=failed'
+                . '&order_id=' . urlencode($orderId ?? 0)
+            );
+        }
+
+        // ✅ Verify Razorpay signature
+        $expectedSignature = hash_hmac(
+            'sha256',
+            $razorpayOrderId . '|' . $razorpayPaymentId,
+            config('services.razorpay.secret')   // same secret used in constructor
+        );
+
+        if (!hash_equals($expectedSignature, $razorpaySignature)) {
+            Log::error('Razorpay signature mismatch', [
+                'expected' => $expectedSignature,
+                'got'      => $razorpaySignature,
+            ]);
+
+            // Signature mismatch ⇒ treat as failed
+            DB::transaction(function () use ($orderId, $razorpayOrderId, $razorpayPaymentId) {
+                $order = OrderModel::where('id', $orderId)
+                    ->where('razorpay_order_id', $razorpayOrderId)
+                    ->first();
+
+                if ($order) {
+                    $order->payment_status = 'failed';
+                    $order->save();
+
+                    $payment = PaymentModel::where('order_id', $order->id)
+                        ->where('razorpay_order_id', $razorpayOrderId)
+                        ->first();
+
+                    if ($payment) {
+                        $payment->status = 'failed';
+                        $payment->razorpay_payment_id = $razorpayPaymentId;
+                        $payment->save();
+                    }
+                }
+            });
+
+            return redirect()->away(
+                'https://haneri.com/order-complete.php'
+                . '?status=failed'
+                . '&order_id=' . urlencode($orderId)
+            );
+        }
+
+        // ✅ Signature OK ⇒ mark payment as PAID in DB
+        DB::transaction(function () use ($orderId, $razorpayOrderId, $razorpayPaymentId) {
+            $order = OrderModel::where('id', $orderId)
+                ->where('razorpay_order_id', $razorpayOrderId)
+                ->first();
+
+            if (!$order) {
+                Log::error('Order not found during Razorpay callback', [
+                    'order_id'          => $orderId,
+                    'razorpay_order_id' => $razorpayOrderId,
+                ]);
+                return;
+            }
+
+            // 1️⃣ Update orders.payment_status
+            $order->payment_status = 'paid';   // ENUM: pending, paid, failed, refunded
+            $order->save();
+
+            // 2️⃣ Update / create payment record in t_payment_records
+            $payment = PaymentModel::where('order_id', $order->id)
+                ->where('razorpay_order_id', $razorpayOrderId)
+                ->first();
+
+            if ($payment) {
+                // update existing pending record
+                $payment->status              = 'paid';      // ENUM mirror
+                $payment->razorpay_payment_id = $razorpayPaymentId;
+                $payment->save();
+            } else {
+                // safety fallback – create one if it doesn't exist
+                PaymentModel::create([
+                    'method'             => 'upi',
+                    'razorpay_payment_id'=> $razorpayPaymentId,
+                    'amount'             => $order->total_amount,
+                    'status'             => 'paid',
+                    'order_id'           => $order->id,
+                    'razorpay_order_id'  => $razorpayOrderId,
+                    'user'               => $order->user_id, // column name is `user` in your model
+                ]);
+            }
+        });
+
+        // 🔁 Redirect user to frontend success page
         $redirectUrl = 'https://haneri.com/order-complete.php'
             . '?status=success'
             . '&order_id=' . urlencode($orderId)
             . '&payment_id=' . urlencode($razorpayPaymentId)
-            . '&amount=' . urlencode($request->input('amount') / 100 ?? 0)
             . '&shipping_address=' . urlencode($shippingAddress);
 
         return redirect()->away($redirectUrl);
