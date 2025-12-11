@@ -79,7 +79,7 @@ class OrderController extends Controller
             // -----------------------------------------
             // SHIPPING CHARGE LOGIC
             // -----------------------------------------
-            $shippingCharge = ($totalAmount < 5000) ? 0 : 120;
+            $shippingCharge = ($totalAmount < 5000) ? 0 : 1;
 
             // Final payable amount
             $finalAmount = $totalAmount + $shippingCharge;
