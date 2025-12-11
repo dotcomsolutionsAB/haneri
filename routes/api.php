@@ -22,15 +22,6 @@ use App\Http\Controllers\UploadController;
 use App\Http\Controllers\InvoiceController;
 
 
-// Route::get('/user', function (Request $request) {
-//     return $request->user();
-// })->middleware('auth:sanctum');
-
-
-// Route::post('/register', [UserController::class, 'register']);
-// Route::post('/login/{otp?}', [AuthController::class, 'login']); // Log in a user
-// Route::post('/otp', [AuthController::class, 'generate_otp']);
-
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
 Route::post('/generate-otp', [AuthController::class, 'generate_otp']); // Generate OTP for mobile login
@@ -215,9 +206,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Route::get('/', [AddressController::class, 'index']);          // List all addresses for a user
         Route::post('/register', [RazorpayController::class, 'createOrder']);         // Add a new address
         Route::get('/payment-status/{paymentId}', [RazorpayController::class, 'fetchPaymentStatus']);
-        Route::get('/order-status/{orderId}', [RazorpayController::class, 'fetchOrderStatus']);
-        Route::post('/callback', [RazorpayController::class, 'handleCallback']);
+        Route::get('/order-status/{orderId}', [RazorpayController::class, 'fetchOrderStatus']);        
     });
 
     Route::post('/payments', [PaymentController::class, 'store']);
 });
+Route::post('/razorpay/callback', [RazorpayController::class, 'handleCallback']);
