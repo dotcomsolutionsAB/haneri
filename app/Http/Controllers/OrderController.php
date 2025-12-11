@@ -76,10 +76,18 @@ class OrderController extends Controller
                 $totalAmount += $linePrice * (int)$cartItem->quantity;
             }
 
+            // -----------------------------------------
+            // SHIPPING CHARGE LOGIC
+            // -----------------------------------------
+            $shippingCharge = ($totalAmount < 5000) ? 0 : 120;
+
+            // Final payable amount
+            $finalAmount = $totalAmount + $shippingCharge;
+
             // Call Razorpay Order API Before Saving Order in DB**
             $razorpayController = new RazorpayController(); 
             $razorpayRequest = new Request([
-                'amount' => $totalAmount,
+                'amount' => $finalAmount,
                 'currency' => 'INR'
             ]);
             $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
@@ -95,7 +103,8 @@ class OrderController extends Controller
             // Create the order record
             $order = OrderModel::create([
                 'user_id' => $user_id,
-                'total_amount' => $totalAmount,
+                'total_amount' => $finalAmount, // include shipping
+                'shipping_charge' => $shippingCharge, // if you have this column (recommended)
                 'status' => $request->input('status', 'pending'),
                 'payment_status' => $request->input('payment_status', 'pending'),
                 'shipping_address' => $request->input('shipping_address'),
@@ -166,7 +175,7 @@ class OrderController extends Controller
             PaymentModel::create([
                 'method'             => $request->input('payment_mode', 'razorpay'),
                 'razorpay_payment_id'=> null,  // will be updated after successful payment
-                'amount'             => $totalAmount,
+                'amount'             => $finalAmount,
                 'status'             => $request->input('payment_status', 'pending'),
                 'order_id'           => $order->id,
                 'razorpay_order_id'  => $order->razorpay_order_id,
@@ -512,38 +521,6 @@ class OrderController extends Controller
         }
     }
 
-
-    // View details of a single order
-    // public function show($id)
-    // {
-    //     $user = Auth::user();
-
-    //     // Fetch the order by ID for the user
-    //     $get_order = OrderModel::with(['items', 'user'])
-    //                         ->where('user_id', $user->id)
-    //                         ->get()
-    //                         ->map(function ($order) {
-    //                             // Make sure to hide the unwanted fields from the user and items
-    //                             if ($order->items) {
-    //                                 $order->items->makeHidden(['id', 'created_at', 'updated_at']);
-    //                             }
-    //                             if ($order->user) {
-    //                                 $order->user->makeHidden(['id', 'created_at', 'updated_at']);
-    //                             }
-    //                             // Optionally hide fields from the order
-    //                             $order->makeHidden(['id', 'created_at', 'updated_at']);
-    //                             return $order;
-    //                         });
-
-    //     if (!$get_order) {
-    //         return response()->json(['message' => 'Order not found.'], 404);
-    //     }
-
-    //     // Hide unnecessary fields
-    //     $get_order->makeHidden(['id', 'created_at', 'updated_at']);
-
-    //     return response()->json(['message' => 'Order details fetched successfully!', 'data' => $get_order], 200);
-    // }
     // View details of a single order
     public function show($id)
     {
@@ -659,49 +636,6 @@ class OrderController extends Controller
             ], 500);
         }
     }
-
-    
-
-    // public function delete($orderId)
-    // {
-    //     try {
-    //         // Start transaction
-    //         DB::beginTransaction();
-
-    //         // Fetch the order
-    //         $order = OrderModel::find($orderId);
-
-    //         if (!$order) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Order not found!',
-    //             ], 404);
-    //         }
-
-    //         // Delete related order items
-    //         OrderItemModel::where('order_id', $orderId)->delete();
-
-    //         // Delete the order
-    //         $order->delete();
-
-    //         // Commit transaction
-    //         DB::commit();
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'message' => 'Order and corresponding items deleted successfully!',
-    //         ], 200);
-    //     } catch (\Exception $e) {
-    //         // Rollback transaction in case of failure
-    //         DB::rollBack();
-
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Failed to delete order.',
-    //             'error' => $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
 
     // for all orders
     public function fetchOrders(Request $request)
@@ -1002,7 +936,6 @@ class OrderController extends Controller
             'data'    => $data,
         ], 200);
     }
-
 
     public function updateOrderStatus(Request $request, int $id)
     {
