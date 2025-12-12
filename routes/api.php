@@ -121,19 +121,18 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // delhivery
         Route::prefix('delivery')->group(function () {
             Route::get('/deliveryone/test', [DelhiveryServiceController::class, 'test']);
-            Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); 
-            //Route::post('/track', [DelhiveryServiceController::class, 'trackAllShipments']);
+            Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); // Raw data passing
+            // manual creation through checking shipment detail before create(admin)
+            Route::post('/check_shipment', [DelhiveryServiceController::class, 'checkShipment']); // check shipment all datas
+            Route::post('/punch_shipment', [DelhiveryServiceController::class, 'punchShipment']); // after check punch
+            Route::post('/create_ship_by_order', [DelhiveryServiceController::class, 'createShipByOrder']); // create shipment and save in db
+
+            // All checks
+            Route::post('/fetch_shipments/{id?}', [DelhiveryServiceController::class, 'fetchShipment']); // fetch from db
             Route::post('/track', [DelhiveryServiceController::class, 'trackShipments']);
             Route::get('/pincode-serviceability', [DelhiveryServiceController::class, 'checkPincodeServiceability']);
             Route::post('/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
             Route::post('/expected-time', [DelhiveryServiceController::class, 'getTat']);
-
-            // manual creation (admin)
-            Route::post('/check_shipment', [DelhiveryServiceController::class, 'checkShipment']); // check shipment all datas
-            Route::post('/punch_shipment', [DelhiveryServiceController::class, 'punchShipment']); // after check punch
-
-            Route::post('/create_ship_by_order', [DelhiveryServiceController::class, 'createShipByOrder']); // create shipment and save in db
-            Route::post('/fetch_shipments/{id?}', [DelhiveryServiceController::class, 'fetchShipment']); // fetch from db
 
             // optional separate setup api
             Route::post('/auto_ship_setup/{orderId}', [DelhiveryServiceController::class, 'autoShipSetup']);
