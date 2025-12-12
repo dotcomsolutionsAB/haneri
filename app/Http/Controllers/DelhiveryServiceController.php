@@ -321,6 +321,50 @@ class DelhiveryServiceController extends Controller
 
             $productsDescription = implode(', ', $descParts);
 
+            // Resolve pickup location:
+            $pickupLocationId = $request->input('pickup_location_id');
+            $pickup = null;
+
+            // If pickup_location_id explicitly provided, try loading it
+            if (!empty($pickupLocationId)) {
+                $pickup = PickupLocationModel::find($pickupLocationId);
+            }
+
+            // If not provided OR not found, find default pickup
+            if (!$pickup) {
+                $pickup = PickupLocationModel::where('is_default', 1)
+                    ->where('is_active', 1)
+                    ->first();
+            }
+
+            // If still not found, pick first active pickup
+            if (!$pickup) {
+                $pickup = PickupLocationModel::where('is_active', 1)
+                    ->orderBy('id')
+                    ->first();
+            }
+
+            // If STILL no pickup → throw error
+            if (!$pickup) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No valid pickup location found. Please configure t_pickup_location.',
+                    'data'    => [],
+                ], 500);
+            }
+
+            // Use courier_pickup_name if set, else internal name
+            $pickupName    = $pickup->courier_pickup_name ?: $pickup->name;
+            $pickupAddress = trim(
+                $pickup->address_line1
+                . ($pickup->address_line2 ? ', '.$pickup->address_line2 : '')
+                . ($pickup->landmark ? ', '.$pickup->landmark : '')
+            );
+            $pickupPin     = $pickup->pin;
+            $pickupCity    = $pickup->city;
+            $pickupState   = $pickup->state;
+            $pickupPhone   = $pickup->phone ?: $pickup->alternate_phone;
+
             // 5) Map shipping details from single shipping_address string
             // New format: name, mobile, city, state, country, pin, add1, add2
             $shippingAddress = $order->shipping_address;
@@ -408,49 +452,7 @@ class DelhiveryServiceController extends Controller
 
             $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
 
-            // Resolve pickup location:
-            $pickupLocationId = $request->input('pickup_location_id');
-            $pickup = null;
-
-            // If pickup_location_id explicitly provided, try loading it
-            if (!empty($pickupLocationId)) {
-                $pickup = PickupLocationModel::find($pickupLocationId);
-            }
-
-            // If not provided OR not found, find default pickup
-            if (!$pickup) {
-                $pickup = PickupLocationModel::where('is_default', 1)
-                    ->where('is_active', 1)
-                    ->first();
-            }
-
-            // If still not found, pick first active pickup
-            if (!$pickup) {
-                $pickup = PickupLocationModel::where('is_active', 1)
-                    ->orderBy('id')
-                    ->first();
-            }
-
-            // If STILL no pickup → throw error
-            if (!$pickup) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No valid pickup location found. Please configure t_pickup_location.',
-                    'data'    => [],
-                ], 500);
-            }
-
-            // Use courier_pickup_name if set, else internal name
-            $pickupName    = $pickup->courier_pickup_name ?: $pickup->name;
-            $pickupAddress = trim(
-                $pickup->address_line1
-                . ($pickup->address_line2 ? ', '.$pickup->address_line2 : '')
-                . ($pickup->landmark ? ', '.$pickup->landmark : '')
-            );
-            $pickupPin     = $pickup->pin;
-            $pickupCity    = $pickup->city;
-            $pickupState   = $pickup->state;
-            $pickupPhone   = $pickup->phone ?: $pickup->alternate_phone;
+            // 
 
             // 8) Build payload for DelhiveryService->placeOrder()
             $orderData = [
