@@ -592,7 +592,6 @@ class DelhiveryServiceController extends Controller
         }
     }
 
-    // Check Shipment API (Returns data for review)
     public function checkShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -632,8 +631,6 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
-
-    // Punch Shipment API (Submits the final shipment data)
     public function punchShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -653,7 +650,14 @@ class DelhiveryServiceController extends Controller
         $payload = $request->input('payload');  // Get the payload from frontend (updated or not)
 
         try {
-            // Punch the shipment to Delhivery with the payload data
+            // 1. Update the database with any changes from the payload (if needed)
+            $shipment = OrderShipment::firstOrNew(['order_id' => $orderId]);
+            $shipment->customer_name = $payload['customer_name'];  // Example of updating data
+            $shipment->shipping_address = $payload['customer_address']; // Example of updating address
+            $shipment->phone = $payload['phone']; // Example of updating phone number
+            $shipment->save();  // Save to DB
+
+            // 2. Now send the updated payload to Delhivery API to create the shipment
             $delhiveryService = new DelhiveryService();
             $apiResponse = $delhiveryService->placeOrder($payload); // Send the payload to Delhivery
 
@@ -667,14 +671,11 @@ class DelhiveryServiceController extends Controller
                 ], 400);
             }
 
-            // Save the shipment in your database
-            $shipment = new OrderShipment();
-            $shipment->order_id = $orderId;
-            $shipment->awb_no = $apiResponse['packages'][0]['waybill'];
-            $shipment->courier_reference = $apiResponse['packages'][0]['refnum'];
-            $shipment->status = 'booked';  // Or the status from the response
-            $shipment->response_payload = $apiResponse;
-            $shipment->save();
+            // 3. Update the shipment data with Delhivery's response (e.g., tracking number, waybill)
+            $shipment->awb_no = $apiResponse['packages'][0]['waybill']; // Update with AWB number from Delhivery
+            $shipment->status = 'booked';  // Example: Delhivery status
+            $shipment->response_payload = $apiResponse; // Save Delhivery response
+            $shipment->save();  // Save to DB
 
             return response()->json([
                 'success' => true,
@@ -689,7 +690,6 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
-
     // Build the shipment data for both checking and punching
     private function buildShipmentData(int $orderId, ?int $pickupLocationId = null, array $overrides = []): array
     {
@@ -852,7 +852,6 @@ class DelhiveryServiceController extends Controller
             'orderData'  => $orderData,
         ];
     }
-
 
     // fetch delivery details from db
     public function fetchShipment(Request $request, $order_id = null)
