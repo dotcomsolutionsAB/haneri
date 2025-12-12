@@ -654,7 +654,7 @@ class DelhiveryServiceController extends Controller
             $shipment = OrderShipment::firstOrNew(['order_id' => $orderId]);
             $shipment->customer_name = $payload['customer_name'];  // Example of updating data
             $shipment->shipping_address = $payload['customer_address']; // Example of updating address
-            $shipment->phone = $payload['phone']; // Example of updating phone number
+            $shipment->customer_phone = $payload['phone']; // Example of updating phone number
             $shipment->save();  // Save to DB
 
             // 2. Now send the updated payload to Delhivery API to create the shipment
