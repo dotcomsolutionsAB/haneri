@@ -22,6 +22,7 @@ class DelhiveryServiceController extends Controller
     //     $this->delhiveryService = $delhiveryService;
     // }
 
+    // Checking 
     public function checkPincodeServiceability(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -55,7 +56,6 @@ class DelhiveryServiceController extends Controller
             'data'    => $response,
         ]);
     }
-
     public function getShippingCost(Request $request)
     {
         // 1. Basic validation for "through"
@@ -165,6 +165,7 @@ class DelhiveryServiceController extends Controller
         ]);
     }
 
+    // Create shipment
     public function createOrder(Request $request)
     {
         // Basic validation – you can tighten later
@@ -243,7 +244,7 @@ class DelhiveryServiceController extends Controller
             'data'    => $response,
         ]);
     }
-
+    // Create shipment by order id and pickup location id
     public function createShipByOrder(Request $request)
     {
         // 1) Validate only order_id – everything else is auto-fetched
@@ -591,329 +592,347 @@ class DelhiveryServiceController extends Controller
         }
     }
 
-    // public function createShipByOrder(Request $request)
-    // {
-    //     // 1) Validate only order_id – everything else is auto-fetched
-    //     $validator = Validator::make($request->all(), [
-    //         'order_id' => 'required|integer|exists:t_orders,id',
-    //         'pickup_location_id' => 'nullable|integer|exists:t_pickup_location,id',
-    //     ]);
+    // punch shipment throough checking
+    public function checkShipment(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_id'            => 'required|integer|exists:t_orders,id',
+            'pickup_location_id'  => 'nullable|integer|exists:t_pickup_location,id',
+        ]);
 
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Validation error',
-    //             'data'    => $validator->errors(),
-    //         ], 422);
-    //     }
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
 
-    //     $orderId = (int) $request->input('order_id');
+        $orderId = (int)$request->order_id;
+        $pickupLocationId = $request->pickup_location_id ?? null;
 
-    //     try {
-    //         // 2) Load order + user
-    //         $order = OrderModel::with('user')->findOrFail($orderId);
-    //         $user  = $order->user;
+        try {
+            $data = $this->buildShipmentData($orderId, $pickupLocationId);
 
-    //         if (!$user) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'User not found for this order.',
-    //                 'data'    => [],
-    //             ], 404);
-    //         }
+            return response()->json([
+                'success' => true,
+                'message' => 'Shipment data prepared.',
+                'data'    => $data,
+            ]);
 
-    //         // 3) Load order items with product + variant (for name & weight)
-    //         $items = OrderItemModel::with([
-    //                 'product:id,name',
-    //                 'variant:id,weight'
-    //             ])
-    //             ->where('order_id', $order->id)
-    //             ->get();
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to prepare shipment: ' . $e->getMessage(),
+                'data'    => [],
+            ], 500);
+        }
+    }
+    public function punchShipment(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_id'            => 'required|integer|exists:t_orders,id',
+            'pickup_location_id'  => 'nullable|integer|exists:t_pickup_location,id',
 
-    //         if ($items->isEmpty()) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'No items found for this order.',
-    //                 'data'    => [],
-    //             ], 400);
-    //         }
+            // frontend can send edits here
+            'overrides'           => 'nullable|array',
 
-    //         // 4) Build products_description, total quantity, total weight
-    //         $descParts   = [];
-    //         $totalQty    = 0;
-    //         $totalWeight = 0.0; // in kg
+            // (optional strict validation for overrides if you want)
+            'overrides.shipping_mode'   => 'nullable|string',
+            'overrides.address_type'    => 'nullable|string',
+            'overrides.shipment_length' => 'nullable|numeric|min:1',
+            'overrides.shipment_width'  => 'nullable|numeric|min:1',
+            'overrides.shipment_height' => 'nullable|numeric|min:1',
 
-    //         foreach ($items as $item) {
-    //             $name = optional($item->product)->name ?? ('Product #'.$item->product_id);
-    //             $qty  = (int) $item->quantity;
+            'overrides.customer_name'   => 'nullable|string|max:255',
+            'overrides.phone'           => 'nullable|string|max:20',
+            'overrides.customer_address'=> 'nullable|string|max:500',
+        ]);
 
-    //             $descParts[] = $name.' x '.$qty;
-    //             $totalQty   += $qty;
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
 
-    //             // weight from variant (if available)
-    //             $variantWeight = optional($item->variant)->weight; // assume in kg
-    //             if (!is_null($variantWeight)) {
-    //                 $totalWeight += ((float) $variantWeight) * $qty;
-    //             }
-    //         }
+        $orderId = (int)$request->order_id;
+        $pickupLocationId = $request->pickup_location_id ?? null;
+        $overrides = $request->input('overrides', []);
 
-    //         if ($totalWeight <= 0) {
-    //             // Fallback – you can change default
-    //             $totalWeight = 1.0;
-    //         }
+        try {
+            // 1) Build final orderData (resolved + edited)
+            $data = $this->buildShipmentData($orderId, $pickupLocationId, $overrides);
+            $orderData = $data['orderData'];
 
-    //         $productsDescription = implode(', ', $descParts);
+            // ✅ Prevent duplicate punching (Delhivery also rejects duplicate order id)
+            $existing = OrderShipment::where('order_id', $orderId)
+                ->whereIn('status', ['booked', 'in_transit', 'delivered'])
+                ->first();
 
-    //         // 5) Map shipping details from single shipping_address string
-    //         $shippingAddress = $order->shipping_address;
+            if ($existing) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Shipment already exists for this order.',
+                    'data'    => [
+                        'shipment_id' => $existing->id,
+                        'awb_no'      => $existing->awb_no,
+                        'status'      => $existing->status,
+                    ],
+                ], 409);
+            }
 
-    //         // Default nulls
-    //         $pin     = null;
-    //         $city    = null;
-    //         $state   = null;
-    //         $country = null;
-    //         $nameFromAddress  = null;
-    //         $phoneFromAddress = null;
+            // 2) Call Delhivery
+            $delhiveryService = new DelhiveryService();
+            $apiResponse = $delhiveryService->placeOrder($orderData);
 
-    //         if ($shippingAddress) {
-    //             // Split by comma and trim
-    //             $parts = array_map('trim', explode(',', $shippingAddress));
-    //             // Remove empty values and reindex
-    //             $parts = array_values(array_filter($parts, fn($v) => $v !== ''));
+            // 3) Save shipment in DB (even if failed, save request/response)
+            $shipment = OrderShipment::firstOrNew(['order_id' => $orderId]);
 
-    //             $count = count($parts);
+            $shipment->user_id            = $data['order']->user_id;
+            $shipment->courier            = 'delhivery';
+            $shipment->pickup_location_id = $data['pickup']->id;
 
-    //             if ($count >= 7) {
-    //                 // According to your pattern:
-    //                 // 0 -> name
-    //                 // 1 -> mobile
-    //                 // ... middle address chunks ...
-    //                 // [count-5] -> city
-    //                 // [count-4] -> district (not used for Delhivery)
-    //                 // [count-3] -> state
-    //                 // [count-2] -> pin
-    //                 // [count-1] -> country
+            $shipment->customer_name      = $orderData['customer_name'];
+            $shipment->customer_phone     = $orderData['phone'];
+            $shipment->customer_email     = $data['user']->email;
 
-    //                 $nameFromAddress  = $parts[0] ?? null;
-    //                 $phoneFromAddress = $parts[1] ?? null;
+            $shipment->shipping_address   = $orderData['customer_address'];
+            $shipment->shipping_pin       = $orderData['pin'];
+            $shipment->shipping_city      = $orderData['city'];
+            $shipment->shipping_state     = $orderData['state'];
 
-    //                 $country = $parts[$count - 1] ?? null;
-    //                 $maybePin = $parts[$count - 2] ?? null;
-    //                 $state  = $parts[$count - 3] ?? null;
-    //                 // district = $parts[$count - 4] ?? null; // if you ever need it
-    //                 $city   = $parts[$count - 5] ?? null;
+            $shipment->payment_mode       = $orderData['payment_mode'];
+            $shipment->total_amount       = $orderData['total_amount'];
+            $shipment->cod_amount         = $orderData['cod_amount'];
 
-    //                 // Validate pin shape (6 digits)
-    //                 if ($maybePin && preg_match('/^\d{6}$/', $maybePin)) {
-    //                     $pin = $maybePin;
-    //                 }
-    //             }
-    //         }
+            $shipment->quantity           = $orderData['quantity'];
+            $shipment->weight             = $orderData['weight'];
+            $shipment->products_description = $orderData['products_description'];
 
-    //         // Prefer parsed values, but fallback to user fields if needed
-    //         if (!$pin)   { $pin   = $user->pin   ?? null; }
-    //         if (!$city)  { $city  = $user->city  ?? null; }
-    //         if (!$state) { $state = $user->state ?? null; }
+            $shipment->pickup_name        = $orderData['pickup_name'];
+            $shipment->pickup_address     = $orderData['pickup_address'];
+            $shipment->pickup_pin         = $orderData['pickup_pin'];
+            $shipment->pickup_city        = $orderData['pickup_city'];
+            $shipment->pickup_state       = $orderData['pickup_state'];
+            $shipment->pickup_phone       = $orderData['pickup_phone'];
 
-    //         // If STILL missing critical pieces, error out
-    //         if (!$pin || !$city || !$state) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Missing shipping pincode/city/state for this order. Please complete address first.',
-    //                 'data'    => [
-    //                     'shipping_address' => $shippingAddress,
-    //                     'pin'              => $pin,
-    //                     'city'             => $city,
-    //                     'state'            => $state,
-    //                 ],
-    //             ], 422);
-    //         }
+            $shipment->request_payload    = $orderData;
+            $shipment->response_payload   = $apiResponse;
 
-    //         // Optionally, you can also override phone from address if missing:
-    //         $finalPhone = $user->mobile ?? $phoneFromAddress ?? null;
+            // 4) handle error / success
+            $isError = (($apiResponse['success'] ?? null) === false) || (!empty($apiResponse['error']));
+            if ($isError) {
+                $msg = $apiResponse['rmk'] ?? 'Delhivery returned an error.';
+                $shipment->status = 'failed';
+                $shipment->error_message = $msg;
+                $shipment->save();
 
-    //         // 6) Payment mode from order.payment_status
-    //         // tweak mapping as per your logic
-    //         $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
-    //         $codAmount   = $paymentMode === 'COD' ? (float) $order->total_amount : 0.0;
+                return response()->json([
+                    'success' => false,
+                    'message' => $msg,
+                    'data'    => $apiResponse,
+                ], 400);
+            }
 
-    //         // Seller can still come from config
-    //         $sellerName    = config('shipping.seller_name', 'Your Store Name');
-    //         $sellerAddress = config('shipping.seller_address', 'Your Warehouse Address');
-    //         $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
+            $awbNo = $apiResponse['packages'][0]['waybill'] ?? null;
+            $refNum = $apiResponse['packages'][0]['refnum'] ?? null;
 
-    //         // Resolve pickup location:
-    //         $pickupLocationId = $request->input('pickup_location_id');
-    //         $pickup = null;
+            $shipment->awb_no = $awbNo;
+            $shipment->courier_reference = $refNum;
+            $shipment->status = 'booked';
+            $shipment->booked_at = Carbon::now();
+            $shipment->error_message = null;
+            $shipment->save();
 
-    //         // If pickup_location_id explicitly provided, try loading it
-    //         if (!empty($pickupLocationId)) {
-    //             $pickup = PickupLocationModel::find($pickupLocationId);
-    //         }
+            return response()->json([
+                'success' => true,
+                'message' => 'Shipment created on Delhivery.',
+                'data'    => [
+                    'order_id'    => $orderId,
+                    'shipment_id' => $shipment->id,
+                    'awb_no'      => $shipment->awb_no,
+                    'status'      => $shipment->status,
+                    'api'         => $apiResponse,
+                ],
+            ]);
 
-    //         // If not provided OR not found, find default pickup
-    //         if (!$pickup) {
-    //             $pickup = PickupLocationModel::where('is_default', 1)
-    //                 ->where('is_active', 1)
-    //                 ->first();
-    //         }
+        } catch (\Exception $e) {
+            Log::error("punchShipment failed for order {$orderId}: ".$e->getMessage());
 
-    //         // If still not found, pick first active pickup
-    //         if (!$pickup) {
-    //             $pickup = PickupLocationModel::where('is_active', 1)
-    //                 ->orderBy('id')
-    //                 ->first();
-    //         }
+            return response()->json([
+                'success' => false,
+                'message' => 'Unexpected error: ' . $e->getMessage(),
+                'data'    => [],
+            ], 500);
+        }
+    }
+    /**
+     * Build shipment data for preview OR final punch
+     * $overrides = editable fields from frontend
+     */
+    private function buildShipmentData(int $orderId, ?int $pickupLocationId = null, array $overrides = []): array
+    {
+        $order = OrderModel::with('user')->findOrFail($orderId);
+        $user = $order->user;
+        if (!$user) throw new \Exception("User not found for this order.");
 
-    //         // If STILL no pickup → throw error
-    //         if (!$pickup) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'No valid pickup location found. Please configure t_pickup_location.',
-    //                 'data'    => [],
-    //             ], 500);
-    //         }
+        // Items
+        $items = OrderItemModel::with(['product:id,name', 'variant:id,weight'])
+            ->where('order_id', $order->id)
+            ->get();
 
-    //         // Use courier_pickup_name if set, else internal name
-    //         $pickupName    = $pickup->courier_pickup_name ?: $pickup->name;
-    //         $pickupAddress = trim(
-    //             $pickup->address_line1
-    //             . ($pickup->address_line2 ? ', '.$pickup->address_line2 : '')
-    //             . ($pickup->landmark ? ', '.$pickup->landmark : '')
-    //         );
-    //         $pickupPin     = $pickup->pin;
-    //         $pickupCity    = $pickup->city;
-    //         $pickupState   = $pickup->state;
-    //         $pickupPhone   = $pickup->phone ?: $pickup->alternate_phone;
+        if ($items->isEmpty()) throw new \Exception("No items found for this order.");
 
-    //         // 8) Build payload for DelhiveryService->placeOrder()
-    //         $orderData = [
-    //             // Customer
-    //             'customer_name'        => $user->name,
-    //             'customer_address'     => $shippingAddress,
-    //             'pin'                  => $pin,
-    //             'city'                 => $city,
-    //             'state'                => $state,
-    //             'phone'                => $finalPhone, //$user->mobile,
+        $descParts = [];
+        $totalQty = 0;
+        $totalWeight = 0.0;
 
-    //             // Order / payment
-    //             'order_no'             => (string) $order->id,   // or your custom order number field
-    //             'payment_mode'         => $paymentMode,
-    //             'total_amount'         => (float) $order->total_amount,
-    //             'cod_amount'           => $codAmount,
+        foreach ($items as $item) {
+            $name = optional($item->product)->name ?? ('Product #'.$item->product_id);
+            $qty  = (int)$item->quantity;
 
-    //             // Products
-    //             'products_description' => $productsDescription,
-    //             'quantity'             => $totalQty,
-    //             'weight'               => round($totalWeight, 3), // in kg
-    //             'order_date'           => $order->created_at
-    //                                         ? $order->created_at->toDateString()
-    //                                         : Carbon::now()->toDateString(),
+            $descParts[] = $name.' x '.$qty;
+            $totalQty += $qty;
 
-    //             // Seller
-    //             'seller_name'          => $sellerName,
-    //             'seller_address'       => $sellerAddress,
-    //             'seller_invoice'       => $sellerInvoice,
+            $variantWeight = optional($item->variant)->weight;
+            if (!is_null($variantWeight)) {
+                $totalWeight += ((float)$variantWeight) * $qty;
+            }
+        }
 
-    //             // Pickup
-    //             'pickup_name'          => $pickupName,
-    //             'pickup_address'       => $pickupAddress,
-    //             'pickup_pin'           => $pickupPin,
-    //             'pickup_city'          => $pickupCity,
-    //             'pickup_state'         => $pickupState,
-    //             'pickup_phone'         => $pickupPhone,
+        if ($totalWeight <= 0) $totalWeight = 1.0;
+        $productsDescription = implode(', ', $descParts);
 
-    //             // Optional
-    //             'shipment_width'       => null,
-    //             'shipment_height'      => null,
-    //             'shipping_mode'        => 'Surface',
-    //             'address_type'         => 'home',
-    //             'return_pin'           => $pickupPin,
-    //             'return_city'          => $pickupCity,
-    //             'return_phone'         => $pickupPhone,
-    //             'return_address'       => $pickupAddress,
-    //             'return_state'         => $pickupState,
-    //             'return_country'       => 'India',
-    //         ];
+        // Pickup resolve
+        $pickup = null;
+        if (!empty($pickupLocationId)) {
+            $pickup = PickupLocationModel::find($pickupLocationId);
+        }
+        if (!$pickup) {
+            $pickup = PickupLocationModel::where('is_default', 1)->where('is_active', 1)->first();
+        }
+        if (!$pickup) {
+            $pickup = PickupLocationModel::where('is_active', 1)->orderBy('id')->first();
+        }
+        if (!$pickup) throw new \Exception("No valid pickup location found.");
 
-    //         // 9) Call DelhiveryService
-    //         $delhiveryService = new DelhiveryService();
-    //         $apiResponse      = $delhiveryService->placeOrder($orderData);
+        $pickupName = $pickup->courier_pickup_name ?: $pickup->name;
+        $pickupAddress = trim(
+            $pickup->address_line1
+            . ($pickup->address_line2 ? ', '.$pickup->address_line2 : '')
+            . ($pickup->landmark ? ', '.$pickup->landmark : '')
+        );
 
-    //         // 10) Prepare / update shipment record in DB
-    //         $shipment = OrderShipment::firstOrNew(['order_id' => $order->id]);
-    //         $shipment->user_id              = $order->user_id;
-    //         $shipment->courier              = 'delhivery';
-    //         $shipment->pickup_location_id   = $pickup->id;   // ⭐ store pickup id here
-    //         $shipment->customer_name        = $orderData['customer_name'];
-    //         $shipment->customer_phone       = $finalPhone;
-    //         $shipment->customer_email       = $user->email;
-    //         $shipment->shipping_address     = $orderData['customer_address'];
-    //         $shipment->shipping_pin         = $orderData['pin'];
-    //         $shipment->shipping_city        = $orderData['city'];
-    //         $shipment->shipping_state       = $orderData['state'];
-    //         $shipment->payment_mode         = $orderData['payment_mode'];
-    //         $shipment->total_amount         = $orderData['total_amount'];
-    //         $shipment->cod_amount           = $orderData['cod_amount'];
-    //         $shipment->quantity             = $orderData['quantity'];
-    //         $shipment->weight               = $orderData['weight'];
-    //         $shipment->products_description = $orderData['products_description'];
-    //         $shipment->pickup_name          = $orderData['pickup_name'];
-    //         $shipment->pickup_address       = $orderData['pickup_address'];
-    //         $shipment->pickup_pin           = $orderData['pickup_pin'];
-    //         $shipment->pickup_city          = $orderData['pickup_city'];
-    //         $shipment->pickup_state         = $orderData['pickup_state'];
-    //         $shipment->pickup_phone         = $orderData['pickup_phone'];
-    //         $shipment->request_payload      = $orderData;
-    //         $shipment->response_payload     = $apiResponse;
+        // Shipping address parse (your new format)
+        $shippingAddressRaw = $order->shipping_address;
 
-    //         // If Delhivery returned an error
-    //         if (isset($apiResponse['error'])) {
-    //             $shipment->status        = 'failed';
-    //             $shipment->error_message = $apiResponse['error'];
-    //             $shipment->save();
+        $pin = $city = $state = $country = null;
+        $nameFromAddress = $phoneFromAddress = null;
+        $addressOnly = null;
 
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => $apiResponse['error'],
-    //                 'data'    => $apiResponse['raw'] ?? [],
-    //             ], 400);
-    //         }
+        if ($shippingAddressRaw) {
+            $parts = array_values(array_filter(array_map('trim', explode(',', $shippingAddressRaw)), fn($v) => $v !== ''));
+            if (count($parts) >= 6) {
+                $nameFromAddress  = $parts[0] ?? null;
+                $phoneFromAddress = $parts[1] ?? null;
+                $city    = $parts[2] ?? null;
+                $state   = $parts[3] ?? null;
+                $country = $parts[4] ?? null;
+                $maybePin= $parts[5] ?? null;
+                if ($maybePin && preg_match('/^\d{6}$/', $maybePin)) $pin = $maybePin;
+                if (count($parts) > 6) $addressOnly = implode(', ', array_slice($parts, 6));
+            }
+        }
 
-    //         // Extract AWB / waybill – adjust keys based on your actual response
-    //         $awbNo   = $apiResponse['packages'][0]['waybill'] ?? null;
-    //         $refNum  = $apiResponse['packages'][0]['refnum']  ?? null;
+        if (!$pin)   $pin   = $user->pin   ?? null;
+        if (!$city)  $city  = $user->city  ?? null;
+        if (!$state) $state = $user->state ?? null;
 
-    //         $shipment->awb_no           = $awbNo;
-    //         $shipment->courier_reference= $refNum;
-    //         $shipment->status           = 'booked';
-    //         $shipment->booked_at        = Carbon::now();
-    //         $shipment->error_message    = null;
-    //         $shipment->save();
+        if (!$pin || !$city || !$state) throw new \Exception("Missing shipping pin/city/state.");
 
-    //         return response()->json([
-    //             'success' => true,
-    //             'message' => 'Shipment created on Delhivery for this order.',
-    //             'data'    => [
-    //                 'order_id'    => $order->id,
-    //                 'shipment_id' => $shipment->id,
-    //                 'awb_no'      => $shipment->awb_no,
-    //                 'courier'     => $shipment->courier,
-    //                 'status'      => $shipment->status,
-    //                 'api'         => $apiResponse,
-    //             ],
-    //         ]);
+        $finalPhone = $phoneFromAddress ?: $user->mobile ?: null;
+        $cleanAddress = $addressOnly
+            ? ($addressOnly . ', ' . $city . ' - ' . $pin . ', ' . $state . ', ' . ($country ?: 'India'))
+            : $shippingAddressRaw;
 
-    //     } catch (\Exception $e) {
-    //         Log::error('createShipByOrder (auto) failed for order '.$orderId.': '.$e->getMessage());
+        // Payment mapping (IMPORTANT: use Prepaid/COD)
+        $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
+        $codAmount   = $paymentMode === 'COD' ? (float)$order->total_amount : 0.0;
 
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Unexpected error while creating shipment: '.$e->getMessage(),
-    //             'data'    => [],
-    //         ], 500);
-    //     }
-    // }
+        // Seller (prefer config; fallback pickup)
+        $sellerName = config('shipping.seller_name', 'Your Store Name');
+        $sellerAddress = config('shipping.seller_address') ?: $pickupAddress;
+        $sellerInvoice = 'INV-' . $order->id;
+
+        // Defaults
+        $orderData = [
+            'customer_name'        => $user->name,
+            'customer_address'     => $cleanAddress,
+            'pin'                  => $pin,
+            'city'                 => $city,
+            'state'                => $state,
+            'phone'                => $finalPhone,
+
+            'order_no'             => (string)$order->id,
+            'payment_mode'         => $paymentMode,
+            'total_amount'         => (float)$order->total_amount,
+            'cod_amount'           => $codAmount,
+
+            'products_description' => $productsDescription,
+            'quantity'             => $totalQty,
+            'weight'               => round($totalWeight, 3),
+            'order_date'           => $order->created_at ? $order->created_at->toDateString() : Carbon::now()->toDateString(),
+
+            'seller_name'          => $sellerName,
+            'seller_address'       => $sellerAddress,
+            'seller_invoice'       => $sellerInvoice,
+
+            'pickup_name'          => $pickupName,
+            'pickup_address'       => $pickupAddress,
+            'pickup_pin'           => $pickup->pin,
+            'pickup_city'          => $pickup->city,
+            'pickup_state'         => $pickup->state,
+            'pickup_phone'         => $pickup->phone ?: $pickup->alternate_phone,
+
+            'shipment_length'      => 10,
+            'shipment_width'       => 10,
+            'shipment_height'      => 10,
+
+            'shipping_mode'        => 'Surface',
+            'address_type'         => 'home',
+
+            'return_pin'           => $pickup->pin,
+            'return_city'          => $pickup->city,
+            'return_phone'         => $pickup->phone ?: $pickup->alternate_phone,
+            'return_address'       => $pickupAddress,
+            'return_state'         => $pickup->state,
+            'return_country'       => 'India',
+        ];
+
+        // ✅ Apply overrides (allow only safe keys)
+        $allowed = [
+            'customer_name','customer_address','phone',
+            'shipping_mode','address_type',
+            'shipment_length','shipment_width','shipment_height',
+        ];
+
+        foreach ($allowed as $k) {
+            if (array_key_exists($k, $overrides) && $overrides[$k] !== null && $overrides[$k] !== '') {
+                $orderData[$k] = $overrides[$k];
+            }
+        }
+
+        // Return full preview pack
+        return [
+            'order'      => $order,
+            'user'       => $user,
+            'pickup'     => $pickup,
+            'items'      => $items,
+            'orderData'  => $orderData,
+        ];
+    }
 
     // fetch delivery details from db
     public function fetchShipment(Request $request, $order_id = null)
@@ -1022,7 +1041,6 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
-
     public function trackShipments(Request $request)
     {
         // From JSON/body: can be "6" or "6,8,10"

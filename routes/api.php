@@ -129,6 +129,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/expected-time', [DelhiveryServiceController::class, 'getTat']);
 
             // manual creation (admin)
+            Route::post('/check_shipment', [DelhiveryServiceController::class, 'checkShipment']); // check shipment all datas
+            Route::post('/punch_shipment', [DelhiveryServiceController::class, 'punchShipment']); // after check punch
+
             Route::post('/create_ship_by_order', [DelhiveryServiceController::class, 'createShipByOrder']); // create shipment and save in db
             Route::post('/fetch_shipments/{id?}', [DelhiveryServiceController::class, 'fetchShipment']); // fetch from db
 
