@@ -69,7 +69,23 @@ return new class extends Migration
             $table->timestamp('booked_at')->nullable();
             $table->timestamp('delivered_at')->nullable();
             $table->timestamp('cancelled_at')->nullable();
-
+            
+            // New columns added
+            $table->string('seller_name', 255)->nullable()->default(null);
+            $table->string('seller_address', 255)->nullable()->default(null);
+            $table->string('seller_invoice', 255)->nullable()->default(null);
+            $table->string('shipment_length', 255)->nullable()->default(null);
+            $table->string('shipment_width', 255)->nullable()->default(null);
+            $table->string('shipment_height', 255)->nullable()->default(null);
+            $table->string('shipping_mode', 255)->nullable()->default(null);
+            $table->string('address_type', 255)->nullable()->default(null);
+            $table->string('return_pin', 255)->nullable()->default(null);
+            $table->string('return_city', 255)->nullable()->default(null);
+            $table->string('return_state', 255)->nullable()->default(null);
+            $table->string('return_phone', 255)->nullable()->default(null);
+            $table->string('return_address', 255)->nullable()->default(null);
+            $table->string('return_country', 255)->nullable()->default(null);
+            
             $table->timestamps();
 
             // FKs (optional but recommended)

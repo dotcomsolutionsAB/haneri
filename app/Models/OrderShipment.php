@@ -39,6 +39,22 @@ class OrderShipment extends Model
         'response_payload',
         'error_message',
         'booked_at',
+        // New columns you added
+        'seller_name',
+        'seller_address',
+        'seller_invoice',
+        'shipment_length',
+        'shipment_width',
+        'shipment_height',
+        'shipping_mode',
+        'address_type',
+        'return_pin',
+        'return_city',
+        'return_state',
+        'return_phone',
+        'return_address',
+        'return_country',
+        
         'delivered_at',
         'cancelled_at',
     ];

@@ -631,93 +631,7 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
-    // public function punchShipment(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'order_id' => 'required|integer|exists:t_orders,id',
-    //         'payload'  => 'required|array',  // This is the same payload you get from `check_shipment` API
-    //     ]);
 
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Validation error',
-    //             'data'    => $validator->errors(),
-    //         ], 422);
-    //     }
-
-    //     $orderId = (int)$request->order_id;
-    //     $payload = $request->input('payload');  // Get the payload from frontend (updated or not)
-
-    //     try {
-    //         // 1. Update the database with any changes from the payload (if needed)
-    //         $shipment = OrderShipment::firstOrNew(['order_id' => $orderId]);
-    //         // Ensure you're updating all required columns from the payload
-    //         $shipment->order_id = $orderId;
-    //         $shipment->user_id = $payload['user_id'] ?? null; // Add user_id if it's provided
-    //         $shipment->courier = $payload['courier'] ?? null;
-    //         $shipment->status = $payload['status'] ?? null;
-    //         $shipment->customer_name = $payload['customer_name'] ?? null;
-    //         $shipment->customer_phone = $payload['phone'] ?? null;  // Corrected field name
-    //         $shipment->customer_email = $payload['customer_email'] ?? null;
-    //         $shipment->shipping_address = $payload['customer_address'] ?? null;
-    //         $shipment->shipping_pin = $payload['pin'] ?? null;
-    //         $shipment->shipping_city = $payload['city'] ?? null;
-    //         $shipment->shipping_state = $payload['state'] ?? null;
-    //         $shipment->payment_mode = $payload['payment_mode'] ?? null;
-    //         $shipment->total_amount = $payload['total_amount'] ?? null;
-    //         $shipment->cod_amount = $payload['cod_amount'] ?? null;
-    //         $shipment->quantity = $payload['quantity'] ?? null;
-    //         $shipment->weight = $payload['weight'] ?? null;
-    //         $shipment->products_description = $payload['products_description'] ?? null;
-    //         $shipment->pickup_location_id = $payload['pickup_location_id'] ?? null;
-    //         $shipment->pickup_name = $payload['pickup_name'] ?? null;
-    //         $shipment->pickup_address = $payload['pickup_address'] ?? null;
-    //         $shipment->pickup_pin = $payload['pickup_pin'] ?? null;
-    //         $shipment->pickup_city = $payload['pickup_city'] ?? null;
-    //         $shipment->pickup_state = $payload['pickup_state'] ?? null;
-    //         $shipment->pickup_phone = $payload['pickup_phone'] ?? null;
-    //         $shipment->awb_no = $payload['awb_no'] ?? null;  // Add AWB number if returned from Delhivery
-    //         $shipment->courier_reference = $payload['courier_reference'] ?? null;
-    //         $shipment->request_payload = $payload;  // Save the entire payload for reference
-    //         $shipment->response_payload = $payload;  // Save Delhivery's response (if available)
-    //         $shipment->error_message = $payload['error_message'] ?? null;
-
-    //         $shipment->save();  // Save to DB
-
-    //         // 2. Now send the updated payload to Delhivery API to create the shipment
-    //         $delhiveryService = new DelhiveryService();
-    //         $apiResponse = $delhiveryService->placeOrder($payload); // Send the payload to Delhivery
-
-    //         // If Delhivery returned an error, log it and return failure
-    //         $isError = isset($apiResponse['error']) || isset($apiResponse['rmk']);
-    //         if ($isError) {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => $apiResponse['rmk'] ?? 'Error from Delhivery',
-    //                 'data'    => $apiResponse,
-    //             ], 400);
-    //         }
-
-    //         // 3. Update the shipment data with Delhivery's response (e.g., tracking number, waybill)
-    //         $shipment->awb_no = $apiResponse['packages'][0]['waybill']; // Update with AWB number from Delhivery
-    //         $shipment->status = 'booked';  // Example: Delhivery status
-    //         $shipment->response_payload = $apiResponse; // Save Delhivery response
-    //         $shipment->save();  // Save to DB
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'message' => 'Shipment successfully booked with Delhivery.',
-    //             'data'    => $apiResponse,
-    //         ]);
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Unexpected error while punching shipment: ' . $e->getMessage(),
-    //             'data'    => [],
-    //         ], 500);
-    //     }
-    // }
     public function punchShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -743,34 +657,54 @@ class DelhiveryServiceController extends Controller
             // Update or create the shipment with all the relevant data
             $shipment->fill([
                 'order_id'             => $orderId,
-                'user_id'              => $payload['user_id'] ?? null,
-                'courier'              => $payload['courier'] ?? null,
-                'status'               => $payload['status'] ?? null,
+                // 'user_id'              => $payload['user_id'] ?? null,
+                // 'courier'              => $payload['courier'] ?? null,
+                // 'status'               => $payload['status'] ?? null,
+
+
                 'customer_name'        => $payload['customer_name'] ?? null,
-                'customer_phone'       => $payload['phone'] ?? null,
-                'customer_email'       => $payload['customer_email'] ?? null,
-                'shipping_address'     => $payload['customer_address'] ?? null,
+                'shipping_address'     => $payload['customer_address'] ?? null,                
                 'shipping_pin'         => $payload['pin'] ?? null,
                 'shipping_city'        => $payload['city'] ?? null,
                 'shipping_state'       => $payload['state'] ?? null,
+                'customer_phone'       => $payload['phone'] ?? null,
                 'payment_mode'         => $payload['payment_mode'] ?? null,
                 'total_amount'         => $payload['total_amount'] ?? null,
                 'cod_amount'           => $payload['cod_amount'] ?? null,
+                'products_description' => $payload['products_description'] ?? null,
                 'quantity'             => $payload['quantity'] ?? null,
                 'weight'               => $payload['weight'] ?? null,
-                'products_description' => $payload['products_description'] ?? null,
-                'pickup_location_id'   => $payload['pickup_location_id'] ?? null,
+
                 'pickup_name'          => $payload['pickup_name'] ?? null,
                 'pickup_address'       => $payload['pickup_address'] ?? null,
                 'pickup_pin'           => $payload['pickup_pin'] ?? null,
                 'pickup_city'          => $payload['pickup_city'] ?? null,
                 'pickup_state'         => $payload['pickup_state'] ?? null,
                 'pickup_phone'         => $payload['pickup_phone'] ?? null,
+                'customer_email'       => $payload['customer_email'] ?? null,
+                // 'pickup_location_id'   => $payload['pickup_location_id'] ?? null,
+                
                 'awb_no'               => $payload['awb_no'] ?? null,  // AWB number if returned from Delhivery
                 'courier_reference'    => $payload['courier_reference'] ?? null,
                 'request_payload'      => $payload,  // Save the entire payload for reference
                 'response_payload'     => $payload,  // Save Delhivery's response (if available)
                 'error_message'        => $payload['error_message'] ?? null,
+
+                // New fields
+                'seller_name'          => $payload['seller_name'] ?? null,
+                'seller_address'       => $payload['seller_address'] ?? null,
+                'seller_invoice'       => $payload['seller_invoice'] ?? null,
+                'shipment_length'      => $payload['shipment_length'] ?? null,
+                'shipment_width'       => $payload['shipment_width'] ?? null,
+                'shipment_height'      => $payload['shipment_height'] ?? null,
+                'shipping_mode'        => $payload['shipping_mode'] ?? null,
+                'address_type'         => $payload['address_type'] ?? null,
+                'return_pin'           => $payload['return_pin'] ?? null,
+                'return_city'          => $payload['return_city'] ?? null,
+                'return_state'         => $payload['return_state'] ?? null,
+                'return_phone'         => $payload['return_phone'] ?? null,
+                'return_address'       => $payload['return_address'] ?? null,
+                'return_country'       => $payload['return_country'] ?? null,
             ]);
 
             $shipment->save();  // Save to DB
