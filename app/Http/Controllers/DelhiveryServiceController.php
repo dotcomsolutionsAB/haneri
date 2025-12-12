@@ -596,8 +596,7 @@ class DelhiveryServiceController extends Controller
     public function checkShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'order_id'            => 'required|integer|exists:t_orders,id',
-            'pickup_location_id'  => 'nullable|integer|exists:t_pickup_location,id',
+            'order_id' => 'required|integer|exists:t_orders,id',
         ]);
 
         if ($validator->fails()) {
@@ -609,21 +608,20 @@ class DelhiveryServiceController extends Controller
         }
 
         $orderId = (int)$request->order_id;
-        $pickupLocationId = $request->pickup_location_id ?? null;
 
         try {
-            $data = $this->buildShipmentData($orderId, $pickupLocationId);
+            // Build the shipment data
+            $data = $this->buildShipmentData($orderId);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Shipment data prepared.',
-                'data'    => $data,
+                'message' => 'Shipment data fetched for review.',
+                'data'    => $data, // this includes all the payload fields
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to prepare shipment: ' . $e->getMessage(),
+                'message' => 'Failed to fetch shipment data: ' . $e->getMessage(),
                 'data'    => [],
             ], 500);
         }
@@ -631,22 +629,8 @@ class DelhiveryServiceController extends Controller
     public function punchShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'order_id'            => 'required|integer|exists:t_orders,id',
-            'pickup_location_id'  => 'nullable|integer|exists:t_pickup_location,id',
-
-            // frontend can send edits here
-            'overrides'           => 'nullable|array',
-
-            // (optional strict validation for overrides if you want)
-            'overrides.shipping_mode'   => 'nullable|string',
-            'overrides.address_type'    => 'nullable|string',
-            'overrides.shipment_length' => 'nullable|numeric|min:1',
-            'overrides.shipment_width'  => 'nullable|numeric|min:1',
-            'overrides.shipment_height' => 'nullable|numeric|min:1',
-
-            'overrides.customer_name'   => 'nullable|string|max:255',
-            'overrides.phone'           => 'nullable|string|max:20',
-            'overrides.customer_address'=> 'nullable|string|max:500',
+            'order_id' => 'required|integer|exists:t_orders,id',
+            'payload'  => 'required|array',  // This is the same payload you get from `check_shipment` API
         ]);
 
         if ($validator->fails()) {
@@ -658,120 +642,45 @@ class DelhiveryServiceController extends Controller
         }
 
         $orderId = (int)$request->order_id;
-        $pickupLocationId = $request->pickup_location_id ?? null;
-        $overrides = $request->input('overrides', []);
+        $payload = $request->input('payload');  // Get the payload from frontend (updated or not)
 
         try {
-            // 1) Build final orderData (resolved + edited)
-            $data = $this->buildShipmentData($orderId, $pickupLocationId, $overrides);
-            $orderData = $data['orderData'];
-
-            // ✅ Prevent duplicate punching (Delhivery also rejects duplicate order id)
-            $existing = OrderShipment::where('order_id', $orderId)
-                ->whereIn('status', ['booked', 'in_transit', 'delivered'])
-                ->first();
-
-            if ($existing) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Shipment already exists for this order.',
-                    'data'    => [
-                        'shipment_id' => $existing->id,
-                        'awb_no'      => $existing->awb_no,
-                        'status'      => $existing->status,
-                    ],
-                ], 409);
-            }
-
-            // 2) Call Delhivery
+            // Punch the shipment to Delhivery with the payload data
             $delhiveryService = new DelhiveryService();
-            $apiResponse = $delhiveryService->placeOrder($orderData);
+            $apiResponse = $delhiveryService->placeOrder($payload); // Send the payload to Delhivery
 
-            // 3) Save shipment in DB (even if failed, save request/response)
-            $shipment = OrderShipment::firstOrNew(['order_id' => $orderId]);
-
-            $shipment->user_id            = $data['order']->user_id;
-            $shipment->courier            = 'delhivery';
-            $shipment->pickup_location_id = $data['pickup']->id;
-
-            $shipment->customer_name      = $orderData['customer_name'];
-            $shipment->customer_phone     = $orderData['phone'];
-            $shipment->customer_email     = $data['user']->email;
-
-            $shipment->shipping_address   = $orderData['customer_address'];
-            $shipment->shipping_pin       = $orderData['pin'];
-            $shipment->shipping_city      = $orderData['city'];
-            $shipment->shipping_state     = $orderData['state'];
-
-            $shipment->payment_mode       = $orderData['payment_mode'];
-            $shipment->total_amount       = $orderData['total_amount'];
-            $shipment->cod_amount         = $orderData['cod_amount'];
-
-            $shipment->quantity           = $orderData['quantity'];
-            $shipment->weight             = $orderData['weight'];
-            $shipment->products_description = $orderData['products_description'];
-
-            $shipment->pickup_name        = $orderData['pickup_name'];
-            $shipment->pickup_address     = $orderData['pickup_address'];
-            $shipment->pickup_pin         = $orderData['pickup_pin'];
-            $shipment->pickup_city        = $orderData['pickup_city'];
-            $shipment->pickup_state       = $orderData['pickup_state'];
-            $shipment->pickup_phone       = $orderData['pickup_phone'];
-
-            $shipment->request_payload    = $orderData;
-            $shipment->response_payload   = $apiResponse;
-
-            // 4) handle error / success
-            $isError = (($apiResponse['success'] ?? null) === false) || (!empty($apiResponse['error']));
+            // If Delhivery returned an error, log it and return failure
+            $isError = isset($apiResponse['error']) || isset($apiResponse['rmk']);
             if ($isError) {
-                $msg = $apiResponse['rmk'] ?? 'Delhivery returned an error.';
-                $shipment->status = 'failed';
-                $shipment->error_message = $msg;
-                $shipment->save();
-
                 return response()->json([
                     'success' => false,
-                    'message' => $msg,
+                    'message' => $apiResponse['rmk'] ?? 'Error from Delhivery',
                     'data'    => $apiResponse,
                 ], 400);
             }
 
-            $awbNo = $apiResponse['packages'][0]['waybill'] ?? null;
-            $refNum = $apiResponse['packages'][0]['refnum'] ?? null;
-
-            $shipment->awb_no = $awbNo;
-            $shipment->courier_reference = $refNum;
-            $shipment->status = 'booked';
-            $shipment->booked_at = Carbon::now();
-            $shipment->error_message = null;
+            // Save the shipment in your database
+            $shipment = new OrderShipment();
+            $shipment->order_id = $orderId;
+            $shipment->awb_no = $apiResponse['packages'][0]['waybill'];
+            $shipment->courier_reference = $apiResponse['packages'][0]['refnum'];
+            $shipment->status = 'booked';  // Or the status from the response
+            $shipment->response_payload = $apiResponse;
             $shipment->save();
 
             return response()->json([
                 'success' => true,
-                'message' => 'Shipment created on Delhivery.',
-                'data'    => [
-                    'order_id'    => $orderId,
-                    'shipment_id' => $shipment->id,
-                    'awb_no'      => $shipment->awb_no,
-                    'status'      => $shipment->status,
-                    'api'         => $apiResponse,
-                ],
+                'message' => 'Shipment successfully booked with Delhivery.',
+                'data'    => $apiResponse,
             ]);
-
         } catch (\Exception $e) {
-            Log::error("punchShipment failed for order {$orderId}: ".$e->getMessage());
-
             return response()->json([
                 'success' => false,
-                'message' => 'Unexpected error: ' . $e->getMessage(),
+                'message' => 'Unexpected error while punching shipment: ' . $e->getMessage(),
                 'data'    => [],
             ], 500);
         }
     }
-    /**
-     * Build shipment data for preview OR final punch
-     * $overrides = editable fields from frontend
-     */
     private function buildShipmentData(int $orderId, ?int $pickupLocationId = null, array $overrides = []): array
     {
         $order = OrderModel::with('user')->findOrFail($orderId);
