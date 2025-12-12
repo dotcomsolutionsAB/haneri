@@ -631,7 +631,6 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
-
     public function punchShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -660,51 +659,60 @@ class DelhiveryServiceController extends Controller
                 // 'user_id'              => $payload['user_id'] ?? null,
                 // 'courier'              => $payload['courier'] ?? null,
                 // 'status'               => $payload['status'] ?? null,
+                // 'customer_email'       => $payload['customer_email'] ?? null,
+                // 'pickup_location_id'   => $payload['pickup_location_id'] ?? null,
 
-
+                // Customer details
                 'customer_name'        => $payload['customer_name'] ?? null,
                 'shipping_address'     => $payload['customer_address'] ?? null,                
                 'shipping_pin'         => $payload['pin'] ?? null,
                 'shipping_city'        => $payload['city'] ?? null,
                 'shipping_state'       => $payload['state'] ?? null,
                 'customer_phone'       => $payload['phone'] ?? null,
-                'payment_mode'         => $payload['payment_mode'] ?? null,
-                'total_amount'         => $payload['total_amount'] ?? null,
-                'cod_amount'           => $payload['cod_amount'] ?? null,
-                'products_description' => $payload['products_description'] ?? null,
-                'quantity'             => $payload['quantity'] ?? null,
-                'weight'               => $payload['weight'] ?? null,
 
+                // Pickup Details
                 'pickup_name'          => $payload['pickup_name'] ?? null,
                 'pickup_address'       => $payload['pickup_address'] ?? null,
                 'pickup_pin'           => $payload['pickup_pin'] ?? null,
                 'pickup_city'          => $payload['pickup_city'] ?? null,
                 'pickup_state'         => $payload['pickup_state'] ?? null,
                 'pickup_phone'         => $payload['pickup_phone'] ?? null,
-                'customer_email'       => $payload['customer_email'] ?? null,
-                // 'pickup_location_id'   => $payload['pickup_location_id'] ?? null,
-                
-                'awb_no'               => $payload['awb_no'] ?? null,  // AWB number if returned from Delhivery
-                'courier_reference'    => $payload['courier_reference'] ?? null,
-                'request_payload'      => $payload,  // Save the entire payload for reference
-                'response_payload'     => $payload,  // Save Delhivery's response (if available)
-                'error_message'        => $payload['error_message'] ?? null,
 
-                // New fields
-                'seller_name'          => $payload['seller_name'] ?? null,
-                'seller_address'       => $payload['seller_address'] ?? null,
-                'seller_invoice'       => $payload['seller_invoice'] ?? null,
-                'shipment_length'      => $payload['shipment_length'] ?? null,
-                'shipment_width'       => $payload['shipment_width'] ?? null,
-                'shipment_height'      => $payload['shipment_height'] ?? null,
-                'shipping_mode'        => $payload['shipping_mode'] ?? null,
-                'address_type'         => $payload['address_type'] ?? null,
+                // Return address
                 'return_pin'           => $payload['return_pin'] ?? null,
                 'return_city'          => $payload['return_city'] ?? null,
                 'return_state'         => $payload['return_state'] ?? null,
                 'return_phone'         => $payload['return_phone'] ?? null,
                 'return_address'       => $payload['return_address'] ?? null,
                 'return_country'       => $payload['return_country'] ?? null,
+
+                // Seller Details
+                'seller_name'          => $payload['seller_name'] ?? null,
+                'seller_address'       => $payload['seller_address'] ?? null,
+                'seller_invoice'       => $payload['seller_invoice'] ?? null,
+
+                // Products
+                'products_description' => $payload['products_description'] ?? null,
+                'quantity'             => $payload['quantity'] ?? null,
+                'weight'               => $payload['weight'] ?? null,
+                'shipment_length'      => $payload['shipment_length'] ?? null,
+                'shipment_width'       => $payload['shipment_width'] ?? null,
+                'shipment_height'      => $payload['shipment_height'] ?? null,
+
+                // Payments & others
+                'payment_mode'         => $payload['payment_mode'] ?? null,
+                'total_amount'         => $payload['total_amount'] ?? null,
+                'cod_amount'           => $payload['cod_amount'] ?? null,
+                'shipping_mode'        => $payload['shipping_mode'] ?? null,
+                'address_type'         => $payload['address_type'] ?? null,
+                                
+                // Resposne get
+                'awb_no'               => $payload['awb_no'] ?? null,  // AWB number if returned from Delhivery
+                'courier_reference'    => $payload['courier_reference'] ?? null,
+                'request_payload'      => $payload,  // Save the entire payload for reference
+                'response_payload'     => $payload,  // Save Delhivery's response (if available)
+                'error_message'        => $payload['error_message'] ?? null,
+                
             ]);
 
             $shipment->save();  // Save to DB
@@ -1330,48 +1338,6 @@ class DelhiveryServiceController extends Controller
             'data'    => $shipment,
         ]);
     }
-
-    // public function getTat(Request $request)
-    // {
-    //     $validator = Validator::make($request->all(), [
-    //         'origin_pin'         => 'required|digits:6',
-    //         'destination_pin'    => 'required|digits:6',
-    //         'mot'                => 'required|in:S,E',           // Surface / Express
-    //         'pdt'                => 'nullable|in:B2B,B2C',
-    //         'expected_pickup_date' => 'nullable|string',         // you can tighten this to date_format if needed
-    //     ]);
-
-    //     if ($validator->fails()) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Validation error',
-    //             'data'    => $validator->errors(),
-    //         ], 422);
-    //     }
-
-    //     $originPin         = $request->input('origin_pin');
-    //     $destinationPin    = $request->input('destination_pin');
-    //     $mot               = $request->input('mot', 'S');
-    //     $pdt               = $request->input('pdt');
-    //     $expectedPickup    = $request->input('expected_pickup_date');
-
-    //     $delhiveryService  = new DelhiveryService();
-    //     $response          = $delhiveryService->getTat($originPin, $destinationPin, $mot, $pdt, $expectedPickup);
-
-    //     if (isset($response['error'])) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => $response['error'],
-    //             'data'    => $response['raw'] ?? [],
-    //         ], 400);
-    //     }
-
-    //     return response()->json([
-    //         'success' => true,
-    //         'message' => 'TAT fetched successfully.',
-    //         'data'    => $response,
-    //     ]);
-    // }
 
     // pickup details :
     public function createPickupLocation(Request $request)
