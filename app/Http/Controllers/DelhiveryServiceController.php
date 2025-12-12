@@ -592,7 +592,7 @@ class DelhiveryServiceController extends Controller
         }
     }
 
-    // punch shipment throough checking
+    // Check Shipment API (Returns data for review)
     public function checkShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -611,12 +611,18 @@ class DelhiveryServiceController extends Controller
 
         try {
             // Build the shipment data
-            $data = $this->buildShipmentData($orderId);
+            $data = $this->buildShipmentData($orderId);  // This returns the necessary data for shipment creation
+
+            // Return the payload in the same structure as punchShipment API
+            $response = [
+                'order_id' => $orderId,
+                'payload'  => $data['orderData']  // All the shipment data in the payload
+            ];
 
             return response()->json([
                 'success' => true,
                 'message' => 'Shipment data fetched for review.',
-                'data'    => $data, // this includes all the payload fields
+                'data'    => $response, // return the data as needed
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -626,6 +632,8 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
+
+    // Punch Shipment API (Submits the final shipment data)
     public function punchShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -681,6 +689,8 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
+
+    // Build the shipment data for both checking and punching
     private function buildShipmentData(int $orderId, ?int $pickupLocationId = null, array $overrides = []): array
     {
         $order = OrderModel::with('user')->findOrFail($orderId);
@@ -842,6 +852,7 @@ class DelhiveryServiceController extends Controller
             'orderData'  => $orderData,
         ];
     }
+
 
     // fetch delivery details from db
     public function fetchShipment(Request $request, $order_id = null)
