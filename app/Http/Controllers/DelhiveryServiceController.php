@@ -314,6 +314,10 @@ class DelhiveryServiceController extends Controller
                 // Fallback – you can change default
                 $totalWeight = 1.0;
             }
+            // ✅ Delhivery safe default dimensions (in cm)
+            $shipmentLength = 10;
+            $shipmentWidth  = 10;
+            $shipmentHeight = 10;
 
             $productsDescription = implode(', ', $descParts);
 
@@ -392,12 +396,16 @@ class DelhiveryServiceController extends Controller
 
             // 6) Payment mode from order.payment_status
             // tweak mapping as per your logic
-            $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
+            $paymentMode = $order->payment_status === 'paid' ? 'Pre-paid' : 'COD';
             $codAmount   = $paymentMode === 'COD' ? (float) $order->total_amount : 0.0;
 
             // Seller can still come from config
             $sellerName    = config('shipping.seller_name', 'Your Store Name');
-            $sellerAddress = config('shipping.seller_address', 'Your Warehouse Address');
+            $sellerAddress = config('shipping.seller_address');
+            if (!$sellerAddress) {
+                $sellerAddress = $pickupAddress; // ✅ safest fallback
+            }
+
             $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
 
             // Resolve pickup location:
@@ -481,9 +489,11 @@ class DelhiveryServiceController extends Controller
                 'pickup_state'         => $pickupState,
                 'pickup_phone'         => $pickupPhone,
 
-                // Optional
-                'shipment_width'       => null,
-                'shipment_height'      => null,
+                // ✅ Dimensions (required by many Delhivery accounts)
+                'shipment_length'      => $shipmentLength,
+                'shipment_width'       => $shipmentWidth,
+                'shipment_height'      => $shipmentHeight,
+
                 'shipping_mode'        => 'Surface',
                 'address_type'         => 'home',
                 'return_pin'           => $pickupPin,

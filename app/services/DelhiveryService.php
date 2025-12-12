@@ -121,8 +121,6 @@ class DelhiveryService
                     'seller_inv'     => $orderData['seller_invoice'],        // Invoice no
                     'quantity'       => $orderData['quantity'],              // Total items
                     'weight'         => $orderData['weight'],                // In kg
-                    'shipment_width' => $orderData['shipment_width'] ?? null,
-                    'shipment_height'=> $orderData['shipment_height'] ?? null,
                     'shipping_mode'  => $orderData['shipping_mode'] ?? 'Surface',
                     'address_type'   => $orderData['address_type'] ?? 'home',
                     // optional return address (else defaults to pickup)
@@ -132,6 +130,10 @@ class DelhiveryService
                     'return_add'     => $orderData['return_address'] ?? $orderData['pickup_address'],
                     'return_state'   => $orderData['return_state']   ?? $orderData['pickup_state'],
                     'return_country' => $orderData['return_country'] ?? 'India',
+                    'shipment_width'  => !empty($orderData['shipment_width'])  ? $orderData['shipment_width']  : 10,
+                    'shipment_height' => !empty($orderData['shipment_height']) ? $orderData['shipment_height'] : 10,
+                    'shipment_length' => !empty($orderData['shipment_length']) ? $orderData['shipment_length'] : 10,
+
                 ],
             ];
 
