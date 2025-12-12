@@ -440,7 +440,7 @@ class DelhiveryServiceController extends Controller
 
             // 6) Payment mode from order.payment_status
             // tweak mapping as per your logic
-            $paymentMode = $order->payment_status === 'paid' ? 'Pre-paid' : 'COD';
+            $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
             $codAmount   = $paymentMode === 'COD' ? (float) $order->total_amount : 0.0;
 
             // Seller can still come from config
