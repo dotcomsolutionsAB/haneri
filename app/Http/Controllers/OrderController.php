@@ -14,6 +14,7 @@ use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\OrderPlacedMail;
+use App\Mail\OrderStatusUpdate;
 use App\Models\PaymentModel;
 
 
@@ -1027,6 +1028,5 @@ class OrderController extends Controller
             ],
         ], 200);
     }
-
 
 }
