@@ -138,7 +138,7 @@ class QuotationController extends Controller
 
             // Send email with the attached PDF to the authenticated user's email
             try {
-                // Send the email to the authenticated user's email (not q_email, but the user's email)
+                // Send the email to the authenticated user's email
                 Mail::to($user->email)->send(new QuotationMail($quotation, $user));  // Send to the authenticated user's email
                 \Log::info('Quotation email sent successfully to ' . $user->email);
             } catch (\Exception $e) {

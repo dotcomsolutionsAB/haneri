@@ -2,9 +2,12 @@
 
 namespace App\Mail;
 
-use App\Models\QuotationModel;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Models\QuotationModel;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class QuotationMail extends Mailable
@@ -24,17 +27,41 @@ class QuotationMail extends Mailable
     // Build the email
     public function build()
     {
-        // Get the PDF URL (ensure it's publicly accessible)
-        $pdfUrl = $this->quotation->invoice_quotation; // Path to the saved PDF
-
-        return $this->subject('Your Quotation - ' . $this->quotation->quotation_no)
-                    ->view('emails.quotation') // Use the email view to show details
-                    ->attachFromStorage($pdfUrl, 'quotation_' . $this->quotation->quotation_no . '.pdf', [
-                        'mime' => 'application/pdf', // Specify mime type as PDF
-                    ])
+        return $this->subject('Your Quotation has been generated!')
+                    ->view('emails.quotation') // Your email view to display details
                     ->with([
                         'user' => $this->user,
                         'quotation' => $this->quotation,
                     ]);
     }
+
+    /**
+     * Get the message envelope.
+     */
+    // public function envelope(): Envelope
+    // {
+    //     return new Envelope(
+    //         subject: 'Quotation Mail',
+    //     );
+    // }
+
+    // /**
+    //  * Get the message content definition.
+    //  */
+    // public function content(): Content
+    // {
+    //     return new Content(
+    //         view: 'view.name',
+    //     );
+    // }
+
+    // /**
+    //  * Get the attachments for the message.
+    //  *
+    //  * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+    //  */
+    // public function attachments(): array
+    // {
+    //     return [];
+    // }
 }
