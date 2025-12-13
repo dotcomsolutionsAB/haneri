@@ -83,7 +83,7 @@
 
                         <p style="margin-top:30px;">Best Regards,<br>
                             <strong>Team {{ $siteName }}</strong><br>
-                            <a href="{{ $frontendUrl }}" style="color:#00473e;">{{ $frontendUrl }}</a>
+                            <a href="{{ $frontendUrl }}" style="color:#00473e;"><b>HANERI ELECTRICALS LLP</b></a>
                         </p>
                     </td>
                 </tr>
