@@ -142,77 +142,6 @@ class InvoiceController extends Controller
         }
     }
 
-    // public function updateOrderStatus(Request $request, int $id)
-    // {
-    //     $validated = $request->validate([
-    //         'status'           => 'nullable|in:pending,completed,cancelled,refunded',
-    //         'payment_status'   => 'nullable|in:pending,paid,failed',
-    //         'delivery_status'  => 'nullable|in:pending,accepted,arrived,completed,cancelled',
-    //     ]);
-
-    //     $order = OrderModel::find($id);
-
-    //     if (!$order) {
-    //         return response()->json([
-    //             'code'    => 404,
-    //             'success' => false,
-    //             'message' => 'Order not found.',
-    //             'data'    => [],
-    //         ], 404);
-    //     }
-
-    //     $oldStatus        = $order->status;
-    //     $oldPaymentStatus = $order->payment_status;
-
-    //     // Update fields
-    //     $order->update(array_filter([
-    //         'status'          => $validated['status'] ?? $order->status,
-    //         'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
-    //         'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
-    //     ]));
-
-    //     /**
-    //      * 🔥 Invoice Generation Condition Updated
-    //      * - Status changed from PENDING → COMPLETED
-    //      * - Payment status is NOT 'pending'   (means paid/failed/whatever next)
-    //      * - Invoice not already generated
-    //      */
-    //     if (
-    //         $oldStatus === 'pending' &&
-    //         $order->status === 'completed' &&
-    //         $order->payment_status !== 'pending' &&
-    //         !$order->invoice_id
-    //     ) {
-    //         $this->generateOrderInvoice($order);
-    //         $order->refresh();
-    //     }
-
-    //     /** 🔹 Find invoice file URL if exists */
-    //     $invoice = null;
-    //     if ($order->invoice_id) {
-    //         $upload = UploadModel::find($order->invoice_id);
-    //         if ($upload) {
-    //             $invoice = [
-    //                 'id'  => $upload->id,
-    //                 'url' => asset('storage/' . $upload->file_path),
-    //             ];
-    //         }
-    //     }
-
-    //     return response()->json([
-    //         'code'    => 200,
-    //         'success' => true,
-    //         'message' => 'Order status updated successfully!',
-    //         'data'    => [
-    //             'id'              => $order->id,
-    //             'status'          => $order->status,
-    //             'payment_status'  => $order->payment_status,
-    //             'delivery_status' => $order->delivery_status,
-    //             'invoice'         => $invoice,  // 🔥 Full URL returned
-    //             'updated_at'      => $order->updated_at->toIso8601String(),
-    //         ],
-    //     ], 200);
-    // }
     public function updateOrderStatus(Request $request, int $id)
     {
         $validated = $request->validate([
@@ -296,6 +225,70 @@ class InvoiceController extends Controller
             ],
         ], 200);
     }
+    // public function updateOrderStatus(Request $request, int $id)
+    // {
+    //     $validated = $request->validate([
+    //         'status'           => 'nullable|in:pending,completed,cancelled,refunded',
+    //         'payment_status'   => 'nullable|in:pending,paid,failed',
+    //         'delivery_status'  => 'nullable|in:pending,accepted,arrived,completed,cancelled',
+    //     ]);
+
+    //     $order = OrderModel::find($id);
+
+    //     if (!$order) {
+    //         return response()->json([
+    //             'code'    => 404,
+    //             'success' => false,
+    //             'message' => 'Order not found.',
+    //             'data'    => [],
+    //         ], 404);
+    //     }
+
+    //     $oldStatus        = $order->status;
+    //     $oldDeliveryStatus = $order->delivery_status;
+
+    //     // Update fields
+    //     $order->update(array_filter([
+    //         'status'          => $validated['status'] ?? $order->status,
+    //         'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
+    //         'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
+    //     ]));
+
+    //     $order->refresh(); // Ensure most recent values for comparison
+
+    //     // Logic to trigger email if status or delivery_status changes as per the rules
+    //     if (
+    //         // Status change logic: 'pending' to 'completed', 'cancelled', or 'refunded'
+    //         ($oldStatus === 'pending' && in_array($order->status, ['completed', 'cancelled', 'refunded'])) ||
+
+    //         // Delivery status change logic: 'pending' to 'accepted', 'arrived', or 'completed'
+    //         ($oldDeliveryStatus === 'pending' && in_array($order->delivery_status, ['accepted', 'arrived', 'completed'])) ||
+
+    //         // Handle middle status changes like 'completed' to 'refunded', or 'arrived' to 'completed'
+    //         ($oldStatus !== $order->status) ||
+
+    //         ($oldDeliveryStatus !== $order->delivery_status)
+    //     ) {
+    //         // Send status update email if the conditions are met
+    //         $user = $order->user;
+    //         Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+    //     }
+
+    //     // Return response
+    //     return response()->json([
+    //         'code'    => 200,
+    //         'success' => true,
+    //         'message' => 'Order status updated successfully!',
+    //         'data'    => [
+    //             'id'              => $order->id,
+    //             'status'          => $order->status,
+    //             'payment_status'  => $order->payment_status,
+    //             'delivery_status' => $order->delivery_status,
+    //             'updated_at'      => $order->updated_at->toIso8601String(),
+    //         ],
+    //     ], 200);
+    // }
+
 
     private function generateOrderInvoice(OrderModel $order): void
     {

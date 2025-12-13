@@ -23,6 +23,8 @@ class OrderStatusUpdate extends Mailable
     public $invoice; // Add invoice to make sure it's passed to the view
     public $siteName;
     public $frontendUrl;
+    public string $supportEmail;
+    public string $techSupportEmail;
 
     /**
      * Create a new message instance.
@@ -42,6 +44,8 @@ class OrderStatusUpdate extends Mailable
         // Get site details directly from .env
         $this->siteName = env('APP_NAME', 'Haneri');  // Default to 'Haneri' if not set
         $this->frontendUrl = env('APP_FRONTEND_URL', 'https://haneri.com');  // Default to your frontend URL if not set
+        $this->supportEmail    = env('MAIL_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
+        $this->techSupportEmail= env('MAIL_TECH_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
 
         // Find invoice if it exists
         $this->invoice = null;
@@ -68,6 +72,8 @@ class OrderStatusUpdate extends Mailable
                         'payment_status' => $this->payment_status,
                         'siteName' => $this->siteName,
                         'frontendUrl' => $this->frontendUrl,
+                        'supportEmail'     => $this->supportEmail,
+                        'techSupportEmail' => $this->techSupportEmail,
                         'invoice' => $this->invoice, // Pass invoice to view
                     ]);
     }

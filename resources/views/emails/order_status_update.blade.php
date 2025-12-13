@@ -36,7 +36,11 @@
                                 </p>
                             @endif
 
-                            <p>If you have any questions, feel free to contact us.</p>
+                            <p>If you have any questions, reach us at
+                                <a href="mailto:{{ $supportEmail }}" style="color:#00473e;">{{ $supportEmail }}</a>.
+                                For technical issues, contact
+                                <a href="mailto:{{ $techSupportEmail }}" style="color:#00473e;">{{ $techSupportEmail }}</a>.
+                            </p>
 
                             <p style="margin-top:30px;">Best Regards,<br>
                                 <strong>Team {{ $siteName }}</strong><br>
