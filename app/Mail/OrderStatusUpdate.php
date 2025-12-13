@@ -19,6 +19,8 @@ class OrderStatusUpdate extends Mailable
     public $user;
     public $status;
     public $payment_status;
+    public $siteName;
+    public $frontendUrl;
 
     /**
      * Create a new message instance.
@@ -34,6 +36,10 @@ class OrderStatusUpdate extends Mailable
         $this->user = $user;
         $this->status = $status;
         $this->payment_status = $payment_status;
+
+        // Get site details directly from .env
+        $this->siteName = env('APP_NAME', 'Haneri');  // Default to 'Haneri' if not set
+        $this->frontendUrl = env('APP_FRONTEND_URL', 'https://example.com');  // Default to your frontend URL if not set
     }
 
     public function build()
@@ -46,6 +52,8 @@ class OrderStatusUpdate extends Mailable
                         'order' => $this->order,
                         'status' => $this->status,
                         'payment_status' => $this->payment_status,
+                        'siteName' => $this->siteName,  // Pass siteName from .env
+                        'frontendUrl' => $this->frontendUrl,  // Pass frontendUrl from .env
                     ]);
     }
 
