@@ -1009,13 +1009,16 @@ class OrderController extends Controller
         ]));
 
         // Check if either 'status' or 'delivery_status' has changed
-        if (($oldStatus !== $order->status) || ($oldDeliveryStatus !== $order->delivery_status)) {
-            try {
-                $user = $order->user;
-                \Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
-            } catch (\Exception $e) {
-                \Log::error('Email sending failed: ' . $e->getMessage());
-            }
+        if ($oldStatus !== $order->status || $oldDeliveryStatus !== $order->delivery_status) {
+            // Log the status change
+            \Log::info('Order status or delivery status has changed. Sending email.');
+
+            // Send status update email to the user
+            $user = $order->user;
+            \Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+        } else {
+            // Log if the status didn't change
+            \Log::info('No status or delivery status change. No email sent.');
         }
 
         return response()->json([
@@ -1031,6 +1034,7 @@ class OrderController extends Controller
             ],
         ], 200);
     }
+
 
 
 }
