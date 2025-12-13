@@ -13,6 +13,7 @@ use DB;
 use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use App\Mail\OrderPlacedMail;
 use App\Mail\OrderStatusUpdate;
 use App\Models\PaymentModel;
@@ -1011,14 +1012,18 @@ class OrderController extends Controller
         // Check if either 'status' or 'delivery_status' has changed
         if ($oldStatus !== $order->status || $oldDeliveryStatus !== $order->delivery_status) {
             // Log the status change
-            \Log::info('Order status or delivery status has changed. Sending email.');
+            Log::info('Order status or delivery status has changed. Sending email.');
 
             // Send status update email to the user
             $user = $order->user;
-            \Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+
+           $test_res =  Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+           die($test_res);
+
         } else {
             // Log if the status didn't change
-            \Log::info('No status or delivery status change. No email sent.');
+            Log::info('No status or delivery status change. No email sent.');
+            die("dd");
         }
 
         return response()->json([
@@ -1034,7 +1039,5 @@ class OrderController extends Controller
             ],
         ], 200);
     }
-
-
 
 }
