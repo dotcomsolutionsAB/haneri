@@ -424,7 +424,7 @@ class OrderController extends Controller
         ], 200);
     }
 
-    // Update order & payment statuses (user side)
+    // Update order & payment statuses (user side on punched order)
     public function statusUpdate(Request $request, $orderId)
     {
         $validated = $request->validate([
@@ -813,7 +813,6 @@ class OrderController extends Controller
             ], 500);
         }
     }
-
     public function fetchOrderDetails($id)
     {
         // Money format helpers
@@ -939,7 +938,45 @@ class OrderController extends Controller
             'data'    => $data,
         ], 200);
     }
+    // public function updateOrderStatus(Request $request, int $id)
+    // {
+    //     $validated = $request->validate([
+    //         'status'           => 'nullable|in:pending,completed,cancelled,refunded',
+    //         'payment_status'   => 'nullable|in:pending,paid,failed',
+    //         'delivery_status'  => 'nullable|in:pending,accepted,arrived,completed,cancelled',
+    //     ]);
 
+    //     $order = OrderModel::find($id);
+
+    //     if (!$order) {
+    //         return response()->json([
+    //             'code'    => 404,
+    //             'success' => false,
+    //             'message' => 'Order not found.',
+    //             'data'    => [],
+    //         ], 404);
+    //     }
+
+    //     // Update only provided fields
+    //     $order->update(array_filter([
+    //         'status'          => $validated['status'] ?? $order->status,
+    //         'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
+    //         'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
+    //     ]));
+
+    //     return response()->json([
+    //         'code'    => 200,
+    //         'success' => true,
+    //         'message' => 'Order status updated successfully!',
+    //         'data'    => [
+    //             'id'              => $order->id,
+    //             'status'          => $order->status,
+    //             'payment_status'  => $order->payment_status,
+    //             'delivery_status' => $order->delivery_status,
+    //             'updated_at'      => $order->updated_at->toIso8601String(),
+    //         ],
+    //     ], 200);
+    // }
     public function updateOrderStatus(Request $request, int $id)
     {
         $validated = $request->validate([
@@ -959,12 +996,23 @@ class OrderController extends Controller
             ], 404);
         }
 
+        // Save the old values for comparison
+        $oldStatus = $order->status;
+        $oldDeliveryStatus = $order->delivery_status;
+
         // Update only provided fields
         $order->update(array_filter([
             'status'          => $validated['status'] ?? $order->status,
             'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
             'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
         ]));
+
+        // Check if either 'status' or 'delivery_status' has changed
+        if ($oldStatus !== $order->status || $oldDeliveryStatus !== $order->delivery_status) {
+            // Send status update email to the user
+            $user = $order->user;
+            \Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+        }
 
         return response()->json([
             'code'    => 200,
