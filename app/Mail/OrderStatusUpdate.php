@@ -49,7 +49,6 @@ class OrderStatusUpdate extends Mailable
                     ]);
     }
 
-
     /**
      * Get the message envelope.
      */
