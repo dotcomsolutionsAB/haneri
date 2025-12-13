@@ -16,12 +16,21 @@ class QuotationMail extends Mailable
 
     public $quotation;
     public $user;
+    public $siteName;
+    public $frontendUrl;
+    public string $supportEmail;
+    public string $techSupportEmail;
 
     // Constructor to pass the necessary data
     public function __construct(QuotationModel $quotation, $user)
     {
         $this->quotation = $quotation;
         $this->user = $user;
+        // Get site details directly from .env
+        $this->siteName = env('APP_NAME', 'Haneri');  // Default to 'Haneri' if not set
+        $this->frontendUrl = env('APP_FRONTEND_URL', 'https://haneri.com');  // Default to your frontend URL if not set
+        $this->supportEmail    = env('MAIL_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
+        $this->techSupportEmail= env('MAIL_TECH_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
     }
 
     // Build the email
@@ -32,9 +41,12 @@ class QuotationMail extends Mailable
                     ->with([
                         'user' => $this->user,
                         'quotation' => $this->quotation,
+                        'siteName' => $this->siteName,
+                        'frontendUrl' => $this->frontendUrl,
+                        'supportEmail'     => $this->supportEmail,
+                        'techSupportEmail' => $this->techSupportEmail
                     ]);
     }
-
     /**
      * Get the message envelope.
      */

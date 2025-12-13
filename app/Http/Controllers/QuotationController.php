@@ -256,11 +256,7 @@ class QuotationController extends Controller
             // Send email with a notification to the authenticated user
             try {
                 // Send the email to the authenticated user's email
-                Mail::to($user->email)->send(new QuotationMail($quotation, $user, [
-                    'supportEmail' => 'support@haneri.com', // Replace with the actual support email
-                    'frontendUrl'  => 'https://haneri.com',  // Replace with your frontend URL
-                    'siteName'     => env('APP_NAME', 'Haneri') // Use environment variable for site name
-                ]));  
+                Mail::to($user->email)->send(new QuotationMail($quotation, $user));  
                 \Log::info('Quotation email sent successfully to ' . $user->email);
             } catch (\Exception $e) {
                 \Log::error('Failed to send quotation email: ' . $e->getMessage());
