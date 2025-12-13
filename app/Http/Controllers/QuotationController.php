@@ -8,6 +8,7 @@ use App\Models\QuotationItemModel;
 use App\Models\CartModel;
 use App\Models\ProductModel;
 use App\Models\ProductVariantModel;
+use App\Mail\QuotationMail;
 use App\Models\User;
 use DB;
 use App\Http\Controllers\RazorpayController;
