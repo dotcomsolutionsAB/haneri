@@ -3,11 +3,14 @@
 namespace App\Http\Controllers;
 use App\Models\QuotationModel;
 use App\Models\QuotationItemModel;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\File;
 use Mpdf\Mpdf;
 use Illuminate\Http\Request;
 use App\Models\OrderModel;
 use App\Models\UploadModel;
+use App\Mail\OrderStatusUpdate;
 use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
@@ -139,6 +142,77 @@ class InvoiceController extends Controller
         }
     }
 
+    // public function updateOrderStatus(Request $request, int $id)
+    // {
+    //     $validated = $request->validate([
+    //         'status'           => 'nullable|in:pending,completed,cancelled,refunded',
+    //         'payment_status'   => 'nullable|in:pending,paid,failed',
+    //         'delivery_status'  => 'nullable|in:pending,accepted,arrived,completed,cancelled',
+    //     ]);
+
+    //     $order = OrderModel::find($id);
+
+    //     if (!$order) {
+    //         return response()->json([
+    //             'code'    => 404,
+    //             'success' => false,
+    //             'message' => 'Order not found.',
+    //             'data'    => [],
+    //         ], 404);
+    //     }
+
+    //     $oldStatus        = $order->status;
+    //     $oldPaymentStatus = $order->payment_status;
+
+    //     // Update fields
+    //     $order->update(array_filter([
+    //         'status'          => $validated['status'] ?? $order->status,
+    //         'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
+    //         'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
+    //     ]));
+
+    //     /**
+    //      * 🔥 Invoice Generation Condition Updated
+    //      * - Status changed from PENDING → COMPLETED
+    //      * - Payment status is NOT 'pending'   (means paid/failed/whatever next)
+    //      * - Invoice not already generated
+    //      */
+    //     if (
+    //         $oldStatus === 'pending' &&
+    //         $order->status === 'completed' &&
+    //         $order->payment_status !== 'pending' &&
+    //         !$order->invoice_id
+    //     ) {
+    //         $this->generateOrderInvoice($order);
+    //         $order->refresh();
+    //     }
+
+    //     /** 🔹 Find invoice file URL if exists */
+    //     $invoice = null;
+    //     if ($order->invoice_id) {
+    //         $upload = UploadModel::find($order->invoice_id);
+    //         if ($upload) {
+    //             $invoice = [
+    //                 'id'  => $upload->id,
+    //                 'url' => asset('storage/' . $upload->file_path),
+    //             ];
+    //         }
+    //     }
+
+    //     return response()->json([
+    //         'code'    => 200,
+    //         'success' => true,
+    //         'message' => 'Order status updated successfully!',
+    //         'data'    => [
+    //             'id'              => $order->id,
+    //             'status'          => $order->status,
+    //             'payment_status'  => $order->payment_status,
+    //             'delivery_status' => $order->delivery_status,
+    //             'invoice'         => $invoice,  // 🔥 Full URL returned
+    //             'updated_at'      => $order->updated_at->toIso8601String(),
+    //         ],
+    //     ], 200);
+    // }
     public function updateOrderStatus(Request $request, int $id)
     {
         $validated = $request->validate([
@@ -194,6 +268,18 @@ class InvoiceController extends Controller
                     'url' => asset('storage/' . $upload->file_path),
                 ];
             }
+        }
+
+        // Log status update
+        Log::info("Order ID {$order->id} status updated to {$order->status}, payment status to {$order->payment_status}");
+
+        // Send status update email if status changed
+        if ($oldStatus !== $order->status || $oldPaymentStatus !== $order->payment_status) {
+            Log::info('Order status or payment status has changed. Sending email.');
+            $user = $order->user;
+            Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+        } else {
+            Log::info('No status or payment status change. No email sent.');
         }
 
         return response()->json([
