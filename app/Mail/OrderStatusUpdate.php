@@ -38,6 +38,7 @@ class OrderStatusUpdate extends Mailable
 
     public function build()
     {
+        \Log::info('Building Order Status Update Email');
         return $this->subject('Order Status Updated - Order #' . $this->order->id)
                     ->view('emails.order_status_update')
                     ->with([
@@ -47,6 +48,7 @@ class OrderStatusUpdate extends Mailable
                         'payment_status' => $this->payment_status,
                     ]);
     }
+
 
     /**
      * Get the message envelope.
@@ -61,20 +63,20 @@ class OrderStatusUpdate extends Mailable
     /**
      * Get the message content definition.
      */
-    public function content(): Content
-    {
-        return new Content(
-            view: 'view.name',
-        );
-    }
+    // public function content(): Content
+    // {
+    //     return new Content(
+    //         view: 'view.name',
+    //     );
+    // }
 
     /**
      * Get the attachments for the message.
      *
      * @return array<int, \Illuminate\Mail\Mailables\Attachment>
      */
-    public function attachments(): array
-    {
-        return [];
-    }
+    // public function attachments(): array
+    // {
+    //     return [];
+    // }
 }
