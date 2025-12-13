@@ -31,7 +31,7 @@
 
                             <p>You can view and download the full quotation from your profile:</p>
                             <p>
-                                <a href="https://haneri.com/profile" target="_blank" style="display:inline-block; background-color:#00473e; color:#ffffff; padding:12px 22px; text-decoration:none; border-radius:6px;">
+                                <a href="https://haneri.com/profile#quotation" target="_blank" style="display:inline-block; background-color:#00473e; color:#ffffff; padding:12px 22px; text-decoration:none; border-radius:6px;">
                                     View Your Quotation
                                 </a>
                             </p>
