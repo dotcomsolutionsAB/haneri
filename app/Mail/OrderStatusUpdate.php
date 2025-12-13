@@ -19,6 +19,7 @@ class OrderStatusUpdate extends Mailable
     public $user;
     public $status;
     public $payment_status;
+    public $invoice; // Add invoice to make sure it's passed to the view
     public $siteName;
     public $frontendUrl;
 
@@ -39,7 +40,19 @@ class OrderStatusUpdate extends Mailable
 
         // Get site details directly from .env
         $this->siteName = env('APP_NAME', 'Haneri');  // Default to 'Haneri' if not set
-        $this->frontendUrl = env('APP_FRONTEND_URL', 'https://example.com');  // Default to your frontend URL if not set
+        $this->frontendUrl = env('APP_FRONTEND_URL', 'https://haneri.com');  // Default to your frontend URL if not set
+
+        // Find invoice if it exists
+        $this->invoice = null;
+        if ($this->order->invoice_id) {
+            $upload = UploadModel::find($this->order->invoice_id);
+            if ($upload) {
+                $this->invoice = [
+                    'id'  => $upload->id,
+                    'url' => asset('storage/' . $upload->file_path),
+                ];
+            }
+        }
     }
 
     public function build()
@@ -52,8 +65,9 @@ class OrderStatusUpdate extends Mailable
                         'order' => $this->order,
                         'status' => $this->status,
                         'payment_status' => $this->payment_status,
-                        'siteName' => $this->siteName,  // Pass siteName from .env
-                        'frontendUrl' => $this->frontendUrl,  // Pass frontendUrl from .env
+                        'siteName' => $this->siteName,
+                        'frontendUrl' => $this->frontendUrl,
+                        'invoice' => $this->invoice, // Pass invoice to view
                     ]);
     }
 
