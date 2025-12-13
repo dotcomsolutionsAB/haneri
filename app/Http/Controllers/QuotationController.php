@@ -134,6 +134,15 @@ class QuotationController extends Controller
             // Save URL on quotation
             $quotation->update(['invoice_quotation' => $invoiceUrl]);
 
+            // Send email with the attached PDF to the authenticated user's email
+            try {
+                // Send the email to the authenticated user's email (not q_email, but the user's email)
+                Mail::to($user->email)->send(new QuotationMail($quotation, $user));  // Send to the authenticated user's email
+                \Log::info('Quotation email sent successfully to ' . $user->email);
+            } catch (\Exception $e) {
+                \Log::error('Failed to send quotation email: ' . $e->getMessage());
+            }
+
             // Response payload
             $response = [
                 'message' => 'Quotation created successfully!',
@@ -151,7 +160,7 @@ class QuotationController extends Controller
             ];
 
             return response()->json([
-                'message' => 'Quotation created successfully!',
+                'message' => 'Quotation created and email sent successfully!',
                 'data'    => $response,
             ], 201);
 
