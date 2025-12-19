@@ -123,11 +123,11 @@ class CartController extends Controller
             ->get();
 
         // ✅ Total weight from product_variants.weight * quantity
-        $totalWeight = $cartItemsRaw->sum(function ($item) {
+        $totalWeight = round($cartItemsRaw->sum(function ($item) {
             $weight = (float) ($item->variant?->weight ?? 0);
             $qty    = (int) ($item->quantity ?? 0);
             return $weight * $qty;
-        });
+        }),2);
 
         $cartItems = $cartItemsRaw
             ->map(function ($cartItem) use ($user) {
