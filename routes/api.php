@@ -29,6 +29,8 @@ Route::post('/generate-otp', [AuthController::class, 'generate_otp']); // Genera
 Route::post('/make_user', [UserController::class, 'guest_register']);
 Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 
+Route::post('/request-otp', [AuthController::class, 'request_otp']);
+
 // Route::middleware(['cors'])->group(function () {
     Route::prefix('cart')->group(function () {
         Route::post('/fetch', [CartController::class, 'index']);             // Get all cart items for a user

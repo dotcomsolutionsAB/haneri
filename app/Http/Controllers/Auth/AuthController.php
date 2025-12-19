@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use App\Utils\sendWhatsAppUtility;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Models\OtpModel;
 use App\Mail\WelcomeUserMail;
 
 class AuthController extends Controller
@@ -451,6 +452,86 @@ class AuthController extends Controller
         ], 200);
     }
 
+    public function request_otp(Request $request)
+    {
+        $request->validate([
+            'mobile' => ['required', 'string', 'min:10', 'max:15'],
+        ]);
+
+        $mobile = $request->input('mobile');
+
+        // 1) If mobile exists in users table => already validated
+        $userExists = User::where('mobile', $mobile)->exists();
+
+        if ($userExists) {
+            return response()->json([
+                'code'    => 200,
+                'success' => true,
+                'message' => 'Mobile already validated.',
+                'data'    => [],
+            ], 200);
+        }
+
+        // 2) Generate OTP and save in OTP table
+        $six_digit_otp = (string) random_int(100000, 999999);
+
+        // if you used unique(mobile), updateOrCreate is best
+        $otpRow = OtpModel::updateOrCreate(
+            ['mobile' => $mobile],
+            [
+                'otp'    => $six_digit_otp,
+                'status' => 'valid',
+            ]
+        );
+
+        if (! $otpRow) {
+            return response()->json([
+                'code'    => 500,
+                'success' => false,
+                'message' => 'Failed to generate OTP. Please try again.',
+                'data'    => [],
+            ], 500);
+        }
+
+        // 3) Send WhatsApp (same structure you used)
+        $templateParams = [
+            'name'      => 'ace_otp',
+            'language'  => ['code' => 'en'],
+            'components'=> [
+                [
+                    'type'       => 'body',
+                    'parameters' => [
+                        [
+                            'type' => 'text',
+                            'text' => $six_digit_otp,
+                        ],
+                    ],
+                ],
+                [
+                    'type'     => 'button',
+                    'sub_type' => 'url',
+                    'index'    => '0',
+                    'parameters' => [
+                        [
+                            'type' => 'text',
+                            'text' => $six_digit_otp,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $whatsappUtility = new sendWhatsAppUtility();
+        $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'OTP sent successfully!',
+            'data'    => [],
+        ], 200);
+    }
+    
     // user `login`
     // public function login(Request $request, $otp = null)
     // {
