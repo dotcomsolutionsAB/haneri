@@ -79,7 +79,6 @@ class CartController extends Controller
     // View All Cart Items for a User
     public function index(Request $request)
     {
-
         // Manually check for Bearer Token (optional)
         $token = $request->bearerToken();
         $user = null; // Initialize the $user variable to avoid "undefined variable" error
@@ -93,11 +92,9 @@ class CartController extends Controller
             if ($user->role == 'admin') {
                 $request->validate([
                     'user_id' => 'required|integer|exists:users,id',
-                ]);  
+                ]);
                 $user_id =  $request->input('user_id');
-            }
-    
-            else {
+            } else {
                 $user_id =  $user->id;
             }
 
@@ -120,117 +117,269 @@ class CartController extends Controller
         // Fetch cart items associated with this cart_id (for guest users)
         $cartItems = CartModel::where('user_id', $user_id)->get();
 
-        $cartItems = CartModel::with(['user', 'product', 'variant']) // Assuming relationships are defined
-        ->where('user_id', $user_id)
-        ->get()
-        ->map(function ($cartItem) use ($user) {
-        // Make sure to hide the unwanted fields from the product and variant
-        if ($cartItem->user) {
-            $cartItem->user->makeHidden(['created_at', 'updated_at']);
-        }
+        // ✅ Fetch with relations first (so we can calculate total weight)
+        $cartItemsRaw = CartModel::with(['user', 'product', 'variant']) // Assuming relationships are defined
+            ->where('user_id', $user_id)
+            ->get();
 
-        if ($cartItem->product) {
-            $cartItem->product->makeHidden(['created_at', 'updated_at']);
-        }
-
-        if ($cartItem->variant) {
-            $cartItem->variant->makeHidden(['created_at', 'updated_at']);
-        }
-
-        // Get variant_value from ProductVariantModel
-        $variantType = $cartItem->variant->variant_value;
-
-        $variant_id = $cartItem->variant->id;
-
-        // Check if the user has a discount in UsersDiscountModel first
-        // $discount = UsersDiscountModel::where('user_id', $user->id)
-        //     ->where('product_variant_id', $cartItem->variant->id)
-        //     ->value('discount');
-
-        // if ($discount === null) {
-        //     // If no discount found, fall back to variant-based discount
-        //     switch ($user->role) {
-        //         case 'customer':
-        //             $discount = $cartItem->variant->customer_discount;
-        //             break;
-        //         case 'dealer':
-        //             $discount = $cartItem->variant->dealer_discount;
-        //             break;
-        //         case 'architect':
-        //             $discount = $cartItem->variant->architect_discount;
-        //             break;
-        //         default:
-        //             $discount = 0;
-        //             break;
-        //     }
-        // }
-
-        $discount = 0; // default: no discount
-
-        if ($user && $cartItem->variant) {
-            $variantId = $cartItem->variant->id;
-
-            // Try user-specific discount first
-            $discount = UsersDiscountModel::where('user_id', $user->id)
-                ->where('product_variant_id', $variantId)
-                ->value('discount');
-
-            // Fallback to role-based discount
-            if ($discount === null) {
-                switch ($user->role) {
-                    case 'customer':
-                        $discount = $cartItem->variant->customer_discount;
-                        break;
-                    case 'dealer':
-                        $discount = $cartItem->variant->dealer_discount;
-                        break;
-                    case 'architect':
-                        $discount = $cartItem->variant->architect_discount;
-                        break;
-                    default:
-                        $discount = 0;
-                        break;
-                }
-            }
-        } else {
-            // guest user — no login / no user_id
-            $discount = 0;
-        }
-
-        $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
-
-        // Get the file URLs from the UploadModel for photo_ids
-        $photoIds = explode(',', $cartItem->variant->photo_id); // Split comma-separated IDs
-
-        // Get file paths from UploadModel and prepend the domain URL
-        $fileUrls = UploadModel::whereIn('id', $photoIds)
-            ->pluck('file_path') // Assuming the field storing the file path is 'file_path'
-            ->map(function ($filePath) {
-                return url('storage/' . $filePath); // Prepend 'storage/' or adjust it based on your file storage setup
-            })
-            ->toArray();
-
-            // Optionally hide fields on the cart item itself
-            $cartItem->makeHidden(['created_at', 'updated_at']);
-
-         return [
-                'id' => $cartItem->id,
-                // 'user_name' => $cartItem->user->name ,
-                'user_name' => $cartItem->user?->name ?? $cartItem->user_id,
-                'product_id' => $cartItem->product->id,
-                'product_name' => $cartItem->product->name,
-                'variant_id' => $variant_id,
-                'variant_value' => $variantType,
-                'selling_price' => $cartItem->selling_price,
-                'quantity' => $cartItem->quantity,
-                'file_urls' => $fileUrls,
-            ];
+        // ✅ Total weight from product_variants.weight * quantity
+        $totalWeight = $cartItemsRaw->sum(function ($item) {
+            $weight = (float) ($item->variant?->weight ?? 0);
+            $qty    = (int) ($item->quantity ?? 0);
+            return $weight * $qty;
         });
 
+        $cartItems = $cartItemsRaw
+            ->map(function ($cartItem) use ($user) {
+                // Make sure to hide the unwanted fields from the product and variant
+                if ($cartItem->user) {
+                    $cartItem->user->makeHidden(['created_at', 'updated_at']);
+                }
+
+                if ($cartItem->product) {
+                    $cartItem->product->makeHidden(['created_at', 'updated_at']);
+                }
+
+                if ($cartItem->variant) {
+                    $cartItem->variant->makeHidden(['created_at', 'updated_at']);
+                }
+
+                // Get variant_value from ProductVariantModel
+                $variantType = $cartItem->variant->variant_value;
+
+                $variant_id = $cartItem->variant->id;
+
+                $discount = 0; // default: no discount
+
+                if ($user && $cartItem->variant) {
+                    $variantId = $cartItem->variant->id;
+
+                    // Try user-specific discount first
+                    $discount = UsersDiscountModel::where('user_id', $user->id)
+                        ->where('product_variant_id', $variantId)
+                        ->value('discount');
+
+                    // Fallback to role-based discount
+                    if ($discount === null) {
+                        switch ($user->role) {
+                            case 'customer':
+                                $discount = $cartItem->variant->customer_discount;
+                                break;
+                            case 'dealer':
+                                $discount = $cartItem->variant->dealer_discount;
+                                break;
+                            case 'architect':
+                                $discount = $cartItem->variant->architect_discount;
+                                break;
+                            default:
+                                $discount = 0;
+                                break;
+                        }
+                    }
+                } else {
+                    // guest user — no login / no user_id
+                    $discount = 0;
+                }
+
+                $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
+
+                // Get the file URLs from the UploadModel for photo_ids
+                $photoIds = explode(',', $cartItem->variant->photo_id); // Split comma-separated IDs
+
+                // Get file paths from UploadModel and prepend the domain URL
+                $fileUrls = UploadModel::whereIn('id', $photoIds)
+                    ->pluck('file_path') // Assuming the field storing the file path is 'file_path'
+                    ->map(function ($filePath) {
+                        return url('storage/' . $filePath); // Prepend 'storage/' or adjust it based on your file storage setup
+                    })
+                    ->toArray();
+
+                // Optionally hide fields on the cart item itself
+                $cartItem->makeHidden(['created_at', 'updated_at']);
+
+                return [
+                    'id' => $cartItem->id,
+                    // 'user_name' => $cartItem->user->name ,
+                    'user_name' => $cartItem->user?->name ?? $cartItem->user_id,
+                    'product_id' => $cartItem->product->id,
+                    'product_name' => $cartItem->product->name,
+                    'variant_id' => $variant_id,
+                    'variant_value' => $variantType,
+                    'selling_price' => $cartItem->selling_price,
+                    'quantity' => $cartItem->quantity,
+                    'file_urls' => $fileUrls,
+                ];
+            });
+
         return $cartItems->isNotEmpty()
-            ? response()->json(['message' => 'Cart items fetched successfully!', 'data' => $cartItems, 'count' => count($cartItems)], 200)
-            : response()->json(['message' => 'Your cart is empty.'], 400);
+            ? response()->json([
+                'message'      => 'Cart items fetched successfully!',
+                'data'         => $cartItems,
+                'count'        => count($cartItems),
+                'total_weight' => $totalWeight,
+            ], 200)
+            : response()->json([
+                'message'      => 'Your cart is empty.',
+                'data'         => [],
+                'count'        => 0,
+                'total_weight' => 0,
+            ], 400);
     }
+
+    // public function index(Request $request)
+    // {
+
+    //     // Manually check for Bearer Token (optional)
+    //     $token = $request->bearerToken();
+    //     $user = null; // Initialize the $user variable to avoid "undefined variable" error
+
+    //     if ($token) {
+    //         $user = Auth::guard('sanctum')->user(); // Manually authenticate using Sanctum
+    //     }
+
+    //     if ($user) {
+
+    //         if ($user->role == 'admin') {
+    //             $request->validate([
+    //                 'user_id' => 'required|integer|exists:users,id',
+    //             ]);  
+    //             $user_id =  $request->input('user_id');
+    //         }
+    
+    //         else {
+    //             $user_id =  $user->id;
+    //         }
+
+    //         $userId = $user->id;
+    //     } else {
+    //         // Retrieve the cart_id from cookies
+    //         //$cartId = $request->cookie('cart_id');
+
+    //         // Replace with Normal Request Input
+    //         $cartId = $request->input('cart_id');
+
+    //         // Check if the cart_id exists in the cookies
+    //         if (!$cartId) {
+    //             return response()->json(['message' => 'Cart not found.'], 404);
+    //         }
+
+    //         $user_id = $cartId;
+    //     }
+
+    //     // Fetch cart items associated with this cart_id (for guest users)
+    //     $cartItems = CartModel::where('user_id', $user_id)->get();
+
+    //     $cartItems = CartModel::with(['user', 'product', 'variant']) // Assuming relationships are defined
+    //     ->where('user_id', $user_id)
+    //     ->get()
+    //     ->map(function ($cartItem) use ($user) {
+    //     // Make sure to hide the unwanted fields from the product and variant
+    //     if ($cartItem->user) {
+    //         $cartItem->user->makeHidden(['created_at', 'updated_at']);
+    //     }
+
+    //     if ($cartItem->product) {
+    //         $cartItem->product->makeHidden(['created_at', 'updated_at']);
+    //     }
+
+    //     if ($cartItem->variant) {
+    //         $cartItem->variant->makeHidden(['created_at', 'updated_at']);
+    //     }
+
+    //     // Get variant_value from ProductVariantModel
+    //     $variantType = $cartItem->variant->variant_value;
+
+    //     $variant_id = $cartItem->variant->id;
+
+    //     // Check if the user has a discount in UsersDiscountModel first
+    //     // $discount = UsersDiscountModel::where('user_id', $user->id)
+    //     //     ->where('product_variant_id', $cartItem->variant->id)
+    //     //     ->value('discount');
+
+    //     // if ($discount === null) {
+    //     //     // If no discount found, fall back to variant-based discount
+    //     //     switch ($user->role) {
+    //     //         case 'customer':
+    //     //             $discount = $cartItem->variant->customer_discount;
+    //     //             break;
+    //     //         case 'dealer':
+    //     //             $discount = $cartItem->variant->dealer_discount;
+    //     //             break;
+    //     //         case 'architect':
+    //     //             $discount = $cartItem->variant->architect_discount;
+    //     //             break;
+    //     //         default:
+    //     //             $discount = 0;
+    //     //             break;
+    //     //     }
+    //     // }
+
+    //     $discount = 0; // default: no discount
+
+    //     if ($user && $cartItem->variant) {
+    //         $variantId = $cartItem->variant->id;
+
+    //         // Try user-specific discount first
+    //         $discount = UsersDiscountModel::where('user_id', $user->id)
+    //             ->where('product_variant_id', $variantId)
+    //             ->value('discount');
+
+    //         // Fallback to role-based discount
+    //         if ($discount === null) {
+    //             switch ($user->role) {
+    //                 case 'customer':
+    //                     $discount = $cartItem->variant->customer_discount;
+    //                     break;
+    //                 case 'dealer':
+    //                     $discount = $cartItem->variant->dealer_discount;
+    //                     break;
+    //                 case 'architect':
+    //                     $discount = $cartItem->variant->architect_discount;
+    //                     break;
+    //                 default:
+    //                     $discount = 0;
+    //                     break;
+    //             }
+    //         }
+    //     } else {
+    //         // guest user — no login / no user_id
+    //         $discount = 0;
+    //     }
+
+    //     $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
+
+    //     // Get the file URLs from the UploadModel for photo_ids
+    //     $photoIds = explode(',', $cartItem->variant->photo_id); // Split comma-separated IDs
+
+    //     // Get file paths from UploadModel and prepend the domain URL
+    //     $fileUrls = UploadModel::whereIn('id', $photoIds)
+    //         ->pluck('file_path') // Assuming the field storing the file path is 'file_path'
+    //         ->map(function ($filePath) {
+    //             return url('storage/' . $filePath); // Prepend 'storage/' or adjust it based on your file storage setup
+    //         })
+    //         ->toArray();
+
+    //         // Optionally hide fields on the cart item itself
+    //         $cartItem->makeHidden(['created_at', 'updated_at']);
+
+    //      return [
+    //             'id' => $cartItem->id,
+    //             // 'user_name' => $cartItem->user->name ,
+    //             'user_name' => $cartItem->user?->name ?? $cartItem->user_id,
+    //             'product_id' => $cartItem->product->id,
+    //             'product_name' => $cartItem->product->name,
+    //             'variant_id' => $variant_id,
+    //             'variant_value' => $variantType,
+    //             'selling_price' => $cartItem->selling_price,
+    //             'quantity' => $cartItem->quantity,
+    //             'file_urls' => $fileUrls,
+    //         ];
+    //     });
+
+    //     return $cartItems->isNotEmpty()
+    //         ? response()->json(['message' => 'Cart items fetched successfully!', 'data' => $cartItems, 'count' => count($cartItems)], 200)
+    //         : response()->json(['message' => 'Your cart is empty.'], 400);
+    // }
 
     // Inside the CartController class
 
