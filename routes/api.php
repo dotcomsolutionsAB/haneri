@@ -30,6 +30,7 @@ Route::post('/make_user', [UserController::class, 'guest_register']);
 Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 
 Route::post('/request-otp', [AuthController::class, 'request_otp']);
+Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
 
 // Route::middleware(['cors'])->group(function () {
     Route::prefix('cart')->group(function () {

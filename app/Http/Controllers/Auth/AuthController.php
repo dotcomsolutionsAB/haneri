@@ -452,6 +452,7 @@ class AuthController extends Controller
         ], 200);
     }
 
+    // Verify user by otp 
     public function request_otp(Request $request)
     {
         $request->validate([
@@ -460,10 +461,8 @@ class AuthController extends Controller
 
         $mobile = $request->input('mobile');
 
-        // 1) If mobile exists in users table => already validated
-        $userExists = User::where('mobile', $mobile)->exists();
-
-        if ($userExists) {
+        // If mobile exists in users => already validated
+        if (User::where('mobile', $mobile)->exists()) {
             return response()->json([
                 'code'    => 200,
                 'success' => true,
@@ -472,15 +471,14 @@ class AuthController extends Controller
             ], 200);
         }
 
-        // 2) Generate OTP and save in OTP table
         $six_digit_otp = (string) random_int(100000, 999999);
 
-        // if you used unique(mobile), updateOrCreate is best
+        // Save OTP in otp table with status = invalid (until verified)
         $otpRow = OtpModel::updateOrCreate(
             ['mobile' => $mobile],
             [
                 'otp'    => $six_digit_otp,
-                'status' => 'valid',
+                'status' => 'invalid',
             ]
         );
 
@@ -493,7 +491,7 @@ class AuthController extends Controller
             ], 500);
         }
 
-        // 3) Send WhatsApp (same structure you used)
+        // Send WhatsApp (same as your template)
         $templateParams = [
             'name'      => 'ace_otp',
             'language'  => ['code' => 'en'],
@@ -501,10 +499,7 @@ class AuthController extends Controller
                 [
                     'type'       => 'body',
                     'parameters' => [
-                        [
-                            'type' => 'text',
-                            'text' => $six_digit_otp,
-                        ],
+                        ['type' => 'text', 'text' => $six_digit_otp],
                     ],
                 ],
                 [
@@ -512,10 +507,7 @@ class AuthController extends Controller
                     'sub_type' => 'url',
                     'index'    => '0',
                     'parameters' => [
-                        [
-                            'type' => 'text',
-                            'text' => $six_digit_otp,
-                        ],
+                        ['type' => 'text', 'text' => $six_digit_otp],
                     ],
                 ],
             ],
@@ -531,7 +523,79 @@ class AuthController extends Controller
             'data'    => [],
         ], 200);
     }
-    
+    public function verify_otp(Request $request)
+    {
+        $request->validate([
+            'mobile' => ['required', 'string', 'min:10', 'max:15'],
+            'otp'    => ['required', 'string', 'min:4', 'max:10'],
+        ]);
+
+        $mobile = $request->input('mobile');
+        $otp    = $request->input('otp');
+
+        $row = OtpModel::where('mobile', $mobile)->first();
+
+        if (! $row) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'OTP record not found for this mobile.',
+                'data'    => [],
+            ], 404);
+        }
+
+        // If already verified
+        if ($row->status === 'valid') {
+            return response()->json([
+                'code'    => 200,
+                'success' => true,
+                'message' => 'OTP already verified.',
+                'data'    => [],
+            ], 200);
+        }
+
+        // Check OTP match
+        if ((string)$row->otp !== (string)$otp) {
+            // keep invalid
+            $row->update(['status' => 'invalid']);
+
+            return response()->json([
+                'code'    => 400,
+                'success' => false,
+                'message' => 'Invalid OTP.',
+                'data'    => [],
+            ], 400);
+        }
+
+        // Check 2-minute expiry using updated_at (OTP must be generated within last 2 minutes)
+        $expiresAt = $row->updated_at->copy()->addMinutes(2);
+        if (now()->greaterThan($expiresAt)) {
+            $row->update(['status' => 'invalid']);
+
+            return response()->json([
+                'code'    => 400,
+                'success' => false,
+                'message' => 'OTP has expired.',
+                'data'    => [],
+            ], 400);
+        }
+
+        // SUCCESS: mark as valid
+        $row->update([
+            'status' => 'valid',
+            // optional: you can also clear otp if you want one-time usage
+            // 'otp' => null,
+        ]);
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'OTP verified successfully!',
+            'data'    => [],
+        ], 200);
+    }
+
+
     // user `login`
     // public function login(Request $request, $otp = null)
     // {
