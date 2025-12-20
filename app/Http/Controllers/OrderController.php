@@ -85,7 +85,8 @@ class OrderController extends Controller
             $finalAmount = (float) $totalAmount + (float) $shippingCharge;
 
             // Convert to paise for Razorpay (must be integer)
-            $amountInPaise = (int) round($finalAmount * 100);
+            // $amountInPaise = (int) round($finalAmount * 100);
+            $amountInPaise = (int) ($finalAmount * 100);
 
             // Call Razorpay Order API Before Saving Order in DB
             $razorpayController = new RazorpayController(); 
@@ -168,7 +169,7 @@ class OrderController extends Controller
             }
 
             // After successfully adding order items, delete the cart items
-            CartModel::where('user_id', (string)$user_id)->delete();
+            // CartModel::where('user_id', (string)$user_id)->delete();
             /**
              * 🔹 Create initial payment record (in t_payment_records)
              * - status = same as order payment_status (usually "pending" here)
