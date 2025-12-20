@@ -377,19 +377,20 @@
             <div class="footer-signature-block">
                 <div class="footer-signature-line"></div>
                 <div style="margin-bottom: 4px;">Authorized Signatory</div>
-                <div><strong>HANERI ELECTRICALS LLP</strong></div>
+                <div><strong>{{ config('blade_static_data.company.name') }}</strong></div>
             </div>
         </div>
         <div style="height:30px; background-color:#fff;"></div>
         <div class="footer-text">
-            <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
-            Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
-            Email:
-            <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">
-                customercare@haneri.com
-            </a>
+            <strong>{{ config('blade_static_data.company.name') }}</strong> &nbsp; | &nbsp;
+            {{ config('blade_static_data.company.address') }}<br>
+            Support Email:
+            <a href="mailto:{{ config('blade_static_data.company.support_email') }}" style="color: #fff; text-decoration: underline;">{{ config('blade_static_data.company.support_email') }}</a>
             &nbsp; | &nbsp;
-            Phone: +91 8377826826
+            Tech Support Email:
+            <a href="mailto:{{ config('blade_static_data.company.tech_email') }}" style="color: #fff; text-decoration: underline;">{{ config('blade_static_data.company.tech_email') }}</a>
+            &nbsp; | &nbsp;
+            Phone: {{ config('blade_static_data.company.phone') }}
         </div>
     </div>
 
