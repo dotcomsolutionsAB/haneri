@@ -29,6 +29,7 @@ class OrderController extends Controller
             'status' => 'required|in:pending,completed,cancelled,refunded',
             'payment_status' => 'required|in:pending,paid,failed',
             'shipping_address' => 'required|string',
+            'shipping_charge' => 'nullable|numeric|min:0',
             'payment_mode'    => 'nullable|in:Prepaid,COD', // optional, but helpful
         ]);
 
@@ -77,14 +78,11 @@ class OrderController extends Controller
                 $linePrice = $this->getFinalPrice($orderUser, $cartItem->product_id, $cartItem->variant_id);
                 $totalAmount += $linePrice * (int)$cartItem->quantity;
             }
-
-            // -----------------------------------------
-            // SHIPPING CHARGE LOGIC
-            // -----------------------------------------
-            $shippingCharge = ($totalAmount < 5000) ? 0 : 0;
-
+            
+            // shipping charge from request (default 0)
+            $shippingCharge = (float) $request->input('shipping_charge', 0);
             // Final payable amount in rupees
-            $finalAmount = $totalAmount + $shippingCharge;
+            $finalAmount = (float) $totalAmount + (float) $shippingCharge;
 
             // Convert to paise for Razorpay (must be integer)
             $amountInPaise = (int) round($finalAmount * 100);
