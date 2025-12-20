@@ -240,7 +240,7 @@
         <table class="header-table">
             <tr>
                 <td style="width: 50%; vertical-align: middle;">
-                    <img src="{{ asset('storage/upload/logo/Haneri_Logo.png') }}" alt="Logo" class="header-logo">
+                    <img src="{{ asset(config('blade_static_data.assets.logo')) }}" alt="Logo" class="header-logo">
                 </td>
                 <td style="width: 50%;" class="header-right">
                     <div><strong>QUOTATION #:</strong> {{ $quotation->quotation_no ?? '—' }}</div>
@@ -355,17 +355,20 @@
             <div class="footer-signature-block">
                 <div class="footer-signature-line"></div>
                 <div style="margin-bottom: 4px;">Authorized Signatory</div>
-                <div><strong>HANERI ELECTRICALS LLP</strong></div>
+                <div><strong>{{ asset(config('blade_static_data.company.name')) }}</strong></div>
             </div>
         </div>
         <div class="div" style="height:30px; background-color:#fff;"></div>
         <div class="footer-text">
-            <strong>HANERI ELECTRICALS LLP</strong> &nbsp; | &nbsp;
-            Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301<br>
-            Email:
-            <a href="mailto:customercare@haneri.com" style="color: #fff; text-decoration: underline;">customercare@haneri.com</a>
+            <strong>{{ asset(config('blade_static_data.company.name')) }}</strong> &nbsp; | &nbsp;
+            {{ asset(config('blade_static_data.company.address')) }}<br>
+            Support Email:
+            <a href="mailto:{{ asset(config('blade_static_data.company.support_email')) }}" style="color: #fff; text-decoration: underline;">{{ asset(config('blade_static_data.company.support_email')) }}</a>
             &nbsp; | &nbsp;
-            Phone: +91 8377826826
+            Tech Support Email:
+            <a href="mailto:{{ asset(config('blade_static_data.company.tech_email')) }}" style="color: #fff; text-decoration: underline;">{{ asset(config('blade_static_data.company.tech_email')) }}</a>
+            &nbsp; | &nbsp;
+            Phone: {{ asset(config('blade_static_data.company.phone')) }}
         </div>
     </div>
 
