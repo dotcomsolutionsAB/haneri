@@ -149,9 +149,11 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/pickup/delete/{id?}', [DelhiveryServiceController::class, 'deletePickupLocation']); // for fetch
 
         });
+
         // Ship Rocket
         Route::prefix('shiprocket')->group(function () {
             Route::post('/create-shipment', [ShiprocketController::class, 'createShipment']);
+            Route::post('/punch-order/{order_id}', [ShiprocketController::class, 'punchOrderById']);
             Route::get('/track/{awb}', [ShiprocketController::class, 'trackAwb']);
         });
 

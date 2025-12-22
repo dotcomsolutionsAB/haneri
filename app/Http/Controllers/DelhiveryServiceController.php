@@ -1295,51 +1295,6 @@ class DelhiveryServiceController extends Controller
         ]);
     }
     
-    // auto ship once run it fetch order id
-    public function autoShipSetup(Request $request, $orderId)
-    {
-        $order = OrderModel::with('user')->findOrFail($orderId);
-
-        // If it already exists, just return it
-        $existing = OrderShipment::where('order_id', $order->id)->first();
-        if ($existing) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Shipment setup already exists for this order.',
-                'data'    => $existing,
-            ]);
-        }
-
-        $user = $order->user;
-
-        $shipment = OrderShipment::create([
-            'order_id'        => $order->id,
-            'user_id'         => $order->user_id,
-            'courier'         => 'delhivery',
-            'status'          => 'setup',
-
-            'customer_name'   => $user->name ?? 'Customer',
-            'customer_phone'  => $user->mobile ?? null,
-            'customer_email'  => $user->email ?? null,
-            'shipping_address'=> $order->shipping_address,
-            'shipping_pin'    => $order->shipping_pin ?? null,
-            'shipping_city'   => $order->shipping_city ?? null,
-            'shipping_state'  => $order->shipping_state ?? null,
-
-            'payment_mode'    => 'Prepaid',
-            'total_amount'    => $order->total_amount,
-            'cod_amount'      => 0,
-            'quantity'        => 1,
-            'products_description' => 'Order #'.$order->id.' items',
-        ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Shipment setup created for order.',
-            'data'    => $shipment,
-        ]);
-    }
-
     // pickup details :
     public function createPickupLocation(Request $request)
     {
