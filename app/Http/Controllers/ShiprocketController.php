@@ -11,13 +11,25 @@ class ShiprocketController extends Controller
 {
     public function createShipment(Request $request, ShiprocketService $shiprocket)
     {
-        // ✅ This API is "JUST OKAY": it accepts payload and pushes to Shiprocket
-        // You can later connect it to your OrderModel automatically.
+        // ✅ Make keys "present" always (Shiprocket throws validation.present if missing)
+        $request->merge([
+            'shipping_is_billing' => $request->input('shipping_is_billing', true),
+            'billing_last_name'   => $request->input('billing_last_name', ''),
+
+            // shiprocket requires these
+            'length'  => $request->input('length', 10),
+            'breadth' => $request->input('breadth', 10),
+            'height'  => $request->input('height', 10),
+            'weight'  => $request->input('weight', 0.5),
+        ]);
 
         $validator = Validator::make($request->all(), [
             'order_id' => ['required', 'string', 'max:50'],
             'order_date' => ['required', 'date'],
             'billing_customer_name' => ['required', 'string', 'max:255'],
+
+            'billing_last_name' => ['present', 'nullable', 'string', 'max:255'],
+
             'billing_address' => ['required', 'string', 'max:500'],
             'billing_city' => ['required', 'string', 'max:100'],
             'billing_state' => ['required', 'string', 'max:100'],
@@ -25,6 +37,8 @@ class ShiprocketController extends Controller
             'billing_pincode' => ['required', 'string', 'max:10'],
             'billing_email' => ['required', 'email', 'max:255'],
             'billing_phone' => ['required', 'string', 'max:20'],
+
+            'shipping_is_billing' => ['present', 'boolean'],
 
             'payment_method' => ['required', 'in:COD,Prepaid'],
             'sub_total' => ['required', 'numeric', 'min:0'],
@@ -35,11 +49,12 @@ class ShiprocketController extends Controller
             'order_items.*.units' => ['required', 'integer', 'min:1'],
             'order_items.*.selling_price' => ['required', 'numeric', 'min:0'],
 
-            // optional:
-            'length' => ['nullable','numeric','min:0'],
-            'breadth' => ['nullable','numeric','min:0'],
-            'height' => ['nullable','numeric','min:0'],
-            'weight' => ['nullable','numeric','min:0'],
+            // ✅ shiprocket required
+            'length'  => ['required','numeric','min:1'],
+            'breadth' => ['required','numeric','min:1'],
+            'height'  => ['required','numeric','min:1'],
+            'weight'  => ['required','numeric','min:0.1'],
+
             'courier_id' => ['nullable','integer'],
         ]);
 
@@ -57,8 +72,12 @@ class ShiprocketController extends Controller
         // Must exist in Shiprocket panel
         $payload['pickup_location'] = (string) config('services.shiprocket.pickup_location');
 
-        // Recommended fields:
-        $payload['shipping_is_billing'] = $payload['shipping_is_billing'] ?? true;
+        // ✅ enforce min values (Shiprocket rejects 0 / missing)
+        $payload['length']  = max((float)$payload['length'],  1.0);
+        $payload['breadth'] = max((float)$payload['breadth'], 1.0);
+        $payload['height']  = max((float)$payload['height'],  1.0);
+        $payload['weight']  = max((float)$payload['weight'],  0.1);
+        $payload['billing_last_name'] = (string)($payload['billing_last_name'] ?? '');
 
         // 1) Create order
         $created = $shiprocket->createOrderAdhoc($payload);
@@ -66,7 +85,6 @@ class ShiprocketController extends Controller
         $shipmentId = data_get($created, 'shipment_id');
         $orderIdSr  = data_get($created, 'order_id');
 
-        // If shipment_id not found, return raw response for debugging
         if (!$shipmentId) {
             return response()->json([
                 'code' => 500,
