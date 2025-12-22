@@ -631,6 +631,7 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
+    
     public function punchShipment(Request $request)
     {
         $validator = Validator::make($request->all(), [

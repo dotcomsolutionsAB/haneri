@@ -18,8 +18,10 @@ use App\Http\Controllers\RazorpayController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\UsersDiscountController;
 use App\Http\Controllers\DelhiveryServiceController;
+use App\Http\Controllers\ShiprocketController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\InvoiceController;
+
 
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
@@ -147,6 +149,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/pickup/delete/{id?}', [DelhiveryServiceController::class, 'deletePickupLocation']); // for fetch
 
         });
+        // Ship Rocket
+        Route::prefix('shiprocket')->group(function () {
+            Route::post('/create-shipment', [ShiprocketController::class, 'createShipment']);
+            Route::get('/track/{awb}', [ShiprocketController::class, 'trackAwb']);
+        });
+
+
         Route::post('/switch_user', [UserController::class, 'switchUser']);
     });
 
@@ -167,14 +176,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/{id}', [BrandController::class, 'update']);       // Update a brand (Admin only)
         Route::delete('/{id}', [BrandController::class, 'destroy']);   // Delete a brand (Admin only)
     });
-
-    // // Cart Routes
-    // Route::prefix('cart')->group(function () {
-    //     Route::get('/', [CartController::class, 'index']);             // Get all cart items for a user
-    //     Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
-    //     Route::put('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
-    //     Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
-    // });
 
     // Order Routes
     Route::prefix('orders')->group(function () {
