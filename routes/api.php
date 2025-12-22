@@ -155,6 +155,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/create-shipment', [ShiprocketController::class, 'createShipment']);
             Route::post('/punch-order/{order_id}', [ShiprocketController::class, 'punchOrderById']); // Puunch by order
             Route::post('/punch-by-payload', [ShiprocketController::class, 'punchByPayload']); // Punch by payload
+            Route::post('/cancel', [ShiprocketController::class, 'cancelOrder']);
             Route::get('/track/{awb}', [ShiprocketController::class, 'trackAwb']);
         });
 

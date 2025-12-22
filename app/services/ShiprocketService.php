@@ -53,6 +53,14 @@ class ShiprocketService
             ->json();
     }
 
+    public function cancelOrders(array $ids)
+    {
+        // Endpoint: https://apiv2.shiprocket.in/v1/external/orders/cancel :contentReference[oaicite:3]{index=3}
+        return $this->request('POST', '/v1/external/orders/cancel', [
+            'ids' => array_values(array_map('intval', $ids)),
+        ]);
+    }
+
     public function assignAwb(int $shipmentId, ?int $courierId = null): array
     {
         $body = ['shipment_id' => $shipmentId];
