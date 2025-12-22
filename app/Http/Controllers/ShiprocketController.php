@@ -543,7 +543,6 @@ class ShiprocketController extends Controller
     {
         $v = Validator::make($request->all(), [
             'order_id' => ['required', 'integer', 'exists:t_orders,id'],
-
             'payload' => ['required', 'array'],
 
             'payload.customer_name' => ['required', 'string', 'max:255'],
@@ -573,6 +572,8 @@ class ShiprocketController extends Controller
             'payload.seller_address' => ['nullable', 'string', 'max:500'],
             'payload.seller_invoice' => ['nullable', 'string', 'max:100'],
 
+            
+            'payload.pickup_location_id' => ['nullable','integer'], 
             'payload.pickup_name' => ['nullable', 'string', 'max:255'],
             'payload.pickup_address' => ['nullable', 'string', 'max:500'],
             'payload.pickup_pin' => ['nullable'],
@@ -754,6 +755,7 @@ class ShiprocketController extends Controller
                 'seller_address' => $p['seller_address'] ?? null,
                 'seller_invoice' => $p['seller_invoice'] ?? null,
 
+                'pickup_location_id' => (int) $p['pickup_location_id'] ?? null,
                 'pickup_name' => $p['pickup_name'] ?? null,
                 'pickup_address' => $p['pickup_address'] ?? null,
                 'pickup_pin' => isset($p['pickup_pin']) ? (string)$p['pickup_pin'] : null,
