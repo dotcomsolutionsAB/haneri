@@ -380,7 +380,16 @@ class ShiprocketController extends Controller
         try {
             // 6) Create order on Shiprocket
             $created = $shiprocket->createOrderAdhoc($payload);
+            $srStatus = strtoupper((string) data_get($created, 'status', 'NEW'));
 
+            // Map Shiprocket status -> your DB allowed statuses
+            $mappedStatus = match ($srStatus) {
+                'NEW' => 'booked',              // ✅ punch success = booked
+                'CANCELED', 'CANCELLED' => 'cancelled',
+                'DELIVERED' => 'delivered',
+                'IN TRANSIT', 'IN_TRANSIT' => 'in_transit',
+                default => 'booked',
+            };
             $shipmentId = data_get($created, 'shipment_id');
             $shiprocketOrderId = data_get($created, 'order_id');
 
@@ -408,13 +417,13 @@ class ShiprocketController extends Controller
 
             // 9) Save into t_order_shipments
             $shippedBy = data_get($awbRes, 'response.data.shipped_by', []);
-
+            
             $shipmentRow = OrderShipment::create([
                 'order_id' => $order->id,
                 'user_id'  => $order->user_id,
 
                 'courier' => $courierName ?: 'Shiprocket',
-                'status'  => data_get($created, 'status', 'NEW'),
+                'status' => $mappedStatus,
 
                 'customer_name'  => $custName,
                 'customer_phone' => (string)$phone,
