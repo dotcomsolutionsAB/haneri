@@ -195,46 +195,122 @@ class ShiprocketController extends Controller
                 'data' => [],
             ], 422);
         }
+        // ✅ Prevent duplicate Shiprocket shipment creation for same order
+        $existing = OrderShipment::where('order_id', $order->id)
+            ->where(function ($q) {
+                $q->where('courier', 'like', '%Shiprocket%')
+                ->orWhere('courier_reference', 'like', '%shiprocket_order_id=%');
+            })
+            ->whereNotIn('status', ['FAILED', 'CANCELLED'])
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'code' => 409,
+                'success' => false,
+                'message' => 'Shiprocket shipment already created for this order.',
+                'data' => [
+                    'shipments_table_id' => $existing->id,
+                    'awb_no' => $existing->awb_no,
+                    'courier_reference' => $existing->courier_reference,
+                ],
+            ], 409);
+        }
+
 
         // 2) Parse shipping_address from t_orders.shipping_address
-        // We will support: JSON string OR array OR plain text
-        $shipping = $order->shipping_address;
+        $shippingRaw = $order->shipping_address;
 
-        if (is_string($shipping)) {
-            $decoded = json_decode($shipping, true);
+        // Try JSON first
+        $shippingArr = null;
+        if (is_string($shippingRaw)) {
+            $decoded = json_decode($shippingRaw, true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
-                $shipping = $decoded;
+                $shippingArr = $decoded;
             }
         }
 
-        // Defaults (you MUST map these correctly as per your shipping_address structure)
+        // defaults from user table
         $custName  = $order->user->name ?? 'Customer';
         $custEmail = $order->user->email ?? 'test@example.com';
         $custPhone = $order->user->mobile ?? ($order->user->phone ?? '');
 
-        // If shipping is array, try to pull fields
-        $address1 = is_array($shipping) ? ($shipping['address'] ?? $shipping['address1'] ?? $shipping['line1'] ?? '') : (string)$shipping;
-        $address2 = is_array($shipping) ? ($shipping['address2'] ?? $shipping['line2'] ?? '') : '';
-        $city     = is_array($shipping) ? ($shipping['city'] ?? '') : '';
-        $state    = is_array($shipping) ? ($shipping['state'] ?? '') : '';
-        $pincode  = is_array($shipping) ? ($shipping['pincode'] ?? $shipping['pin'] ?? '') : '';
-        $country  = is_array($shipping) ? ($shipping['country'] ?? 'India') : 'India';
-        $phone    = is_array($shipping) ? ($shipping['phone'] ?? $custPhone) : $custPhone;
+        // Variables we must fill
+        $address1 = '';
+        $address2 = '';
+        $city     = '';
+        $state    = '';
+        $pincode  = '';
+        $country  = 'India';
+        $phone    = $custPhone;
 
-        // If important fields missing, return clear error
+        // ✅ Case A: shipping stored as JSON
+        if (is_array($shippingArr)) {
+
+            $custName = $shippingArr['name'] ?? $custName;
+            $phone    = $shippingArr['phone'] ?? $shippingArr['mobile'] ?? $phone;
+
+            $address1 = $shippingArr['address'] ?? $shippingArr['address1'] ?? $shippingArr['line1'] ?? '';
+            $address2 = $shippingArr['address2'] ?? $shippingArr['line2'] ?? '';
+
+            $city     = $shippingArr['city'] ?? '';
+            $state    = $shippingArr['state'] ?? '';
+            $country  = $shippingArr['country'] ?? 'India';
+            $pincode  = $shippingArr['pincode'] ?? $shippingArr['pin'] ?? '';
+
+        // ✅ Case B: shipping stored as comma-separated string
+        } else {
+
+            $raw = trim((string)$shippingRaw);
+
+            // Example format:
+            // Name, Mobile, City, State, Country, Pincode, Address1 (rest...)
+            $parts = array_map('trim', explode(',', $raw));
+            $parts = array_values(array_filter($parts, fn($x) => $x !== ''));
+
+            if (count($parts) >= 6) {
+                $custName = $parts[0] ?? $custName;
+                $phone    = $parts[1] ?? $phone;
+                $city     = $parts[2] ?? '';
+                $state    = $parts[3] ?? '';
+                $country  = $parts[4] ?? 'India';
+                $pincode  = $parts[5] ?? '';
+
+                // Everything after pincode is address
+                $addrParts = array_slice($parts, 6);
+                $address1  = trim(implode(', ', $addrParts));
+
+                // fallback if no address given after pincode
+                if ($address1 === '') {
+                    $address1 = $city; // at least keep something
+                }
+            } else {
+                // fallback: treat whole string as address only
+                $address1 = $raw;
+            }
+        }
+
+        // ✅ Basic cleanup
+        $phone = preg_replace('/\D+/', '', (string)$phone); // keep digits only
+        $pincode = preg_replace('/\D+/', '', (string)$pincode);
+
+        // ✅ Validate required fields now
         if (trim($address1) === '' || trim($city) === '' || trim($state) === '' || trim($pincode) === '' || trim($phone) === '') {
             return response()->json([
                 'code' => 422,
                 'success' => false,
-                'message' => 'Shipping address is incomplete in t_orders.shipping_address. Required: address, city, state, pincode, phone.',
+                'message' => 'Shipping address is incomplete in t_orders.shipping_address. Required: name, phone, city, state, pincode, address.',
                 'data' => [
-                    'shipping_address_raw' => $order->shipping_address,
+                    'shipping_address_raw' => $shippingRaw,
                     'parsed' => [
+                        'name' => $custName,
+                        'phone' => $phone,
                         'address1' => $address1,
                         'city' => $city,
                         'state' => $state,
+                        'country' => $country,
                         'pincode' => $pincode,
-                        'phone' => $phone,
                     ],
                 ],
             ], 422);
@@ -245,8 +321,8 @@ class ShiprocketController extends Controller
         $subTotal = 0;
 
         foreach ($order->items as $it) {
-            $name = $it->product->name ?? ('Product ' . $it->product_id);
-            $sku  = $it->product->sku ?? ('SKU-' . $it->product_id);
+            $name = $it->product->item_name ?? $it->product->name ?? ('Product ' . $it->product_id);
+            $sku  = $it->product->sku ?? $it->product->product_code ?? ('SKU-' . $it->product_id);
 
             $units = (int) ($it->quantity ?? 1);
             $price = (float) ($it->price ?? 0);
