@@ -539,4 +539,281 @@ class ShiprocketController extends Controller
         }
     }
 
+    public function punchByPayload(Request $request, ShiprocketService $shiprocket)
+    {
+        $v = Validator::make($request->all(), [
+            'order_id' => ['required', 'integer', 'exists:t_orders,id'],
+
+            'payload' => ['required', 'array'],
+
+            'payload.customer_name' => ['required', 'string', 'max:255'],
+            'payload.customer_address' => ['required', 'string', 'max:500'],
+            'payload.pin' => ['required', 'string', 'max:10'],
+            'payload.city' => ['required', 'string', 'max:100'],
+            'payload.state' => ['required', 'string', 'max:100'],
+            'payload.phone' => ['required', 'string', 'max:20'],
+
+            'payload.order_no' => ['required', 'string', 'max:50'],
+            'payload.payment_mode' => ['required', 'in:Prepaid,COD'],
+            'payload.total_amount' => ['required', 'numeric', 'min:0'],
+            'payload.cod_amount' => ['required', 'numeric', 'min:0'],
+
+            'payload.products_description' => ['required', 'string', 'max:500'],
+            'payload.quantity' => ['required', 'integer', 'min:1'],
+            'payload.weight' => ['required', 'numeric', 'min:0.1'],
+
+            'payload.order_date' => ['required', 'date'],
+
+            'payload.shipment_length' => ['required', 'numeric', 'min:1'],
+            'payload.shipment_width'  => ['required', 'numeric', 'min:1'],
+            'payload.shipment_height' => ['required', 'numeric', 'min:1'],
+
+            // Optional extras you send
+            'payload.seller_name' => ['nullable', 'string', 'max:255'],
+            'payload.seller_address' => ['nullable', 'string', 'max:500'],
+            'payload.seller_invoice' => ['nullable', 'string', 'max:100'],
+
+            'payload.pickup_name' => ['nullable', 'string', 'max:255'],
+            'payload.pickup_address' => ['nullable', 'string', 'max:500'],
+            'payload.pickup_pin' => ['nullable'],
+            'payload.pickup_city' => ['nullable', 'string', 'max:100'],
+            'payload.pickup_state' => ['nullable', 'string', 'max:100'],
+            'payload.pickup_phone' => ['nullable', 'string', 'max:20'],
+
+            'payload.return_pin' => ['nullable'],
+            'payload.return_city' => ['nullable', 'string', 'max:100'],
+            'payload.return_state' => ['nullable', 'string', 'max:100'],
+            'payload.return_phone' => ['nullable', 'string', 'max:20'],
+            'payload.return_address' => ['nullable', 'string', 'max:500'],
+            'payload.return_country' => ['nullable', 'string', 'max:100'],
+
+            // Optional: choose courier
+            'courier_id' => ['nullable', 'integer'],
+        ]);
+
+        if ($v->fails()) {
+            return response()->json([
+                'code' => 422,
+                'success' => false,
+                'message' => 'Validation failed.',
+                'data' => $v->errors(),
+            ], 422);
+        }
+
+        $orderId = (int) $request->input('order_id');
+        $p = $request->input('payload');
+
+        // fetch order just to get user_id
+        $order = OrderModel::find($orderId);
+
+        // prevent duplicate shiprocket shipment
+        $existing = OrderShipment::where('order_id', $orderId)
+            ->where(function ($q) {
+                $q->where('courier', 'like', '%Shiprocket%')
+                ->orWhere('courier_reference', 'like', '%shiprocket_order_id=%');
+            })
+            ->whereNotIn('status', ['failed', 'cancelled'])
+            ->latest('id')
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'code' => 409,
+                'success' => false,
+                'message' => 'Shiprocket shipment already created for this order.',
+                'data' => [
+                    'shipments_table_id' => $existing->id,
+                    'awb_no' => $existing->awb_no,
+                    'courier_reference' => $existing->courier_reference,
+                ],
+            ], 409);
+        }
+
+        // Build Shiprocket order_items from your products_description + quantity
+        // (Shiprocket requires sku + name + units + selling_price)
+        $itemName = trim((string) ($p['products_description'] ?? 'Item'));
+        $units = (int) ($p['quantity'] ?? 1);
+        $totalAmount = (float) ($p['total_amount'] ?? 0);
+        $unitPrice = $units > 0 ? round($totalAmount / $units, 2) : $totalAmount;
+
+        $orderItems = [
+            [
+                'name' => $itemName,
+                'sku' => 'SKU-' . $orderId,
+                'units' => $units,
+                'selling_price' => $unitPrice,
+            ]
+        ];
+
+        // Shiprocket payload
+        $shiprocketPayload = [
+            'order_id' => (string) $p['order_no'], // your channel order number
+            'order_date' => (string) $p['order_date'],
+            'pickup_location' => (string) config('services.shiprocket.pickup_location'),
+
+            'billing_customer_name' => (string) $p['customer_name'],
+            'billing_last_name' => '',
+
+            'billing_address' => (string) $p['customer_address'],
+            'billing_address_2' => '',
+            'billing_city' => (string) $p['city'],
+            'billing_state' => (string) $p['state'],
+            'billing_country' => 'India',
+            'billing_pincode' => (string) $p['pin'],
+            'billing_email' => $order->user->email ?? 'test@example.com',
+            'billing_phone' => preg_replace('/\D+/', '', (string) $p['phone']),
+
+            'shipping_is_billing' => true,
+
+            'payment_method' => (string) $p['payment_mode'],
+            'sub_total' => round((float) $p['total_amount'], 2),
+            'order_items' => $orderItems,
+
+            'length'  => (float) $p['shipment_length'],
+            'breadth' => (float) $p['shipment_width'],
+            'height'  => (float) $p['shipment_height'],
+            'weight'  => (float) $p['weight'],
+        ];
+
+        $courierId = $request->input('courier_id');
+
+        DB::beginTransaction();
+        try {
+            // 1) Create on shiprocket
+            $created = $shiprocket->createOrderAdhoc($shiprocketPayload);
+
+            $shipmentId = data_get($created, 'shipment_id');
+            $shiprocketOrderId = data_get($created, 'order_id');
+
+            if (!$shipmentId) {
+                DB::rollBack();
+                return response()->json([
+                    'code' => 500,
+                    'success' => false,
+                    'message' => 'Shiprocket created response but shipment_id missing.',
+                    'data' => $created,
+                ], 500);
+            }
+
+            // Map status for DB
+            $srStatus = strtoupper((string) data_get($created, 'status', 'NEW'));
+            $mappedStatus = match ($srStatus) {
+                'NEW' => 'booked',
+                'CANCELED', 'CANCELLED' => 'cancelled',
+                'DELIVERED' => 'delivered',
+                'IN TRANSIT', 'IN_TRANSIT' => 'in_transit',
+                default => 'booked',
+            };
+
+            // 2) Assign AWB
+            $awbRes = $shiprocket->assignAwb((int)$shipmentId, $courierId ? (int)$courierId : null);
+            $awbAssignStatus = (int) data_get($awbRes, 'awb_assign_status', 0);
+
+            $awb = data_get($awbRes, 'response.data.awb_code') ?? null;
+            $courierName = data_get($awbRes, 'response.data.courier_name') ?? null;
+
+            // if AWB fails, keep it pending (optional but recommended)
+            if ($awbAssignStatus !== 1) {
+                $mappedStatus = 'pending';
+            }
+
+            // 3) Label (will be null if AWB not assigned)
+            $labelRes = $shiprocket->generateLabel([(int)$shipmentId]);
+            $labelUrl = data_get($labelRes, 'label_url');
+
+            // 4) Save shipment row
+            $shipmentRow = OrderShipment::create([
+                'order_id' => $orderId,
+                'user_id'  => $order->user_id,
+
+                'courier' => $courierName ?: 'Shiprocket',
+                'status' => $mappedStatus,
+
+                'customer_name' => (string) $p['customer_name'],
+                'customer_phone' => preg_replace('/\D+/', '', (string) $p['phone']),
+                'customer_email' => $order->user->email ?? null,
+
+                'shipping_address' => (string) $p['customer_address'],
+                'shipping_pin' => (string) $p['pin'],
+                'shipping_city' => (string) $p['city'],
+                'shipping_state' => (string) $p['state'],
+
+                'payment_mode' => (string) $p['payment_mode'],
+                'total_amount' => (float) $p['total_amount'],
+                'cod_amount' => (float) $p['cod_amount'],
+
+                'quantity' => (int) $p['quantity'],
+                'weight' => (float) $p['weight'],
+                'products_description' => (string) $p['products_description'],
+
+                'shipment_length' => (float) $p['shipment_length'],
+                'shipment_width'  => (float) $p['shipment_width'],
+                'shipment_height' => (float) $p['shipment_height'],
+
+                'seller_name' => $p['seller_name'] ?? null,
+                'seller_address' => $p['seller_address'] ?? null,
+                'seller_invoice' => $p['seller_invoice'] ?? null,
+
+                'pickup_name' => $p['pickup_name'] ?? null,
+                'pickup_address' => $p['pickup_address'] ?? null,
+                'pickup_pin' => isset($p['pickup_pin']) ? (string)$p['pickup_pin'] : null,
+                'pickup_city' => $p['pickup_city'] ?? null,
+                'pickup_state' => $p['pickup_state'] ?? null,
+                'pickup_phone' => isset($p['pickup_phone']) ? (string)$p['pickup_phone'] : null,
+
+                'return_pin' => isset($p['return_pin']) ? (string)$p['return_pin'] : null,
+                'return_city' => $p['return_city'] ?? null,
+                'return_state' => $p['return_state'] ?? null,
+                'return_phone' => isset($p['return_phone']) ? (string)$p['return_phone'] : null,
+                'return_address' => $p['return_address'] ?? null,
+                'return_country' => $p['return_country'] ?? 'India',
+
+                'courier_reference' => 'shiprocket_order_id=' . $shiprocketOrderId . ', shipment_id=' . $shipmentId,
+                'awb_no' => $awb,
+
+                'request_payload' => [
+                    'input_payload' => $p,
+                    'shiprocket_payload' => $shiprocketPayload,
+                ],
+                'response_payload' => [
+                    'created_response' => $created,
+                    'awb_response' => $awbRes,
+                    'label_response' => $labelRes,
+                ],
+
+                'error_message' => null,
+                'booked_at' => now(),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'code' => 200,
+                'success' => true,
+                'message' => 'Payload punched to Shiprocket and shipment saved.',
+                'data' => [
+                    'order_id' => $orderId,
+                    'shipments_table_id' => $shipmentRow->id,
+                    'shiprocket_order_id' => $shiprocketOrderId,
+                    'shiprocket_shipment_id' => (int)$shipmentId,
+                    'awb' => $awb,
+                    'label_url' => $labelUrl,
+                    'status' => $mappedStatus,
+                ],
+            ]);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Shiprocket punch failed.',
+                'data' => [
+                    'error' => $e->getMessage(),
+                ],
+            ], 500);
+        }
+    }
+
 }

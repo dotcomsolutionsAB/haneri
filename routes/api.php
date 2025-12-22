@@ -153,7 +153,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Ship Rocket
         Route::prefix('shiprocket')->group(function () {
             Route::post('/create-shipment', [ShiprocketController::class, 'createShipment']);
-            Route::post('/punch-order/{order_id}', [ShiprocketController::class, 'punchOrderById']);
+            Route::post('/punch-order/{order_id}', [ShiprocketController::class, 'punchOrderById']); // Puunch by order
+            Route::post('/punch-by-payload', [ShiprocketController::class, 'punchByPayload']); // Punch by payload
             Route::get('/track/{awb}', [ShiprocketController::class, 'trackAwb']);
         });
 
