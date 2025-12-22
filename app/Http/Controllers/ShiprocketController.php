@@ -417,14 +417,16 @@ class ShiprocketController extends Controller
 
             // 9) Save into t_order_shipments
             $shippedBy = data_get($awbRes, 'response.data.shipped_by', []);
-            
+            $pickupId = null; // set correctly later
+
             $shipmentRow = OrderShipment::create([
                 'order_id' => $order->id,
                 'user_id'  => $order->user_id,
 
                 'courier' => $courierName ?: 'Shiprocket',
                 'status' => $mappedStatus,
-
+                'pickup_location_id' => $pickupId,
+                
                 'customer_name'  => $custName,
                 'customer_phone' => (string)$phone,
                 'customer_email' => $custEmail,
