@@ -32,6 +32,7 @@ Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 Route::post('/request-otp', [AuthController::class, 'request_otp']);
 Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
 Route::post('/delivery/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
+
 // Route::middleware(['cors'])->group(function () {
     Route::prefix('cart')->group(function () {
         Route::post('/fetch', [CartController::class, 'index']);             // Get all cart items for a user

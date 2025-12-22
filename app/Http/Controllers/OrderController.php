@@ -210,14 +210,15 @@ class OrderController extends Controller
                     ];
                 })
                 ->toArray();
-
-            // Send confirmation email (do not block order if email fails)
-            try {
-                Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
-            } catch (\Throwable $e) {
-                \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
+            // Send confirmation email ONLY if payment is already paid
+            if ($order->payment_status === 'paid') {
+                // Send confirmation email (do not block order if email fails)
+                try {
+                    Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
+                } catch (\Throwable $e) {
+                    \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
+                }
             }
-
             // Prepare response
             $response = [
                 'message' => 'Order created successfully!',
@@ -304,60 +305,7 @@ class OrderController extends Controller
         return $this->price($regular, (float)$userDiscount);
     }
 
-    // View all orders for a user
-    // public function index(Request $request)
-    // {
-    //     $user = Auth::user(); 
-
-    //     // If the user is an admin, validate user_id in the request
-    //     if ($user->role == 'admin') {
-    //         $request->validate([
-    //             'user_id' => 'required|integer|exists:users,id',
-    //         ]);
-    //         $user_id =  $request->input('user_id');
-    //     } else {
-    //         $user_id =  $user->id;
-    //     }
-
-    //     // Fetch all orders for the user
-    //     $orders = OrderModel::with(['items', 'user', 'invoiceFile'])
-    //         -> where('user_id', $user_id)
-    //         ->get()
-    //         ->map(function ($order) {
-
-    //             // Build invoice data if exists
-    //             $invoiceId  = $order->invoice_id;
-    //             $invoiceUrl = null;
-
-    //             if ($invoiceId && $order->invoiceFile) {
-    //                 // file_path is like: upload/order_invoice/HAN-INV-000001.pdf
-    //                 $invoiceUrl = asset('storage/' . $order->invoiceFile->file_path);
-    //             }
-
-    //             // Make sure to hide the unwanted fields from the user and items
-    //             if ($order->items) {
-    //                 $order->items->makeHidden(['id', 'created_at', 'updated_at']);
-    //             }
-    //             if ($order->user) {
-    //                 $order->user->makeHidden(['id', 'created_at', 'updated_at']);
-    //             }
-    //             // Optionally hide fields from the order
-    //             $order->makeHidden(['id', 'created_at', 'updated_at']);
-
-    //             // 🔹 Attach invoice info in a clean way
-    //             $order->invoice = [
-    //                 'id'  => $invoiceId,
-    //                 'url' => $invoiceUrl,
-    //             ];
-
-    //             return $order;
-    //         });
-
-    //     return $orders->isNotEmpty()
-    //         ? response()->json(['message' => 'Orders fetched successfully!', 'data' => $orders, 'count' => count($orders)], 200)
-    //         : response()->json(['message' => 'No orders found.'], 200);
-    // }
-    
+    // View all orders for a user    
     public function index(Request $request)
     {
         $user = Auth::user(); 
@@ -374,6 +322,7 @@ class OrderController extends Controller
 
         $orders = OrderModel::with(['items', 'user', 'invoiceFile'])
             ->where('user_id', $user_id)
+            ->where('payment_status', 'paid')   // ✅ only paid orders
             ->get()
             ->map(function ($order) {
                 // 🔹 1) Build invoice URL (prefer DB row, fallback to pattern)
