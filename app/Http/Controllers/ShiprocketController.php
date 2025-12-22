@@ -755,7 +755,7 @@ class ShiprocketController extends Controller
                 'seller_address' => $p['seller_address'] ?? null,
                 'seller_invoice' => $p['seller_invoice'] ?? null,
 
-                'pickup_location_id' => (int) $p['pickup_location_id'] ?? null,
+                'pickup_location_id' => isset($p['pickup_location_id']) ? (int)$p['pickup_location_id'] : null,
                 'pickup_name' => $p['pickup_name'] ?? null,
                 'pickup_address' => $p['pickup_address'] ?? null,
                 'pickup_pin' => isset($p['pickup_pin']) ? (string)$p['pickup_pin'] : null,
