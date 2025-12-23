@@ -961,7 +961,7 @@ class ShiprocketController extends Controller
             'weight'   => ['required_without:order_id','numeric','min:0.1'],
 
             // optional filters
-            'mode'          => ['nullable','in:Air,Surface'],
+            'mode' => ['nullable','in:Air,Surface,air,surface,AIR,SURFACE'],
             'declared_value'=> ['nullable','numeric','min:0'],
             'length'        => ['nullable','numeric','min:1'],
             'breadth'       => ['nullable','numeric','min:1'],
@@ -1008,9 +1008,10 @@ class ShiprocketController extends Controller
         if ($request->filled('only_local'))    $params['only_local'] = (int) $request->only_local;
         if ($request->filled('qc_check'))      $params['qc_check'] = (int) $request->qc_check;
         if ($request->filled('mode')) {
-            $params['mode'] = ucfirst(strtolower($request->mode)); // Surface / Air
+            $mode = strtolower(trim((string)$request->mode));
+            $params['mode'] = ($mode === 'air') ? 'Air' : 'Surface'; // default Surface
         }
-        
+
         try {
             $res = $shiprocket->getCourierRates($params);
 
