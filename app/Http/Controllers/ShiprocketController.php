@@ -1093,7 +1093,7 @@ class ShiprocketController extends Controller
         }
 
         try {
-            $res = $shiprocket->getCourierRates($params);
+            $res = $shiprocket->getTatRates($params);
 
             $couriers = data_get($res, 'data.available_courier_companies', []);
             if (!is_array($couriers)) $couriers = [];
