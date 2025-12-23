@@ -64,11 +64,12 @@ class ShiprocketService
             ->json();
     }
 
+    // ✅ Shiprocket courier serviceability (rates)
     public function getCourierRates(array $params): array
     {
-        // IMPORTANT: serviceability endpoint is GET with query params
+        // Important: this is GET with query params
         return $this->client()
-            ->get($this->baseUrl . '/v1/external/courier/serviceability/', $params)
+            ->get($this->baseUrl . '/v1/external/courier/serviceability', $params) // no trailing slash also ok
             ->throw()
             ->json();
     }

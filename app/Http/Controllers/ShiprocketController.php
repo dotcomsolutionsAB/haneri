@@ -955,31 +955,19 @@ class ShiprocketController extends Controller
             'pickup_postcode'   => ['required','digits_between:4,10'],
             'delivery_postcode' => ['required','digits_between:4,10'],
 
-            // Either order_id OR (cod + weight)
             'order_id' => ['nullable','integer'],
-            'cod'      => ['required_without:order_id','in:0,1'],      // 0 prepaid, 1 cod
+            'cod'      => ['required_without:order_id','in:0,1'],
             'weight'   => ['required_without:order_id','numeric','min:0.1'],
 
-            // optional filters
-            'mode' => ['nullable','in:Air,Surface,air,surface,AIR,SURFACE'],
-            'declared_value'=> ['nullable','numeric','min:0'],
-            'length'        => ['nullable','numeric','min:1'],
-            'breadth'       => ['nullable','numeric','min:1'],
-            'height'        => ['nullable','numeric','min:1'],
-
-            // optional (rarely needed)
-            'is_return'     => ['nullable','in:0,1'],
-            'couriers_type' => ['nullable','in:1'],
-            'only_local'    => ['nullable','in:1'],
-            'qc_check'      => ['nullable','in:1'],
+            'mode' => ['nullable','string'], // ✅ just string, we normalize ourselves
         ]);
 
         if ($v->fails()) {
             return response()->json([
-                'code'    => 422,
+                'code' => 422,
                 'success' => false,
                 'message' => 'Validation failed.',
-                'data'    => $v->errors(),
+                'data' => $v->errors(),
             ], 422);
         }
 
@@ -988,7 +976,6 @@ class ShiprocketController extends Controller
             'delivery_postcode' => (int) $request->delivery_postcode,
         ];
 
-        // If order_id given, Shiprocket can calculate from it (optional support)
         if ($request->filled('order_id')) {
             $params['order_id'] = (int) $request->order_id;
         } else {
@@ -996,20 +983,10 @@ class ShiprocketController extends Controller
             $params['weight'] = (float) $request->weight;
         }
 
-        // optional params
-        if ($request->filled('mode'))           $params['mode'] = $request->mode;
-        if ($request->filled('declared_value')) $params['declared_value'] = (float) $request->declared_value;
-        if ($request->filled('length'))         $params['length']  = (float) $request->length;
-        if ($request->filled('breadth'))        $params['breadth'] = (float) $request->breadth;
-        if ($request->filled('height'))         $params['height']  = (float) $request->height;
-
-        if ($request->filled('is_return'))     $params['is_return'] = (int) $request->is_return;
-        if ($request->filled('couriers_type')) $params['couriers_type'] = (int) $request->couriers_type;
-        if ($request->filled('only_local'))    $params['only_local'] = (int) $request->only_local;
-        if ($request->filled('qc_check'))      $params['qc_check'] = (int) $request->qc_check;
+        // ✅ normalize mode
         if ($request->filled('mode')) {
-            $mode = strtolower(trim((string)$request->mode));
-            $params['mode'] = ($mode === 'air') ? 'Air' : 'Surface'; // default Surface
+            $m = strtolower(trim((string)$request->mode));
+            $params['mode'] = ($m === 'air') ? 'Air' : 'Surface';
         }
 
         try {
@@ -1018,7 +995,21 @@ class ShiprocketController extends Controller
             $couriers = data_get($res, 'available_courier_companies', []);
             if (!is_array($couriers)) $couriers = [];
 
-            // Pick cheapest & fastest (optional)
+            // If empty → show raw, because Shiprocket usually tells why
+            if (count($couriers) === 0) {
+                return response()->json([
+                    'code' => 200,
+                    'success' => true,
+                    'message' => 'No couriers returned for this lane. Check raw response.',
+                    'data' => [
+                        'input' => $params,
+                        'couriers' => [],
+                        'raw' => $res,
+                    ],
+                ]);
+            }
+
+            // cheapest / fastest
             $cheapest = null;
             $fastest  = null;
 
@@ -1035,28 +1026,29 @@ class ShiprocketController extends Controller
             }
 
             return response()->json([
-                'code'    => 200,
+                'code' => 200,
                 'success' => true,
                 'message' => 'Shipping rates fetched successfully.',
-                'data'    => [
-                    'input'    => $params,
+                'data' => [
+                    'input' => $params,
                     'cheapest' => $cheapest,
-                    'fastest'  => $fastest,
+                    'fastest' => $fastest,
                     'couriers' => $couriers,
                 ],
             ]);
 
         } catch (\Throwable $e) {
             return response()->json([
-                'code'    => 500,
+                'code' => 500,
                 'success' => false,
                 'message' => 'Failed to fetch Shiprocket rates.',
-                'data'    => [
-                    'error' => $e->getMessage(),
-                ],
+                'data' => ['error' => $e->getMessage()],
             ], 500);
         }
     }
+
+
+
 
 
 }
