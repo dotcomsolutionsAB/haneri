@@ -62,29 +62,29 @@ class ShiprocketService
         ]);
     }
 
-    public function getCourierRates(array $params)
-    {
-        // GET /v1/external/courier/serviceability/
-        return $this->request('GET', '/v1/external/courier/serviceability/', $params, true);
-    }
-
     // public function getCourierRates(array $params)
     // {
-    //     $token = $this->getToken(); // ✅ must exist in your service (same token used for create order)
-
-    //     $url = 'https://apiv2.shiprocket.in/v1/external/courier/serviceability/';
-
-    //     $res = Http::withToken($token)
-    //         ->acceptJson()
-    //         ->get($url, $params);
-
-    //     // If Shiprocket returned error, throw exception so controller returns 500 with message
-    //     if (!$res->successful()) {
-    //         throw new \Exception("Shiprocket HTTP {$res->status()}: " . $res->body());
-    //     }
-
-    //     return $res->json();
+    //     // GET /v1/external/courier/serviceability/
+    //     return $this->request('GET', '/v1/external/courier/serviceability/', $params, true);
     // }
+
+    public function getCourierRates(array $params)
+    {
+        $token = $this->getToken(); // ✅ must exist in your service (same token used for create order)
+
+        $url = 'https://apiv2.shiprocket.in/v1/external/courier/serviceability/';
+
+        $res = Http::withToken($token)
+            ->acceptJson()
+            ->get($url, $params);
+
+        // If Shiprocket returned error, throw exception so controller returns 500 with message
+        if (!$res->successful()) {
+            throw new \Exception("Shiprocket HTTP {$res->status()}: " . $res->body());
+        }
+
+        return $res->json();
+    }
 
     public function assignAwb(int $shipmentId, ?int $courierId = null): array
     {
