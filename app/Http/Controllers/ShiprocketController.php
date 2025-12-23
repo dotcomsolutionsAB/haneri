@@ -856,11 +856,12 @@ class ShiprocketController extends Controller
             $shipmentRow = OrderShipment::where('order_id', $orderId)
                 ->where(function ($q) {
                     $q->where('courier', 'like', '%Shiprocket%')
-                    ->orWhere('courier_reference', 'like', '%shiprocket_order_id=%')
-                    ->orWhereNotNull('response_payload');
+                    ->orWhere('courier_reference', 'like', '%shiprocket_order_id=%');
                 })
+                ->whereNotIn('status', ['failed', 'cancelled'])
                 ->latest('id')
                 ->first();
+
 
             if (!$shipmentRow) {
                 return response()->json([
@@ -1006,7 +1007,10 @@ class ShiprocketController extends Controller
         if ($request->filled('couriers_type')) $params['couriers_type'] = (int) $request->couriers_type;
         if ($request->filled('only_local'))    $params['only_local'] = (int) $request->only_local;
         if ($request->filled('qc_check'))      $params['qc_check'] = (int) $request->qc_check;
-
+        if ($request->filled('mode')) {
+            $params['mode'] = ucfirst(strtolower($request->mode)); // Surface / Air
+        }
+        
         try {
             $res = $shiprocket->getCourierRates($params);
 

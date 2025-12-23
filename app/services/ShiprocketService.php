@@ -54,36 +54,23 @@ class ShiprocketService
             ->json();
     }
 
-    public function cancelOrders(array $ids)
+    public function cancelOrders(array $ids): array
     {
-        // Endpoint: https://apiv2.shiprocket.in/v1/external/orders/cancel :contentReference[oaicite:3]{index=3}
-        return $this->request('POST', '/v1/external/orders/cancel', [
-            'ids' => array_values(array_map('intval', $ids)),
-        ]);
+        return $this->client()
+            ->post($this->baseUrl . '/v1/external/orders/cancel', [
+                'ids' => array_values(array_map('intval', $ids)),
+            ])
+            ->throw()
+            ->json();
     }
 
-    // public function getCourierRates(array $params)
-    // {
-    //     // GET /v1/external/courier/serviceability/
-    //     return $this->request('GET', '/v1/external/courier/serviceability/', $params, true);
-    // }
-
-    public function getCourierRates(array $params)
+    public function getCourierRates(array $params): array
     {
-        $token = $this->getToken(); // ✅ must exist in your service (same token used for create order)
-
-        $url = 'https://apiv2.shiprocket.in/v1/external/courier/serviceability/';
-
-        $res = Http::withToken($token)
-            ->acceptJson()
-            ->get($url, $params);
-
-        // If Shiprocket returned error, throw exception so controller returns 500 with message
-        if (!$res->successful()) {
-            throw new \Exception("Shiprocket HTTP {$res->status()}: " . $res->body());
-        }
-
-        return $res->json();
+        // IMPORTANT: serviceability endpoint is GET with query params
+        return $this->client()
+            ->get($this->baseUrl . '/v1/external/courier/serviceability/', $params)
+            ->throw()
+            ->json();
     }
 
     public function assignAwb(int $shipmentId, ?int $courierId = null): array
