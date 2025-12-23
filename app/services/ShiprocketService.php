@@ -79,7 +79,26 @@ class ShiprocketService
             ->json();
     }
 
-    
+    // Track by AWB
+    public function trackByAwb(string $awb): array
+    {
+        $awb = trim($awb);
+        return $this->client()
+            ->get($this->baseUrl . '/v1/external/courier/track/awb/' . urlencode($awb))
+            ->throw()
+            ->json();
+    }
+
+    // Track by Shipment ID
+    public function trackByShipment(int $shipmentId): array
+    {
+        return $this->client()
+            ->get($this->baseUrl . '/v1/external/courier/track/shipment/' . (int)$shipmentId)
+            ->throw()
+            ->json();
+    }
+
+
     public function assignAwb(int $shipmentId, ?int $courierId = null): array
     {
         $body = ['shipment_id' => $shipmentId];
@@ -108,11 +127,5 @@ class ShiprocketService
             ->throw()
             ->json();
     }
-    public function trackByAwb(string $awb): array
-    {
-        return $this->client()
-            ->get($this->baseUrl . '/v1/external/courier/track/awb/' . urlencode($awb))
-            ->throw()
-            ->json();
-    }
+
 }

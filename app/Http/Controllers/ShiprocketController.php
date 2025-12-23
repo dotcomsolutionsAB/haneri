@@ -1154,5 +1154,123 @@ class ShiprocketController extends Controller
         }
     }
 
+    // Track Shipment
+    public function trackShipment(Request $request, ShiprocketService $shiprocket)
+    {
+        $v = Validator::make($request->all(), [
+            // pass any one:
+            'awb'         => ['nullable','string','max:50'],
+            'shipment_id' => ['nullable','integer'],
+            'order_id'    => ['nullable','integer','exists:t_orders,id'],
+
+            // optional: return raw full response
+            'debug'       => ['nullable','in:0,1'],
+        ]);
+
+        if ($v->fails()) {
+            return response()->json([
+                'code' => 422,
+                'success' => false,
+                'message' => 'Validation failed.',
+                'data' => $v->errors(),
+            ], 422);
+        }
+
+        if (!$request->filled('awb') && !$request->filled('shipment_id') && !$request->filled('order_id')) {
+            return response()->json([
+                'code' => 422,
+                'success' => false,
+                'message' => 'Pass awb OR shipment_id OR order_id.',
+                'data' => [],
+            ], 422);
+        }
+
+        $awb = $request->filled('awb') ? trim((string)$request->awb) : null;
+        $shipmentId = $request->filled('shipment_id') ? (int)$request->shipment_id : null;
+
+        // If order_id given → auto find awb/shipment_id from t_order_shipments
+        if ($request->filled('order_id') && (!$awb && !$shipmentId)) {
+            $row = OrderShipment::where('order_id', (int)$request->order_id)
+                ->latest('id')
+                ->first();
+
+            if (!$row) {
+                return response()->json([
+                    'code' => 404,
+                    'success' => false,
+                    'message' => 'No shipment found for this order_id.',
+                    'data' => [],
+                ], 404);
+            }
+
+            // Prefer awb_no if present
+            $awb = $row->awb_no ?: null;
+
+            // Try shipment_id from response_payload OR courier_reference
+            if (!$shipmentId) {
+                $shipmentId = (int) data_get($row->response_payload, 'created_response.shipment_id', 0);
+
+                if (!$shipmentId && !empty($row->courier_reference)) {
+                    if (preg_match('/shipment_id\s*=\s*(\d+)/i', (string)$row->courier_reference, $m)) {
+                        $shipmentId = (int)$m[1];
+                    }
+                }
+            }
+        }
+
+        try {
+            // Prefer AWB tracking if we have AWB (more direct)
+            if ($awb) {
+                $res = $shiprocket->trackByAwb($awb);
+            } elseif ($shipmentId) {
+                $res = $shiprocket->trackByShipment($shipmentId);
+            } else {
+                return response()->json([
+                    'code' => 422,
+                    'success' => false,
+                    'message' => 'Unable to resolve awb or shipment_id.',
+                    'data' => [],
+                ], 422);
+            }
+
+            // ✅ Return only “actual useful data”
+            $shipmentTrack = data_get($res, 'tracking_data.shipment_track', []);
+            $activities    = data_get($res, 'tracking_data.shipment_track_activities', []);
+
+            // Sometimes response nesting differs; fallback if needed
+            if (empty($shipmentTrack) && data_get($res, 'data.tracking_data.shipment_track')) {
+                $shipmentTrack = data_get($res, 'data.tracking_data.shipment_track', []);
+                $activities    = data_get($res, 'data.tracking_data.shipment_track_activities', []);
+            }
+
+            $data = [
+                'input' => [
+                    'awb' => $awb,
+                    'shipment_id' => $shipmentId ?: null,
+                ],
+                'shipment_track' => $shipmentTrack,
+                'activities'     => $activities,
+            ];
+
+            if ((int)$request->input('debug', 0) === 1) {
+                $data['raw'] = $res; // only if you want full raw
+            }
+
+            return response()->json([
+                'code' => 200,
+                'success' => true,
+                'message' => 'Tracking fetched successfully.',
+                'data' => $data,
+            ]);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to fetch tracking.',
+                'data' => ['error' => $e->getMessage()],
+            ], 500);
+        }
+    }
 
 }
