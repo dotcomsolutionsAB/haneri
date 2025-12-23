@@ -66,6 +66,11 @@ class ShiprocketService
         // GET https://apiv2.shiprocket.in/v1/external/courier/serviceability/ :contentReference[oaicite:8]{index=8}
         return $this->request('GET', '/v1/external/courier/serviceability/', $params, true);
     }
+    public function getCourierRates(array $params)
+    {
+        // GET /v1/external/courier/serviceability/
+        return $this->request('GET', '/v1/external/courier/serviceability/', $params, true);
+    }
 
 
     public function assignAwb(int $shipmentId, ?int $courierId = null): array
