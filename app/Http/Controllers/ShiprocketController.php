@@ -822,60 +822,46 @@ class ShiprocketController extends Controller
     public function cancelOrder(Request $request, ShiprocketService $shiprocket)
     {
         $v = Validator::make($request->all(), [
-            // You can pass either one:
-            'shiprocket_order_id' => ['nullable','integer'],
-            'order_id'            => ['nullable','integer','exists:t_orders,id'],
+            // ✅ user must pass at least one
+            'shiprocket_order_id' => ['nullable','integer','required_without:order_id'],
+            'order_id'            => ['nullable','integer','exists:t_orders,id','required_without:shiprocket_order_id'],
         ]);
 
         if ($v->fails()) {
             return response()->json([
-                'code' => 422,
+                'code'    => 422,
                 'success' => false,
                 'message' => 'Validation failed.',
-                'data' => $v->errors(),
-            ], 422);
-        }
-
-        if (!$request->filled('shiprocket_order_id') && !$request->filled('order_id')) {
-            return response()->json([
-                'code' => 422,
-                'success' => false,
-                'message' => 'Pass either shiprocket_order_id OR order_id.',
-                'data' => [],
+                'data'    => $v->errors(),
             ], 422);
         }
 
         $srOrderId = $request->input('shiprocket_order_id');
-
-        // If user sent local order_id, find shiprocket_order_id from t_order_shipments
         $shipmentRow = null;
 
+        // ✅ If local order_id is sent, find shiprocket_order_id from DB
         if (!$srOrderId) {
             $orderId = (int) $request->input('order_id');
 
             $shipmentRow = OrderShipment::where('order_id', $orderId)
-                ->where(function ($q) {
-                    $q->where('courier', 'like', '%Shiprocket%')
-                    ->orWhere('courier_reference', 'like', '%shiprocket_order_id=%');
-                })
+                ->where('courier_reference', 'like', '%shiprocket_order_id=%')   // ✅ reliable always
                 ->whereNotIn('status', ['failed', 'cancelled'])
                 ->latest('id')
                 ->first();
 
-
             if (!$shipmentRow) {
                 return response()->json([
-                    'code' => 404,
+                    'code'    => 404,
                     'success' => false,
                     'message' => 'No Shiprocket shipment found for this order_id.',
-                    'data' => [],
+                    'data'    => [],
                 ], 404);
             }
 
-            // Prefer response_payload.created_response.order_id
+            // ✅ Prefer saved response_payload.created_response.order_id
             $srOrderId = data_get($shipmentRow->response_payload, 'created_response.order_id');
 
-            // Fallback: parse from courier_reference: "shiprocket_order_id=123, shipment_id=..."
+            // ✅ fallback: parse from courier_reference
             if (!$srOrderId && $shipmentRow->courier_reference) {
                 if (preg_match('/shiprocket_order_id\s*=\s*(\d+)/i', $shipmentRow->courier_reference, $m)) {
                     $srOrderId = (int) $m[1];
@@ -885,37 +871,42 @@ class ShiprocketController extends Controller
 
         if (!$srOrderId) {
             return response()->json([
-                'code' => 422,
+                'code'    => 422,
                 'success' => false,
                 'message' => 'Shiprocket order id not found. Pass shiprocket_order_id explicitly.',
-                'data' => [],
+                'data'    => [],
             ], 422);
         }
 
         DB::beginTransaction();
         try {
-            // Shiprocket cancel expects {"ids":[srOrderId]} :contentReference[oaicite:2]{index=2}
-            $cancelRes = $shiprocket->cancelOrders([(int)$srOrderId]);
+            // ✅ Cancel on Shiprocket
+            $cancelRes = $shiprocket->cancelOrders([(int) $srOrderId]);
 
-            // Update local DB if we have shipment row
+            // ✅ Update local DB row if found
             if ($shipmentRow) {
+                $oldPayload = is_array($shipmentRow->response_payload) ? $shipmentRow->response_payload : [];
+
                 $shipmentRow->update([
-                    'status' => 'cancelled',
-                    'cancelled_at' => now(),
-                    'response_payload' => array_merge((array) $shipmentRow->response_payload, [
+                    'status'         => 'cancelled',
+                    'cancelled_at'   => now(),
+                    'response_payload' => array_merge($oldPayload, [
                         'cancel_response' => $cancelRes,
                     ]),
                 ]);
             } else {
-                // If user provided shiprocket_order_id only, update latest matching row (optional)
+                // ✅ If user passed shiprocket_order_id only, still try updating last row
                 $row = OrderShipment::where('courier_reference', 'like', '%shiprocket_order_id='.(int)$srOrderId.'%')
                     ->latest('id')
                     ->first();
+
                 if ($row) {
+                    $oldPayload = is_array($row->response_payload) ? $row->response_payload : [];
+
                     $row->update([
-                        'status' => 'cancelled',
-                        'cancelled_at' => now(),
-                        'response_payload' => array_merge((array) $row->response_payload, [
+                        'status'         => 'cancelled',
+                        'cancelled_at'   => now(),
+                        'response_payload' => array_merge($oldPayload, [
                             'cancel_response' => $cancelRes,
                         ]),
                     ]);
@@ -925,12 +916,12 @@ class ShiprocketController extends Controller
             DB::commit();
 
             return response()->json([
-                'code' => 200,
+                'code'    => 200,
                 'success' => true,
                 'message' => 'Shiprocket order cancel request submitted.',
-                'data' => [
-                    'shiprocket_order_id' => (int)$srOrderId,
-                    'cancel_response' => $cancelRes,
+                'data'    => [
+                    'shiprocket_order_id' => (int) $srOrderId,
+                    'cancel_response'     => $cancelRes,
                 ],
             ]);
 
@@ -938,10 +929,10 @@ class ShiprocketController extends Controller
             DB::rollBack();
 
             return response()->json([
-                'code' => 500,
+                'code'    => 500,
                 'success' => false,
                 'message' => 'Cancel failed.',
-                'data' => [
+                'data'    => [
                     'error' => $e->getMessage(),
                 ],
             ], 500);

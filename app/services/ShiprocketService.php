@@ -62,7 +62,8 @@ class ShiprocketService
             ])
             ->throw()
             ->json();
-    }    
+    }
+  
     public function getCourierRates(array $params): array // ✅ Shiprocket courier serviceability (rates)
     {
         // Important: this is GET with query params
@@ -88,7 +89,6 @@ class ShiprocketService
             ->throw()
             ->json();
     }
-
     // Track by Shipment ID
     public function trackByShipment(int $shipmentId): array
     {
