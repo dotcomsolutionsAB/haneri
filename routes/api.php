@@ -159,7 +159,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/cancel', [ShiprocketController::class, 'cancelOrder']);  // Cancel order
             Route::post('/rates', [ShiprocketController::class, 'getShippingRates']); // get shipping cost
             Route::post('/tat', [ShiprocketController::class, 'getTat']); // get shipping cost            
-            Route::post('/track', [ShiprocketController::class, 'trackAwb']);  // track 
+            Route::post('/track', [ShiprocketController::class, 'trackShipment']);  // track 
         });
 
 
