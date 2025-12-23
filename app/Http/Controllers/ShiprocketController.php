@@ -992,7 +992,8 @@ class ShiprocketController extends Controller
         try {
             $res = $shiprocket->getCourierRates($params);
 
-            $couriers = data_get($res, 'available_courier_companies', []);
+            $couriers = data_get($res, 'data.available_courier_companies', []);
+
             if (!is_array($couriers)) $couriers = [];
 
             // If empty → show raw, because Shiprocket usually tells why
