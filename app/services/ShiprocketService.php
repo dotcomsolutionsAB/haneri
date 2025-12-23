@@ -62,12 +62,18 @@ class ShiprocketService
             ])
             ->throw()
             ->json();
-    }
-
-    // ✅ Shiprocket courier serviceability (rates)
-    public function getCourierRates(array $params): array
+    }    
+    public function getCourierRates(array $params): array // ✅ Shiprocket courier serviceability (rates)
     {
         // Important: this is GET with query params
+        return $this->client()
+            ->get($this->baseUrl . '/v1/external/courier/serviceability', $params) // no trailing slash also ok
+            ->throw()
+            ->json();
+    }
+
+    public function getTatRates(array $params): array  // Get Expected Delivery date
+    {
         return $this->client()
             ->get($this->baseUrl . '/v1/external/courier/serviceability', $params) // no trailing slash also ok
             ->throw()

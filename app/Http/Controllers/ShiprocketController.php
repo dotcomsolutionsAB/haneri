@@ -1061,4 +1061,98 @@ class ShiprocketController extends Controller
         }
     }
 
+    public function getTat(Request $request, ShiprocketService $shiprocket)
+    {
+        $v = Validator::make($request->all(), [
+            'pickup_postcode'   => ['required','digits_between:4,10'],
+            'delivery_postcode' => ['required','digits_between:4,10'],
+            'cod'               => ['required','in:0,1'],
+            'weight'            => ['required','numeric','min:0.1'],
+            'mode'              => ['nullable','string'],
+        ]);
+
+        if ($v->fails()) {
+            return response()->json([
+                'code' => 422,
+                'success' => false,
+                'message' => 'Validation failed.',
+                'data' => $v->errors(),
+            ], 422);
+        }
+
+        $params = [
+            'pickup_postcode'   => (string) $request->pickup_postcode,
+            'delivery_postcode' => (string) $request->delivery_postcode,
+            'cod'               => (int) $request->cod,
+            'weight'            => (float) $request->weight,
+        ];
+
+        if ($request->filled('mode')) {
+            $m = strtolower(trim((string)$request->mode));
+            $params['mode'] = ($m === 'air') ? 'Air' : 'Surface';
+        }
+
+        try {
+            $res = $shiprocket->getCourierRates($params);
+
+            $couriers = data_get($res, 'data.available_courier_companies', []);
+            if (!is_array($couriers)) $couriers = [];
+
+            if (count($couriers) === 0) {
+                return response()->json([
+                    'code' => 200,
+                    'success' => true,
+                    'message' => 'No couriers returned for this lane.',
+                    'data' => [
+                        'input' => $params,
+                        'tat_list' => [],
+                    ],
+                ]);
+            }
+
+            // keep only tat fields
+            $tatList = array_values(array_map(function ($c) {
+                return [
+                    'courier_company_id'      => data_get($c, 'courier_company_id'),
+                    'courier_name'            => data_get($c, 'courier_name'),
+                    'estimated_delivery_days' => (int) data_get($c, 'estimated_delivery_days', 0),
+                    'etd'                     => data_get($c, 'etd'),
+                    'pickup_availability'     => (int) data_get($c, 'pickup_availability', 0),
+                    'rate'                    => (float) data_get($c, 'rate', 0),
+                ];
+            }, $couriers));
+
+            // fastest tat = lowest days
+            $fastest = null;
+            foreach ($tatList as $t) {
+                $days = (int) ($t['estimated_delivery_days'] ?? 0);
+                if ($days <= 0) continue;
+
+                if ($fastest === null || $days < (int) $fastest['estimated_delivery_days']) {
+                    $fastest = $t;
+                }
+            }
+
+            return response()->json([
+                'code' => 200,
+                'success' => true,
+                'message' => 'TAT fetched successfully.',
+                'data' => [
+                    'input' => $params,
+                    'fastest' => $fastest,
+                    'tat_list' => $tatList,
+                ],
+            ]);
+
+        } catch (\Throwable $e) {
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to fetch Shiprocket TAT.',
+                'data' => ['error' => $e->getMessage()],
+            ], 500);
+        }
+    }
+
+
 }
