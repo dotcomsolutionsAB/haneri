@@ -34,6 +34,7 @@ Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 Route::post('/request-otp', [AuthController::class, 'request_otp']);
 Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
 Route::post('/delivery/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
+Route::post('/delivery/track', [DelhiveryServiceController::class, 'trackShipments']);
 
 // Route::middleware(['cors'])->group(function () {
     Route::prefix('cart')->group(function () {
@@ -135,7 +136,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
             // All checks
             Route::post('/fetch_shipments/{id?}', [DelhiveryServiceController::class, 'fetchShipment']); // fetch from db
-            Route::post('/track', [DelhiveryServiceController::class, 'trackShipments']);
+            // Route::post('/delivery/track', [DelhiveryServiceController::class, 'trackShipments']);
             Route::get('/pincode-serviceability', [DelhiveryServiceController::class, 'checkPincodeServiceability']);
             // Route::post('/delivery/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
             Route::post('/expected-time', [DelhiveryServiceController::class, 'getTat']);
