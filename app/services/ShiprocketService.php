@@ -71,7 +71,6 @@ class ShiprocketService
             ->throw()
             ->json();
     }
-
     public function getTatRates(array $params): array  // Get Expected Delivery date
     {
         return $this->client()
@@ -80,6 +79,7 @@ class ShiprocketService
             ->json();
     }
 
+    
     public function assignAwb(int $shipmentId, ?int $courierId = null): array
     {
         $body = ['shipment_id' => $shipmentId];
@@ -90,7 +90,6 @@ class ShiprocketService
             ->throw()
             ->json();
     }
-
     public function generateLabel(array $shipmentIds): array
     {
         return $this->client()
@@ -100,7 +99,6 @@ class ShiprocketService
             ->throw()
             ->json();
     }
-
     public function generatePickup(int $shipmentId): array
     {
         return $this->client()
@@ -110,7 +108,6 @@ class ShiprocketService
             ->throw()
             ->json();
     }
-
     public function trackByAwb(string $awb): array
     {
         return $this->client()
