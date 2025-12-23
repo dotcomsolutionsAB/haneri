@@ -959,7 +959,7 @@ class ShiprocketController extends Controller
             'cod'      => ['required_without:order_id','in:0,1'],
             'weight'   => ['required_without:order_id','numeric','min:0.1'],
 
-            'mode' => ['nullable','string'], // ✅ just string, we normalize ourselves
+            'mode'     => ['nullable','string'], // air/surface
         ]);
 
         if ($v->fails()) {
@@ -971,9 +971,10 @@ class ShiprocketController extends Controller
             ], 422);
         }
 
+        // ✅ build params as string (safe)
         $params = [
-            'pickup_postcode'   => (int) $request->pickup_postcode,
-            'delivery_postcode' => (int) $request->delivery_postcode,
+            'pickup_postcode'   => (string) $request->pickup_postcode,
+            'delivery_postcode' => (string) $request->delivery_postcode,
         ];
 
         if ($request->filled('order_id')) {
@@ -993,35 +994,47 @@ class ShiprocketController extends Controller
             $res = $shiprocket->getCourierRates($params);
 
             $couriers = data_get($res, 'data.available_courier_companies', []);
-
             if (!is_array($couriers)) $couriers = [];
 
-            // If empty → show raw, because Shiprocket usually tells why
-            if (count($couriers) === 0) {
+            // ✅ keep only useful fields
+            $filtered = array_values(array_map(function ($c) {
+                return [
+                    'courier_company_id'       => data_get($c, 'courier_company_id'),
+                    'courier_name'             => data_get($c, 'courier_name'),
+                    'rate'                     => (float) data_get($c, 'rate', 0),
+                    'estimated_delivery_days'  => (int) data_get($c, 'estimated_delivery_days', 0),
+                    'etd'                      => data_get($c, 'etd'),
+                    'mode'                     => ((int) data_get($c, 'mode', 0) === 1) ? 'Air' : 'Surface',
+                    'cod'                      => (int) data_get($c, 'cod', 0),
+                    'rating'                   => (float) data_get($c, 'rating', 0),
+                    'pickup_availability'      => (int) data_get($c, 'pickup_availability', 0),
+                ];
+            }, $couriers));
+
+            if (count($filtered) === 0) {
                 return response()->json([
                     'code' => 200,
                     'success' => true,
-                    'message' => 'No couriers returned for this lane. Check raw response.',
+                    'message' => 'No couriers returned for this lane.',
                     'data' => [
                         'input' => $params,
                         'couriers' => [],
-                        'raw' => $res,
                     ],
                 ]);
             }
 
-            // cheapest / fastest
+            // ✅ cheapest and fastest from filtered
             $cheapest = null;
             $fastest  = null;
 
-            foreach ($couriers as $c) {
-                $rate = (float) data_get($c, 'rate', 0);
-                $etd  = (int) data_get($c, 'estimated_delivery_days', 0);
+            foreach ($filtered as $c) {
+                $rate = (float) ($c['rate'] ?? 0);
+                $days = (int) ($c['estimated_delivery_days'] ?? 0);
 
-                if ($rate > 0 && ($cheapest === null || $rate < (float) data_get($cheapest, 'rate', PHP_FLOAT_MAX))) {
+                if ($rate > 0 && ($cheapest === null || $rate < (float) $cheapest['rate'])) {
                     $cheapest = $c;
                 }
-                if ($etd > 0 && ($fastest === null || $etd < (int) data_get($fastest, 'estimated_delivery_days', PHP_INT_MAX))) {
+                if ($days > 0 && ($fastest === null || $days < (int) $fastest['estimated_delivery_days'])) {
                     $fastest = $c;
                 }
             }
@@ -1034,7 +1047,7 @@ class ShiprocketController extends Controller
                     'input' => $params,
                     'cheapest' => $cheapest,
                     'fastest' => $fastest,
-                    'couriers' => $couriers,
+                    'couriers' => $filtered,
                 ],
             ]);
 
@@ -1047,9 +1060,5 @@ class ShiprocketController extends Controller
             ], 500);
         }
     }
-
-
-
-
 
 }
