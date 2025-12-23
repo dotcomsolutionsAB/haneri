@@ -947,4 +947,84 @@ class ShiprocketController extends Controller
         }
     }
 
+    // Get shipping Cost
+    public function getShippingRates(Request $request, ShiprocketService $shiprocket)
+    {
+        $v = Validator::make($request->all(), [
+            'pickup_postcode'   => ['required','integer'],
+            'delivery_postcode' => ['required','integer'],
+
+            // Either: (order_id) OR (cod + weight). We'll do cod+weight for rate calculation
+            'cod'    => ['required','in:0,1'],     // 1 = COD, 0 = Prepaid
+            'weight' => ['required','numeric','min:0.1'],
+
+            // optional filters
+            'mode' => ['nullable','in:Air,Surface'],               // :contentReference[oaicite:2]{index=2}
+            'declared_value' => ['nullable','numeric','min:0'],    // :contentReference[oaicite:3]{index=3}
+            'length'  => ['nullable','integer','min:1'],           // :contentReference[oaicite:4]{index=4}
+            'breadth' => ['nullable','integer','min:1'],           // :contentReference[oaicite:5]{index=5}
+            'height'  => ['nullable','integer','min:1'],           // :contentReference[oaicite:6]{index=6}
+
+            'is_return'     => ['nullable','in:0,1'],
+            'couriers_type' => ['nullable','in:1'], // documents couriers filter
+            'only_local'    => ['nullable','in:1'], // hyperlocal filter
+            'qc_check'      => ['nullable','in:1'], // works with is_return=1
+        ]);
+
+        if ($v->fails()) {
+            return response()->json([
+                'code' => 422,
+                'success' => false,
+                'message' => 'Validation failed.',
+                'data' => $v->errors(),
+            ], 422);
+        }
+
+        // Build query params exactly for Shiprocket
+        $params = array_filter([
+            'pickup_postcode'   => (int) $request->pickup_postcode,
+            'delivery_postcode' => (int) $request->delivery_postcode,
+            'cod'               => (int) $request->cod,
+            'weight'            => (string) $request->weight,
+
+            'mode'          => $request->mode,
+            'declared_value'=> $request->declared_value !== null ? (int)$request->declared_value : null,
+            'length'        => $request->length !== null ? (int)$request->length : null,
+            'breadth'       => $request->breadth !== null ? (int)$request->breadth : null,
+            'height'        => $request->height !== null ? (int)$request->height : null,
+
+            'is_return'     => $request->is_return !== null ? (int)$request->is_return : null,
+            'couriers_type' => $request->couriers_type !== null ? (int)$request->couriers_type : null,
+            'only_local'    => $request->only_local !== null ? (int)$request->only_local : null,
+            'qc_check'      => $request->qc_check !== null ? (int)$request->qc_check : null,
+        ], fn($x) => $x !== null && $x !== '');
+
+        // Call Shiprocket
+        $res = $shiprocket->checkCourierServiceability($params);
+
+        // Shiprocket usually returns list in: available_courier_companies
+        $companies = data_get($res, 'available_courier_companies', []);
+
+        // Optional: find cheapest
+        $cheapest = null;
+        foreach ($companies as $c) {
+            $rate = (float) data_get($c, 'rate', 0);
+            if ($rate > 0 && ($cheapest === null || $rate < (float) data_get($cheapest, 'rate', PHP_FLOAT_MAX))) {
+                $cheapest = $c;
+            }
+        }
+
+        return response()->json([
+            'code' => 200,
+            'success' => true,
+            'message' => 'Shipping rates fetched.',
+            'data' => [
+                'input' => $params,
+                'cheapest' => $cheapest,
+                'couriers' => $companies,
+                'raw' => $res,
+            ],
+        ]);
+    }
+
 }

@@ -142,7 +142,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/expected-time', [DelhiveryServiceController::class, 'getTat']);
 
             // optional separate setup api
-            Route::post('/auto_ship_setup/{orderId}', [DelhiveryServiceController::class, 'autoShipSetup']);
+            // Route::post('/auto_ship_setup/{orderId}', [DelhiveryServiceController::class, 'autoShipSetup']);
 
             // pickup crud
             Route::post('/pickup/create', [DelhiveryServiceController::class, 'createPickupLocation']); // for create
@@ -156,7 +156,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/create-shipment', [ShiprocketController::class, 'createShipment']);
             Route::post('/punch-order/{order_id}', [ShiprocketController::class, 'punchOrderById']); // Puunch by order
             Route::post('/punch-by-payload', [ShiprocketController::class, 'punchByPayload']); // Punch by payload
-            Route::post('/cancel', [ShiprocketController::class, 'cancelOrder']);
+            Route::post('/cancel', [ShiprocketController::class, 'cancelOrder']);  // Cancel order
+            Route::post('/rates', [ShiprocketController::class, 'getShippingRates']); // get shipping cost
+            
             Route::get('/track/{awb}', [ShiprocketController::class, 'trackAwb']);
         });
 
