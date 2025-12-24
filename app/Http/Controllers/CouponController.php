@@ -45,7 +45,7 @@ class CouponController extends Controller
             ->limit($limit)
             ->offset($offset)
             ->get()
-            ->makeHidden(['id', 'created_at', 'updated_at']);
+            ->makeHidden(['created_at', 'updated_at']);
 
         if ($coupons->isEmpty()) {
             return response()->json([
