@@ -9,10 +9,11 @@ use App\Models\OrderItemModel; // not needed here, ignore
 use App\Models\User; // if needed
 use App\Models\UsersDiscountModel;
 use App\Models\UploadModel;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
-use Str;
 use Illuminate\Support\Facades\Cookie;
+use Str;
 use Hash;
 
 class CartController extends Controller
