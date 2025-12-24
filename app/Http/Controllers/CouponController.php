@@ -9,10 +9,41 @@ class CouponController extends Controller
 {
     //
     // List all coupons
-    public function fetchAll()
+    public function fetchAll(Request $request)
     {
-        $coupons = CouponModel::query()
-            ->orderByDesc('id')
+        $limit  = max(1, (int) $request->input('limit', 10));
+        $offset = max(0, (int) $request->input('offset', 0));
+
+        $coupon_code = trim((string) $request->input('coupon_code', ''));
+        $status      = trim((string) $request->input('status', ''));
+
+        $q = CouponModel::query();
+
+        // ✅ Filter: coupon_code (partial match)
+        if ($coupon_code !== '') {
+            $q->where('coupon_code', 'like', '%' . $coupon_code . '%');
+        }
+
+        // ✅ Filter: status (active / inactive)
+        if ($status !== '') {
+            if (!in_array($status, ['active', 'inactive'], true)) {
+                return response()->json([
+                    'code'    => 422,
+                    'success' => false,
+                    'message' => 'Invalid status. Allowed: active, inactive.',
+                    'data'    => [],
+                ], 422);
+            }
+            $q->where('status', $status);
+        }
+
+        // ✅ Total count before pagination
+        $total = (clone $q)->count();
+
+        // ✅ Pagination: limit + offset
+        $coupons = $q->orderByDesc('id')
+            ->limit($limit)
+            ->offset($offset)
             ->get()
             ->makeHidden(['id', 'created_at', 'updated_at']);
 
@@ -30,7 +61,10 @@ class CouponController extends Controller
             'success' => true,
             'message' => 'Coupons retrieved successfully!',
             'data'    => [
+                'total'   => $total,
                 'count'   => $coupons->count(),
+                'limit'   => $limit,
+                'offset'  => $offset,
                 'coupons' => $coupons,
             ],
         ], 200);
