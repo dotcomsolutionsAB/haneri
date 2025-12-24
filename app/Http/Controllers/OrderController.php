@@ -170,7 +170,7 @@ class OrderController extends Controller
             }
 
             // After successfully adding order items, delete the cart items
-            // CartModel::where('user_id', (string)$user_id)->delete();
+            CartModel::where('user_id', (string)$user_id)->delete();
             /**
              * 🔹 Create initial payment record (in t_payment_records)
              * - status = same as order payment_status (usually "pending" here)

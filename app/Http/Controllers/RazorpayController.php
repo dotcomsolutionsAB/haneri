@@ -126,6 +126,7 @@ class RazorpayController extends Controller
             return redirect()->away(
                 'https://haneri.com/order-complete.php'
                 . '?status=failed'
+                . '&method=' . urlencode('Razorpay')   // ✅ add this
                 . '&order_id=' . urlencode($orderId ?? 0)
             );
         }
@@ -168,9 +169,36 @@ class RazorpayController extends Controller
             return redirect()->away(
                 'https://haneri.com/order-complete.php'
                 . '?status=failed'
+                . '&method=' . urlencode('Razorpay')   // ✅ add this
                 . '&order_id=' . urlencode($orderId)
             );
         }
+        // ✅ Fetch actual payment method from Razorpay (upi/card/netbanking/wallet etc.)
+        $paymentMethod = 'Razorpay';
+        try {
+            $rzpPayment = $this->razorpay->payment->fetch($razorpayPaymentId);
+
+            if (!empty($rzpPayment['method'])) {
+                $paymentMethod = (string) $rzpPayment['method']; // e.g. upi, card, netbanking
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Unable to fetch Razorpay payment method: ' . $e->getMessage());
+        }
+
+        $methodLabel = strtoupper($paymentMethod);
+        $map = [
+            'upi'        => 'UPI',
+            'card'       => 'Card',
+            'netbanking' => 'Net Banking',
+            'wallet'     => 'Wallet',
+            'emi'        => 'EMI',
+            'paylater'   => 'Pay Later',
+        ];
+        $paymentMethodLower = strtolower($paymentMethod);
+        if (isset($map[$paymentMethodLower])) {
+            $methodLabel = $map[$paymentMethodLower];
+        }
+
 
         // ✅ Signature OK ⇒ mark payment as PAID in DB + send email once
         DB::transaction(function () use ($orderId, $razorpayOrderId, $razorpayPaymentId) {
@@ -251,56 +279,13 @@ class RazorpayController extends Controller
         // 🔁 Redirect user to frontend success page
         $redirectUrl = 'https://haneri.com/order-complete.php'
             . '?status=success'
+            . '&method=' . urlencode($methodLabel)   // ✅ ADD THIS
             . '&order_id=' . urlencode($orderId)
             . '&payment_id=' . urlencode($razorpayPaymentId)
             . '&shipping_address=' . urlencode($shippingAddress);
 
         return redirect()->away($redirectUrl);
     }
-
-    // public function createOrder(Request $request)
-    // {
-    //     $request->validate([
-    //         'amount' => 'required|numeric|min:1',
-    //         'currency' => 'required|string|in:INR',
-    //         'receipt' => 'nullable|string',
-    //     ]);
-
-    //     try {
-    //         $orderData = [
-    //             'amount' => $request->amount * 100, // Amount in paise
-    //             'currency' => $request->currency,
-    //             'receipt' => $request->receipt ?? 'order_receipt_' . time(),
-    //             'payment_capture' => 1, // Auto capture payment
-    //         ];
-
-    //         // ✅ Create Order in Razorpay
-    //         $order = $this->razorpay->order->create($orderData);
-
-    //         // ✅ Extract Order ID
-    //         $orderId = $order['id'];
-
-    //         // ✅ Convert Razorpay Order Object to Array Properly
-    //         $orderArray = $order->toArray();
-
-    //         // ✅ Log Response
-    //         \Log::info('Razorpay Order Created:', ['order' => $orderArray]);
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'message' => 'Razorpay order created successfully.',
-    //             'order_id' => $orderId, // Return Order ID separately
-    //             'order' => $orderArray,
-    //         ], 201);
-    //     } catch (Exception $e) {
-    //         \Log::error('Razorpay Order Error:', ['error' => $e->getMessage()]);
-    
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Error creating Razorpay order: ' . $e->getMessage(),
-    //         ], 500);
-    //     }
-    // }
 
     /**
      * Verify Razorpay Payment Signature
