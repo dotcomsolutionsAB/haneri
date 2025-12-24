@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\CartModel;
+use App\Models\QuotationModel;
+use App\Models\OrderItemModel; // not needed here, ignore
+use App\Models\User; // if needed
 use App\Models\UsersDiscountModel;
 use App\Models\UploadModel;
 use Illuminate\Support\Facades\Auth;
@@ -74,6 +77,129 @@ class CartController extends Controller
         unset($cart['id'], $cart['created_at'], $cart['updated_at']);
 
         return response()->json(['message' => 'Item added to cart successfully!', 'data' => $cart], 201);
+    }
+
+    public function createCartFromQuotation(Request $request)
+    {
+        $request->validate([
+            'quotation_id' => ['required', 'integer', 'exists:t_quotations,id'],
+            // optional: if you want to replace cart instead of merge
+            'mode' => ['nullable', 'in:merge,replace'],
+        ]);
+
+        $user = Auth::guard('sanctum')->user();
+        if (!$user) {
+            return response()->json([
+                'message' => 'Unauthorized.',
+                'data' => []
+            ], 401);
+        }
+
+        // ✅ Only architect / dealer
+        if (!in_array($user->role, ['architect', 'dealer'], true)) {
+            return response()->json([
+                'message' => 'Only architect/dealer can create cart from quotation.',
+                'data' => []
+            ], 403);
+        }
+
+        $quotationId = (int) $request->input('quotation_id');
+        $mode = $request->input('mode', 'merge'); // merge by default
+
+        // Load quotation with items
+        $quotation = QuotationModel::with('items')
+            ->where('id', $quotationId)
+            ->first();
+
+        if (!$quotation) {
+            return response()->json([
+                'message' => 'Quotation not found.',
+                'data' => []
+            ], 404);
+        }
+
+        // ✅ Security: ensure this quotation belongs to logged-in user
+        // (If admins should be allowed, add role check and bypass accordingly)
+        if ((int)$quotation->user_id !== (int)$user->id) {
+            return response()->json([
+                'message' => 'You are not allowed to use this quotation.',
+                'data' => []
+            ], 403);
+        }
+
+        if ($quotation->items->isEmpty()) {
+            return response()->json([
+                'message' => 'Quotation has no items.',
+                'data' => []
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $userId = $quotation->user_id; // cart owner (same as quotation user)
+
+            // optional: replace cart
+            if ($mode === 'replace') {
+                CartModel::where('user_id', (string)$userId)->delete();
+            }
+
+            foreach ($quotation->items as $qi) {
+                $productId = (int) $qi->product_id;
+                $variantId = $qi->variant_id ? (int)$qi->variant_id : null;
+                $qty       = max(1, (int)$qi->quantity);
+
+                // Find existing cart row for same product + same variant/null variant
+                $existing = CartModel::where('user_id', (string)$userId)
+                    ->where('product_id', $productId)
+                    ->where(function ($q) use ($variantId) {
+                        if ($variantId) {
+                            $q->where('variant_id', $variantId);
+                        } else {
+                            $q->whereNull('variant_id');
+                        }
+                    })
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing) {
+                    $existing->quantity += $qty;
+                    $existing->save();
+                } else {
+                    CartModel::create([
+                        'user_id'    => (string)$userId,     // important: your cart uses string
+                        'product_id' => $productId,
+                        'variant_id' => $variantId,
+                        'quantity'   => $qty,
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            // Return updated cart (you can also include product/variant if you want)
+            $cart = CartModel::where('user_id', (string)$userId)->get();
+
+            return response()->json([
+                'message' => 'Cart created from quotation successfully!',
+                'data' => [
+                    'quotation_id' => $quotation->id,
+                    'user_id'      => $userId,
+                    'mode'         => $mode,
+                    'cart'         => $cart,
+                ]
+            ], 200);
+
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            \Log::error('createCartFromQuotation failed: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Failed to create cart from quotation.',
+                'data' => [
+                    'error' => $e->getMessage(),
+                ]
+            ], 500);
+        }
     }
 
     // View All Cart Items for a User

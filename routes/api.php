@@ -42,6 +42,8 @@ Route::post('/delivery/track', [DelhiveryServiceController::class, 'trackShipmen
         Route::post('/add', [CartController::class, 'store']);         // Add an item to the cart
         Route::post('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
         Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
+        Route::post('/cart-from-quotation', [CartController::class, 'createCartFromQuotation']);
+
     });
 // });
 
