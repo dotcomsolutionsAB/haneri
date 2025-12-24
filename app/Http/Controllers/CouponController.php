@@ -9,58 +9,93 @@ class CouponController extends Controller
 {
     //
     // List all coupons
-    public function index()
+    public function fetchAll()
     {
-        $coupons = CouponModel::all();  // Get all coupons
+        $coupons = CouponModel::query()
+            ->orderByDesc('id')
+            ->get()
+            ->makeHidden(['id', 'created_at', 'updated_at']);
 
-        return $coupons->isNotEmpty()
-            ? response()->json(['message' => 'Coupons retrieved successfully!', 'data' => $coupons->makeHidden(['id', 'created_at', 'updated_at']), 'count' => count($coupons)], 200)
-            : response()->json(['message' => 'No coupons found.'], 400);
+        if ($coupons->isEmpty()) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'No coupons found.',
+                'data'    => [],
+            ], 404);
+        }
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Coupons retrieved successfully!',
+            'data'    => [
+                'count'   => $coupons->count(),
+                'coupons' => $coupons,
+            ],
+        ], 200);
     }
 
     // Add a new coupon
-    public function store(Request $request)
+    public function create(Request $request)
     {
         // Validate the incoming data
         $request->validate([
-            'code' => 'required|string|unique:t_coupons,code', // Ensure the code is unique
-            'discount_type' => 'required|in:fixed,percentage', // Ensure the discount type is valid
-            'discount_value' => 'required|numeric|min:0', // Ensure the discount value is valid
-            'expiration_date' => 'required|date|after:today', // Expiration date must be after today
-            'usage_limit' => 'nullable|integer|min:1', // Usage limit (optional)
+            'coupon_code'    => 'required|string|max:100|unique:t_coupons,coupon_code',
+            'user_id'        => 'nullable|integer|exists:users,id',
+            'discount_type'  => 'required|in:percentage,price',
+            'discount_value' => 'required|numeric|min:0',
+            'count'          => 'nullable|integer|min:0', // if not passed, default handled below
+            'validity'       => 'required|date', // you can add after_or_equal:today if you want
         ]);
 
         // Create the coupon
         $coupon = CouponModel::create([
-            'code' => $request->input('code'),
-            'discount_type' => $request->input('discount_type'),
+            'coupon_code'    => $request->input('coupon_code'),
+            'user_id'        => $request->input('user_id'),
+            'discount_type'  => $request->input('discount_type'),
             'discount_value' => $request->input('discount_value'),
-            'expiration_date' => $request->input('expiration_date'),
-            'usage_limit' => $request->input('usage_limit', null), // Default to null if not provided
-            'used_count' => 0, // Initialize used count to 0
+            'count'          => $request->input('count', 0),
+            'validity'       => $request->input('validity'),
         ]);
 
-        unset($coupon['id'], $coupon['created_at'], $coupon['updated_at']);
+        // Remove extra fields from response
+        $data = $coupon->toArray();
+        unset($data['id'], $data['created_at'], $data['updated_at']);
 
         // Return the newly created coupon
-        return response()->json(['message' => 'Coupon created successfully!', 'data' => $coupon], 201);
+        return response()->json([
+            'message' => 'Coupon created successfully!',
+            'data'    => $data
+        ], 201);
     }
 
     // Delete a coupon
-    public function destroy($id)
+    public function delete($id)
     {
         // Find the coupon by ID
         $coupon = CouponModel::find($id);
 
         // If coupon doesn't exist, return error
         if (!$coupon) {
-            return response()->json(['message' => 'Coupon not found.'], 404);
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'Coupon not found.',
+                'data'    => [],
+            ], 404);
         }
 
         // Delete the coupon
         $coupon->delete();
 
         // Return success message
-        return response()->json(['message' => 'Coupon deleted successfully!'], 200);
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Coupon deleted successfully!',
+            'data'    => [],
+        ], 200);
     }
+
 }

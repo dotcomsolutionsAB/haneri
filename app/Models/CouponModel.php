@@ -9,5 +9,17 @@ class CouponModel extends Model
     //
     protected $table = 't_coupons';
 
-    protected $fillable = ['code', 'discount_type', 'discount_value', 'expiration_date', 'usage_limit', 'used_count'];
+    protected $fillable = [
+        'coupon_code', 
+        'user_id', 
+        'discount_type', 
+        'discount_value', 
+        'count',
+        'validity'
+    ];
+
+    protected $casts = [
+        'discount_value' => 'float',
+        'validity'       => 'date',
+    ];
 }
