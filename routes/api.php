@@ -207,6 +207,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/create', [CouponController::class, 'create']);          // Add a new coupon
         Route::post('/update/{id}', [CouponController::class, 'update']);          // Add a new coupon
         Route::delete('/delete/{id}', [CouponController::class, 'delete']);  // Delete a coupon
+        Route::post('/check', [CouponController::class, 'checkValidation']);  // Delete a coupon
     });
 
     // Address Routes

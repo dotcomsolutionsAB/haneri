@@ -192,5 +192,72 @@ class CouponController extends Controller
         ], 200);
     }
 
+    // Check validate
+    public function checkValidation(Request $request)
+    {
+        $request->validate([
+            'coupon_code' => ['required', 'string', 'max:100'],
+        ]);
+
+        $code = trim((string) $request->input('coupon_code'));
+
+        $coupon = CouponModel::where('coupon_code', $code)->first();
+
+        // ❌ Not found
+        if (!$coupon) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'Coupon not found.',
+                'data'    => [],
+            ], 404);
+        }
+
+        // ❌ Inactive
+        if (($coupon->status ?? 'inactive') !== 'active') {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Coupon is inactive.',
+                'data'    => [],
+            ], 422);
+        }
+
+        // ❌ Expired (validity is date column)
+        $today = Carbon::today();
+        if (!empty($coupon->validity) && Carbon::parse($coupon->validity)->lt($today)) {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Coupon expired.',
+                'data'    => [],
+            ], 422);
+        }
+
+        // ❌ Usage limit reached (count = remaining uses or allowed uses — you decide)
+        // Here: we assume count = remaining uses
+        if (isset($coupon->count) && (int)$coupon->count <= 0) {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Coupon usage limit reached.',
+                'data'    => [],
+            ], 422);
+        }
+
+        // ✅ Valid coupon
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Coupon is valid.',
+            'data'    => [
+                'coupon_code'     => $coupon->coupon_code,
+                'discount_type'   => $coupon->discount_type,   // percentage / price
+                'discount_value'  => (float) $coupon->discount_value,
+                'validity'        => $coupon->validity,
+                'status'          => $coupon->status,
+            ],
+        ], 200);
+    }
 
 }
