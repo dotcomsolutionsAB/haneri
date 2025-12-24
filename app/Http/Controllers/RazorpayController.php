@@ -172,10 +172,12 @@ class RazorpayController extends Controller
             );
         }
 
-        // ✅ Signature OK ⇒ mark payment as PAID in DB
+        // ✅ Signature OK ⇒ mark payment as PAID in DB + send email once
         DB::transaction(function () use ($orderId, $razorpayOrderId, $razorpayPaymentId) {
+
             $order = OrderModel::where('id', $orderId)
                 ->where('razorpay_order_id', $razorpayOrderId)
+                ->lockForUpdate()
                 ->first();
 
             if (!$order) {
@@ -187,30 +189,62 @@ class RazorpayController extends Controller
             }
 
             // 1️⃣ Update orders.payment_status
-            $order->payment_status = 'paid';   // ENUM: pending, paid, failed, refunded
+            $order->payment_status = 'paid';
             $order->save();
 
-            // 2️⃣ Update / create payment record in t_payment_records
+            // 2️⃣ Update / create payment record
             $payment = PaymentModel::where('order_id', $order->id)
                 ->where('razorpay_order_id', $razorpayOrderId)
                 ->first();
 
             if ($payment) {
-                // update existing pending record
-                $payment->status              = 'paid';      // ENUM mirror
+                $payment->status              = 'paid';
                 $payment->razorpay_payment_id = $razorpayPaymentId;
                 $payment->save();
             } else {
-                // safety fallback – create one if it doesn't exist
                 PaymentModel::create([
-                    'method'             => 'upi',
-                    'razorpay_payment_id'=> $razorpayPaymentId,
-                    'amount'             => $order->total_amount,
-                    'status'             => 'paid',
-                    'order_id'           => $order->id,
-                    'razorpay_order_id'  => $razorpayOrderId,
-                    'user'               => $order->user_id, // column name is `user` in your model
+                    'method'              => 'upi',
+                    'razorpay_payment_id' => $razorpayPaymentId,
+                    'amount'              => $order->total_amount,
+                    'status'              => 'paid',
+                    'order_id'            => $order->id,
+                    'razorpay_order_id'   => $razorpayOrderId,
+                    'user'                => $order->user_id,
                 ]);
+            }
+
+            // ✅ Send email ONCE
+            if ($order->mail_sent_at) {
+                return; // already sent earlier
+            }
+
+            $orderUser = User::find($order->user_id);
+            if (!$orderUser) return;
+
+            $items = OrderItemModel::with(['product:id,name', 'variant:id,variant_type,variant_value'])
+                ->where('order_id', $order->id)
+                ->get()
+                ->map(function($it) {
+                    $vType  = optional($it->variant)->variant_type;
+                    $vValue = optional($it->variant)->variant_value;
+                    $variantLabel = $vValue ? ($vType ? ($vType . ': ' . $vValue) : $vValue) : null;
+
+                    return [
+                        'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
+                        'variant' => $variantLabel,
+                        'qty'     => (int) $it->quantity,
+                        'price'   => (float) $it->price,
+                        'total'   => (float) $it->price * (int)$it->quantity,
+                    ];
+                })
+                ->toArray();
+
+            try {
+                Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
+                $order->mail_sent_at = now();
+                $order->save();
+            } catch (\Throwable $e) {
+                Log::warning('OrderPlacedMail failed in callback for order '.$orderId.': '.$e->getMessage());
             }
         });
 

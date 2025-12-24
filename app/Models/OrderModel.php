@@ -9,7 +9,7 @@ class OrderModel extends Model
     //
     protected $table = 't_orders';
 
-    protected $fillable = ['user_id', 'invoice_id', 'total_amount', 'status', 'payment_status', 'delivery_status', 'shipping_address', 'shipping_charge', 'razorpay_order_id'];
+    protected $fillable = ['user_id', 'invoice_id', 'total_amount', 'status', 'payment_status', 'delivery_status', 'shipping_address', 'shipping_charge', 'razorpay_order_id','mail_sent_at'];
 
      /**
      * Relation to the User table

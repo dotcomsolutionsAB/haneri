@@ -125,6 +125,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/edit/{id}', [UsersDiscountController::class, 'update']); // Update record
             Route::delete('/{id}', [UsersDiscountController::class, 'delete']); // Delete record
         });
+
         // delhivery
         Route::prefix('delivery')->group(function () {
             Route::get('/deliveryone/test', [DelhiveryServiceController::class, 'test']);
@@ -150,7 +151,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/pickup/delete/{id?}', [DelhiveryServiceController::class, 'deletePickupLocation']); // for fetch
 
         });
-
         // Ship Rocket
         Route::prefix('shiprocket')->group(function () {
             Route::post('/create-shipment', [ShiprocketController::class, 'createShipment']);

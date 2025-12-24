@@ -18,6 +18,7 @@ return new class extends Migration
             $table->decimal('total_amount', 10, 2); // Total order amount
             $table->enum('status', ['pending', 'completed', 'cancelled', 'refunded'])->default('pending'); // Order status
             $table->enum('payment_status', ['pending', 'paid', 'failed'])->default('pending'); // Payment status
+            $table->timestamp('mail_sent_at')->nullable()->after('payment_status');
             $table->enum('delivery_status', ['pending', 'accepted', 'arrived', 'completed', 'cancelled'])->default('pending'); // Payment status
             $table->string('shipping_charge');
             $table->text('shipping_address'); // Shipping address

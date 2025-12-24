@@ -27,7 +27,8 @@ class OrderController extends Controller
         // Validate request data
         $request->validate([
             'status' => 'required|in:pending,completed,cancelled,refunded',
-            'payment_status' => 'required|in:pending,paid,failed',
+            // 'payment_status' => 'required|in:pending,paid,failed',
+            'payment_status' => 'pending',
             'shipping_address' => 'required|string',
             'shipping_charge' => 'nullable|numeric|min:0',
             'payment_mode'    => 'nullable|in:Prepaid,COD', // optional, but helpful
@@ -211,14 +212,14 @@ class OrderController extends Controller
                 })
                 ->toArray();
             // Send confirmation email ONLY if payment is already paid
-            if ($order->payment_status === 'paid') {
-                // Send confirmation email (do not block order if email fails)
-                try {
-                    Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
-                } catch (\Throwable $e) {
-                    \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
-                }
-            }
+            // if ($order->payment_status === 'paid') {
+            //     // Send confirmation email (do not block order if email fails)
+            //     try {
+            //         Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
+            //     } catch (\Throwable $e) {
+            //         \Log::warning('OrderPlacedMail failed for order '.$order->id.': '.$e->getMessage());
+            //     }
+            // }
             // Prepare response
             $response = [
                 'message' => 'Order created successfully!',
