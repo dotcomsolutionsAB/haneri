@@ -15,7 +15,8 @@ class CouponModel extends Model
         'discount_type', 
         'discount_value', 
         'count',
-        'validity'
+        'validity',
+        'status'
     ];
 
     protected $casts = [

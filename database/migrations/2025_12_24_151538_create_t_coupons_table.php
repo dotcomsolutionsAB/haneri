@@ -18,6 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id')->nullable()->index();
             $table->enum('discount_type', ['percentage', 'price'])->default('percentage');
             $table->decimal('discount_value', 5, 2); // e.g. 10.00
+            $table->enum('status', ['active', 'inactive'])->default('active');
             $table->unsignedInteger('count')->default(0); // how many times used/allowed (as you decide)
             $table->date('validity'); // validity date
 

@@ -40,33 +40,44 @@ class CouponController extends Controller
     public function create(Request $request)
     {
         // Validate the incoming data
-        $request->validate([
-            'coupon_code'    => 'required|string|max:100|unique:t_coupons,coupon_code',
-            'user_id'        => 'nullable|integer|exists:users,id',
-            'discount_type'  => 'required|in:percentage,price',
-            'discount_value' => 'required|numeric|min:0',
-            'count'          => 'nullable|integer|min:0', // if not passed, default handled below
-            'validity'       => 'required|date', // you can add after_or_equal:today if you want
+        $validator = \Validator::make($request->all(), [
+            'coupon_code'     => 'required|string|max:100|unique:t_coupons,coupon_code',
+            'user_id'         => 'nullable|integer', // optionally you can add exists:users,id
+            'discount_type'   => 'required|in:percentage,price',
+            'discount_value'  => 'required|numeric|min:0',
+            'count'           => 'required|integer|min:0',
+            'validity'        => 'required|date',
+            'status'          => 'nullable|in:active,inactive',
         ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Validation failed.',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
 
         // Create the coupon
         $coupon = CouponModel::create([
             'coupon_code'    => $request->input('coupon_code'),
-            'user_id'        => $request->input('user_id'),
+            'user_id'        => $request->input('user_id', null),
             'discount_type'  => $request->input('discount_type'),
             'discount_value' => $request->input('discount_value'),
-            'count'          => $request->input('count', 0),
+            'count'          => (int) $request->input('count', 0),
             'validity'       => $request->input('validity'),
+            'status'         => $request->input('status', 'active'),
         ]);
 
-        // Remove extra fields from response
-        $data = $coupon->toArray();
-        unset($data['id'], $data['created_at'], $data['updated_at']);
+        // Hide unwanted fields (optional)
+        $coupon->makeHidden(['id', 'created_at', 'updated_at']);
 
-        // Return the newly created coupon
         return response()->json([
+            'code'    => 201,
+            'success' => true,
             'message' => 'Coupon created successfully!',
-            'data'    => $data
+            'data'    => $coupon,
         ], 201);
     }
 
@@ -97,5 +108,55 @@ class CouponController extends Controller
             'data'    => [],
         ], 200);
     }
+
+    // Update Coupon
+    public function update(Request $request, $id)
+    {
+        // Find coupon
+        $coupon = CouponModel::find($id);
+
+        if (!$coupon) {
+            return response()->json([
+                'code'    => 404,
+                'success' => false,
+                'message' => 'Coupon not found.',
+                'data'    => [],
+            ], 404);
+        }
+
+        // Validate
+        $validator = \Validator::make($request->all(), [
+            'coupon_code'    => 'sometimes|required|string|max:100|unique:t_coupons,coupon_code,' . $id,
+            'user_id'        => 'nullable|integer', // optionally: exists:users,id
+            'discount_type'  => 'sometimes|required|in:percentage,price',
+            'discount_value' => 'sometimes|required|numeric|min:0',
+            'count'          => 'sometimes|required|integer|min:0',
+            'validity'       => 'sometimes|required|date',
+            'status'         => 'sometimes|required|in:active,inactive',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Validation failed.',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        // Apply updates (only provided fields)
+        $coupon->fill($validator->validated());
+        $coupon->save();
+
+        $coupon->makeHidden(['id', 'created_at', 'updated_at']);
+
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Coupon updated successfully!',
+            'data'    => $coupon,
+        ], 200);
+    }
+
 
 }
