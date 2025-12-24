@@ -203,7 +203,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
     // Coupon Routes
     Route::prefix('coupons')->group(function () {
-        Route::get('/fetch', [CouponController::class, 'fetchAll']);           // List all coupons
+        Route::post('/fetch', [CouponController::class, 'fetchAll']);           // List all coupons
         Route::post('/create', [CouponController::class, 'create']);          // Add a new coupon
         Route::post('/update/{id}', [CouponController::class, 'update']);          // Add a new coupon
         Route::delete('/delete/{id}', [CouponController::class, 'delete']);  // Delete a coupon

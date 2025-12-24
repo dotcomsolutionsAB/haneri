@@ -40,7 +40,7 @@ class CouponController extends Controller
         // ✅ Total count before pagination
         $total = (clone $q)->count();
 
-        // ✅ Pagination: limit + offset
+        // ✅ Pagination
         $coupons = $q->orderByDesc('id')
             ->limit($limit)
             ->offset($offset)
