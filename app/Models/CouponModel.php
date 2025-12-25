@@ -23,4 +23,9 @@ class CouponModel extends Model
         'discount_value' => 'float',
         'validity'       => 'date',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'id');
+    }
 }

@@ -8,7 +8,6 @@ use Illuminate\Support\Carbon;
 
 class CouponController extends Controller
 {
-    //
     // List all coupons
     public function fetchAll(Request $request)
     {
@@ -17,8 +16,10 @@ class CouponController extends Controller
 
         $coupon_code = trim((string) $request->input('coupon_code', ''));
         $status      = trim((string) $request->input('status', ''));
+        $user_name   = trim((string) $request->input('user_name', ''));
 
-        $q = CouponModel::query();
+        // ✅ base query + join user (for showing name in response)
+        $q = CouponModel::query()->with(['user:id,name']);
 
         // ✅ Filter: coupon_code (partial match)
         if ($coupon_code !== '') {
@@ -38,6 +39,13 @@ class CouponController extends Controller
             $q->where('status', $status);
         }
 
+        // ✅ Filter: user_name (partial match) via relation
+        if ($user_name !== '') {
+            $q->whereHas('user', function ($uq) use ($user_name) {
+                $uq->where('name', 'like', '%' . $user_name . '%');
+            });
+        }
+
         // ✅ Total count before pagination
         $total = (clone $q)->count();
 
@@ -46,7 +54,13 @@ class CouponController extends Controller
             ->limit($limit)
             ->offset($offset)
             ->get()
-            ->makeHidden(['created_at', 'updated_at']);
+            ->makeHidden(['created_at', 'updated_at'])
+            ->map(function ($c) {
+                // ✅ show user_name only (and keep user_id)
+                $c->user_name = optional($c->user)->name;
+                unset($c->user); // remove nested user object
+                return $c;
+            });
 
         if ($coupons->isEmpty()) {
             return response()->json([
