@@ -23,237 +23,13 @@ use App\Models\CouponModel;
 class OrderController extends Controller
 {
     //
-
-    // public function store(Request $request)
-    // {
-    //     // Validate request data
-    //     $request->validate([
-    //         'status' => 'required|in:pending,completed,cancelled,refunded',
-    //         // 'payment_status' => 'required|in:pending,paid,failed',
-    //         'payment_status' => 'pending',
-    //         'shipping_address' => 'required|string',
-    //         'shipping_charge' => 'nullable|numeric|min:0',
-    //         'payment_mode'    => 'nullable|in:Prepaid,COD', // optional, but helpful
-    //     ]);
-
-    //     $user = Auth::user(); 
-
-    //     if ($user->role == 'admin') {
-    //         $request->validate([
-    //             'user_id' => 'required|integer|exists:users,id',
-    //         ]);  
-    //         $user_id =  $request->input('user_id');
-    //     }
-
-    //     else {
-    //         $user_id =  $user->id;
-    //     }
-
-    //     // Fetch user details from User model
-    //     $orderUser = User::find($user_id);
-    //     if (!$orderUser) {
-    //         return response()->json(['message' => 'User not found.'], 404);
-    //     }
-
-    //     $user_name = $orderUser->name;  // Fetch name
-    //     $user_email = $orderUser->email;  // Fetch email
-    //     $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
-
-    //     // Start a transaction to ensure all operations are atomic
-    //     DB::beginTransaction();
-
-    //     try{
-    //         // Fetch all items from the cart for the user
-    //         // $cartItems = CartModel::where('user_id', $user_id)->get();
-    //         $cartItems = CartModel::where('user_id', (string)$user_id)->get();
-
-
-    //         // Check if the cart is empty
-    //         if ($cartItems->isEmpty()) {
-    //             DB::rollBack(); // 🔴 this was missing
-    //             return response()->json(['message' => 'Sorry, cart is empty.'], 400);
-    //         }
-
-    //         // Calculate the total amount by iterating through the cart items
-    //         $totalAmount = 0.0;
-
-    //         foreach ($cartItems as $cartItem) {
-    //             $linePrice = $this->getFinalPrice($orderUser, $cartItem->product_id, $cartItem->variant_id);
-    //             $totalAmount += $linePrice * (int)$cartItem->quantity;
-    //         }
-            
-    //         // shipping charge from request (default 0)
-    //         $shippingCharge = (float) $request->input('shipping_charge', 0);
-    //         // Final payable amount in rupees
-    //         $finalAmount = (float) $totalAmount + (float) $shippingCharge;
-
-    //         // Convert to paise for Razorpay (must be integer)
-    //         // $amountInPaise = (int) round($finalAmount * 100);
-    //         $amountInPaise = (int) ($finalAmount * 100);
-
-    //         // Call Razorpay Order API Before Saving Order in DB
-    //         $razorpayController = new RazorpayController(); 
-    //         $razorpayRequest = new Request([
-    //             'amount'   => $amountInPaise, // paise
-    //             'currency' => 'INR'
-    //         ]);
-    //         $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
-
-
-    //         // Decode Razorpay response
-    //         $razorpayData = json_decode($razorpayResponse->getContent(), true);
-
-    //         if (!($razorpayData['success'] ?? false) || empty($razorpayData['order']['id'])) {
-    //             DB::rollBack();
-    //             return response()->json(['message' => 'Failed to create Razorpay order.'], 500);
-    //         }
-
-    //         // Create the order record
-    //         $order = OrderModel::create([
-    //             'user_id' => $user_id,
-    //             'total_amount' => $finalAmount, // include shipping
-    //             'shipping_charge' => $shippingCharge, // if you have this column (recommended)
-    //             'status' => $request->input('status', 'pending'),
-    //             'payment_status' => $request->input('payment_status', 'pending'),
-    //             'shipping_address' => $request->input('shipping_address'),
-    //             'razorpay_order_id' => $razorpayData['order']['id'],
-    //         ]);
-
-    //         // --- AUTO SHIP SETUP (runs when order is punched) ---
-    //         OrderShipment::create([
-    //             'order_id'        => $order->id,
-    //             'user_id'         => $orderUser->id,
-    //             'courier'         => 'delhivery',
-    //             'status'          => 'setup',
-
-    //             'customer_name'   => $user_name,
-    //             'customer_phone'  => $user_phone,
-    //             'customer_email'  => $user_email,
-    //             'shipping_address'=> $order->shipping_address,
-
-    //             // if you have separate columns for pin/city/state then map them here:
-    //             'shipping_pin'    => $order->shipping_pin ?? null,
-    //             'shipping_city'   => $order->shipping_city ?? null,
-    //             'shipping_state'  => $order->shipping_state ?? null,
-
-    //             // Amounts
-    //             'payment_mode'    => $request->input('payment_mode', 'Prepaid'), // if you store it somewhere
-    //             'total_amount'    => $order->total_amount,
-    //             'cod_amount'      => $request->input('payment_mode') === 'COD'
-    //                                 ? $order->total_amount
-    //                                 : 0,
-
-    //             // Package summary (simple default)
-    //             'quantity'        => $cartItems->sum('quantity'),
-    //             'weight'          => null, // we can set in manual API
-    //             'products_description' => 'Order #'.$order->id.' items',
-
-    //             // Pickup info – if you have configured somewhere, you can fill from config
-    //             'pickup_location_id' => config('shipping.default_pickup.location_id', 1),
-    //             'pickup_name'     => config('shipping.default_pickup.name', 'Default Pickup'),
-    //             'pickup_address'  => config('shipping.default_pickup.address', ''),
-    //             'pickup_pin'      => config('shipping.default_pickup.pin', ''),
-    //             'pickup_city'     => config('shipping.default_pickup.city', ''),
-    //             'pickup_state'    => config('shipping.default_pickup.state', ''),
-    //             'pickup_phone'    => config('shipping.default_pickup.phone', ''),
-    //         ]);
-
-    //         // Iterate through each cart item to add it to the order items table
-    //         foreach ($cartItems as $cartItem) {
-    //             $linePrice = $this->getFinalPrice($orderUser, $cartItem->product_id, $cartItem->variant_id);
-
-    //             OrderItemModel::create([
-    //                 'order_id'   => $order->id,
-    //                 'product_id' => $cartItem->product_id,
-    //                 'variant_id' => $cartItem->variant_id,
-    //                 'quantity'   => $cartItem->quantity,
-    //                 'price'      => $linePrice, // lock the computed selling price
-    //             ]);
-    //         }
-
-    //         // After successfully adding order items, delete the cart items
-    //         CartModel::where('user_id', (string)$user_id)->delete();
-    //         /**
-    //          * 🔹 Create initial payment record (in t_payment_records)
-    //          * - status = same as order payment_status (usually "pending" here)
-    //          * - method = Razorpay (or COD / Prepaid based on your logic)
-    //          * - razorpay_payment_id will be filled later from webhook / callback
-    //          */
-    //         PaymentModel::create([
-    //             'method'             => $request->input('payment_mode', 'razorpay'),
-    //             'razorpay_payment_id'=> null,  // will be updated after successful payment
-    //             'amount'             => $finalAmount,
-    //             'status'             => $request->input('payment_status', 'pending'),
-    //             'order_id'           => $order->id,
-    //             'razorpay_order_id'  => $order->razorpay_order_id,
-    //             'user'               => $user_id, // assuming this column stores user_id
-    //         ]);
-
-    //         // Commit the transaction
-    //         DB::commit();
-
-    //         // Build line items for the email (with product/variant names)
-    //         $items = OrderItemModel::with(['product:id,name', 'variant:id,variant_type,variant_value'])
-    //             ->where('order_id', $order->id)
-    //             ->get()
-    //             ->map(function($it) {
-    //                 // Build a human label like "Size: Large" (fallbacks handled)
-    //                 $vType  = optional($it->variant)->variant_type;
-    //                 $vValue = optional($it->variant)->variant_value;
-    //                 $variantLabel = $vValue
-    //                     ? ($vType ? ($vType . ': ' . $vValue) : $vValue)
-    //                     : null;
-
-    //                 return [
-    //                     'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
-    //                     'variant' => $variantLabel,
-    //                     'qty'     => (int) $it->quantity,
-    //                     'price'   => (float) $it->price,
-    //                     'total'   => (float) $it->price * (int)$it->quantity,
-    //                 ];
-    //             })
-    //             ->toArray();
-
-    //         // Prepare response
-    //         $response = [
-    //             'message' => 'Order created successfully!',
-    //             'data' => [
-    //                 'order_id' => $order->id,
-    //                 'total_amount' => $order->total_amount,
-    //                 'status' => $order->status,
-    //                 'payment_status' => $order->payment_status,
-    //                 'shipping_address' => $order->shipping_address,
-    //                 'razorpay_order_id' => $order->razorpay_order_id,
-    //                 'name' => $user_name,
-    //                 'email' => $user_email, 
-    //                 'phone' => $user_phone, 
-    //             ]
-    //         ];
-
-    //         // Return success response
-    //         return response()->json(['message' => 'Order created successfully!', 'data' => $response], 201);
-    //     }
-
-    //     catch(\Exception $e)
-    //     {
-    //         // Log the exception for debugging
-    //         \Log::error('Failed to create order: ' . $e->getMessage());
-
-    //         // In case of any failure, roll back the transaction
-    //         DB::rollBack();
-
-    //         // Return error response
-    //         return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
-    //     }
-    // }
-
     public function store(Request $request)
     {
         // Validate request data
         $request->validate([
             'status' => 'required|in:pending,completed,cancelled,refunded',
-            // 'payment_status' => 'required|in:pending,paid,failed',
-            'payment_status' => 'pending',
+            'payment_status' => 'required|in:pending,paid,failed',
+            // 'payment_status' => 'pending',
             'shipping_address' => 'required|string',
             'shipping_charge' => 'nullable|numeric|min:0',
             'payment_mode'    => 'nullable|in:Prepaid,COD', // optional, but helpful
@@ -522,7 +298,6 @@ class OrderController extends Controller
         $selling = $regular * (1 - ($discountPercent / 100));
         return round($selling, 2);
     }
-
     // Replace your getFinalPrice with this version (note it needs $user)
     private function getFinalPrice(User $user, int $product_id, ?int $variant_id = null): float
     {
@@ -568,6 +343,229 @@ class OrderController extends Controller
         $regular = (float) ($variant->regular_price ?? 0);
         return $this->price($regular, (float)$userDiscount);
     }
+
+    // public function store(Request $request)
+    // {
+    //     // Validate request data
+    //     $request->validate([
+    //         'status' => 'required|in:pending,completed,cancelled,refunded',
+    //         // 'payment_status' => 'required|in:pending,paid,failed',
+    //         'payment_status' => 'pending',
+    //         'shipping_address' => 'required|string',
+    //         'shipping_charge' => 'nullable|numeric|min:0',
+    //         'payment_mode'    => 'nullable|in:Prepaid,COD', // optional, but helpful
+    //     ]);
+
+    //     $user = Auth::user(); 
+
+    //     if ($user->role == 'admin') {
+    //         $request->validate([
+    //             'user_id' => 'required|integer|exists:users,id',
+    //         ]);  
+    //         $user_id =  $request->input('user_id');
+    //     }
+
+    //     else {
+    //         $user_id =  $user->id;
+    //     }
+
+    //     // Fetch user details from User model
+    //     $orderUser = User::find($user_id);
+    //     if (!$orderUser) {
+    //         return response()->json(['message' => 'User not found.'], 404);
+    //     }
+
+    //     $user_name = $orderUser->name;  // Fetch name
+    //     $user_email = $orderUser->email;  // Fetch email
+    //     $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
+
+    //     // Start a transaction to ensure all operations are atomic
+    //     DB::beginTransaction();
+
+    //     try{
+    //         // Fetch all items from the cart for the user
+    //         // $cartItems = CartModel::where('user_id', $user_id)->get();
+    //         $cartItems = CartModel::where('user_id', (string)$user_id)->get();
+
+
+    //         // Check if the cart is empty
+    //         if ($cartItems->isEmpty()) {
+    //             DB::rollBack(); // 🔴 this was missing
+    //             return response()->json(['message' => 'Sorry, cart is empty.'], 400);
+    //         }
+
+    //         // Calculate the total amount by iterating through the cart items
+    //         $totalAmount = 0.0;
+
+    //         foreach ($cartItems as $cartItem) {
+    //             $linePrice = $this->getFinalPrice($orderUser, $cartItem->product_id, $cartItem->variant_id);
+    //             $totalAmount += $linePrice * (int)$cartItem->quantity;
+    //         }
+            
+    //         // shipping charge from request (default 0)
+    //         $shippingCharge = (float) $request->input('shipping_charge', 0);
+    //         // Final payable amount in rupees
+    //         $finalAmount = (float) $totalAmount + (float) $shippingCharge;
+
+    //         // Convert to paise for Razorpay (must be integer)
+    //         // $amountInPaise = (int) round($finalAmount * 100);
+    //         $amountInPaise = (int) ($finalAmount * 100);
+
+    //         // Call Razorpay Order API Before Saving Order in DB
+    //         $razorpayController = new RazorpayController(); 
+    //         $razorpayRequest = new Request([
+    //             'amount'   => $amountInPaise, // paise
+    //             'currency' => 'INR'
+    //         ]);
+    //         $razorpayResponse = $razorpayController->createOrder($razorpayRequest);
+
+
+    //         // Decode Razorpay response
+    //         $razorpayData = json_decode($razorpayResponse->getContent(), true);
+
+    //         if (!($razorpayData['success'] ?? false) || empty($razorpayData['order']['id'])) {
+    //             DB::rollBack();
+    //             return response()->json(['message' => 'Failed to create Razorpay order.'], 500);
+    //         }
+
+    //         // Create the order record
+    //         $order = OrderModel::create([
+    //             'user_id' => $user_id,
+    //             'total_amount' => $finalAmount, // include shipping
+    //             'shipping_charge' => $shippingCharge, // if you have this column (recommended)
+    //             'status' => $request->input('status', 'pending'),
+    //             'payment_status' => $request->input('payment_status', 'pending'),
+    //             'shipping_address' => $request->input('shipping_address'),
+    //             'razorpay_order_id' => $razorpayData['order']['id'],
+    //         ]);
+
+    //         // --- AUTO SHIP SETUP (runs when order is punched) ---
+    //         OrderShipment::create([
+    //             'order_id'        => $order->id,
+    //             'user_id'         => $orderUser->id,
+    //             'courier'         => 'delhivery',
+    //             'status'          => 'setup',
+
+    //             'customer_name'   => $user_name,
+    //             'customer_phone'  => $user_phone,
+    //             'customer_email'  => $user_email,
+    //             'shipping_address'=> $order->shipping_address,
+
+    //             // if you have separate columns for pin/city/state then map them here:
+    //             'shipping_pin'    => $order->shipping_pin ?? null,
+    //             'shipping_city'   => $order->shipping_city ?? null,
+    //             'shipping_state'  => $order->shipping_state ?? null,
+
+    //             // Amounts
+    //             'payment_mode'    => $request->input('payment_mode', 'Prepaid'), // if you store it somewhere
+    //             'total_amount'    => $order->total_amount,
+    //             'cod_amount'      => $request->input('payment_mode') === 'COD'
+    //                                 ? $order->total_amount
+    //                                 : 0,
+
+    //             // Package summary (simple default)
+    //             'quantity'        => $cartItems->sum('quantity'),
+    //             'weight'          => null, // we can set in manual API
+    //             'products_description' => 'Order #'.$order->id.' items',
+
+    //             // Pickup info – if you have configured somewhere, you can fill from config
+    //             'pickup_location_id' => config('shipping.default_pickup.location_id', 1),
+    //             'pickup_name'     => config('shipping.default_pickup.name', 'Default Pickup'),
+    //             'pickup_address'  => config('shipping.default_pickup.address', ''),
+    //             'pickup_pin'      => config('shipping.default_pickup.pin', ''),
+    //             'pickup_city'     => config('shipping.default_pickup.city', ''),
+    //             'pickup_state'    => config('shipping.default_pickup.state', ''),
+    //             'pickup_phone'    => config('shipping.default_pickup.phone', ''),
+    //         ]);
+
+    //         // Iterate through each cart item to add it to the order items table
+    //         foreach ($cartItems as $cartItem) {
+    //             $linePrice = $this->getFinalPrice($orderUser, $cartItem->product_id, $cartItem->variant_id);
+
+    //             OrderItemModel::create([
+    //                 'order_id'   => $order->id,
+    //                 'product_id' => $cartItem->product_id,
+    //                 'variant_id' => $cartItem->variant_id,
+    //                 'quantity'   => $cartItem->quantity,
+    //                 'price'      => $linePrice, // lock the computed selling price
+    //             ]);
+    //         }
+
+    //         // After successfully adding order items, delete the cart items
+    //         CartModel::where('user_id', (string)$user_id)->delete();
+    //         /**
+    //          * 🔹 Create initial payment record (in t_payment_records)
+    //          * - status = same as order payment_status (usually "pending" here)
+    //          * - method = Razorpay (or COD / Prepaid based on your logic)
+    //          * - razorpay_payment_id will be filled later from webhook / callback
+    //          */
+    //         PaymentModel::create([
+    //             'method'             => $request->input('payment_mode', 'razorpay'),
+    //             'razorpay_payment_id'=> null,  // will be updated after successful payment
+    //             'amount'             => $finalAmount,
+    //             'status'             => $request->input('payment_status', 'pending'),
+    //             'order_id'           => $order->id,
+    //             'razorpay_order_id'  => $order->razorpay_order_id,
+    //             'user'               => $user_id, // assuming this column stores user_id
+    //         ]);
+
+    //         // Commit the transaction
+    //         DB::commit();
+
+    //         // Build line items for the email (with product/variant names)
+    //         $items = OrderItemModel::with(['product:id,name', 'variant:id,variant_type,variant_value'])
+    //             ->where('order_id', $order->id)
+    //             ->get()
+    //             ->map(function($it) {
+    //                 // Build a human label like "Size: Large" (fallbacks handled)
+    //                 $vType  = optional($it->variant)->variant_type;
+    //                 $vValue = optional($it->variant)->variant_value;
+    //                 $variantLabel = $vValue
+    //                     ? ($vType ? ($vType . ': ' . $vValue) : $vValue)
+    //                     : null;
+
+    //                 return [
+    //                     'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
+    //                     'variant' => $variantLabel,
+    //                     'qty'     => (int) $it->quantity,
+    //                     'price'   => (float) $it->price,
+    //                     'total'   => (float) $it->price * (int)$it->quantity,
+    //                 ];
+    //             })
+    //             ->toArray();
+
+    //         // Prepare response
+    //         $response = [
+    //             'message' => 'Order created successfully!',
+    //             'data' => [
+    //                 'order_id' => $order->id,
+    //                 'total_amount' => $order->total_amount,
+    //                 'status' => $order->status,
+    //                 'payment_status' => $order->payment_status,
+    //                 'shipping_address' => $order->shipping_address,
+    //                 'razorpay_order_id' => $order->razorpay_order_id,
+    //                 'name' => $user_name,
+    //                 'email' => $user_email, 
+    //                 'phone' => $user_phone, 
+    //             ]
+    //         ];
+
+    //         // Return success response
+    //         return response()->json(['message' => 'Order created successfully!', 'data' => $response], 201);
+    //     }
+
+    //     catch(\Exception $e)
+    //     {
+    //         // Log the exception for debugging
+    //         \Log::error('Failed to create order: ' . $e->getMessage());
+
+    //         // In case of any failure, roll back the transaction
+    //         DB::rollBack();
+
+    //         // Return error response
+    //         return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
+    //     }
+    // }
 
     // View all orders for a user    
     public function index(Request $request)
