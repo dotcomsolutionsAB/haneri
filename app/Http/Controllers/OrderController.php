@@ -164,6 +164,17 @@ class OrderController extends Controller
                 'razorpay_order_id' => $razorpayData['order']['id'],
             ]);
 
+            $ship = $this->parseShippingAddress((string) $order->shipping_address);
+
+            // these three you asked for:
+            $shippingPin   = $ship['pin'] ?? null;
+            $shippingCity  = $ship['city'] ?? null;
+            $shippingState = $ship['state'] ?? null;
+
+            // (optional) if you want to use extracted customer name/phone instead of profile values:
+            $shipCustomerName  = $ship['name']  ?: $user_name;
+            $shipCustomerPhone = $ship['phone'] ?: $user_phone;
+
             // --- AUTO SHIP SETUP (runs when order is punched) ---
             OrderShipment::create([
                 'order_id'        => $order->id,
@@ -171,15 +182,15 @@ class OrderController extends Controller
                 'courier'         => 'delhivery',
                 'status'          => 'setup',
 
-                'customer_name'   => $user_name,
-                'customer_phone'  => $user_phone,
+                'customer_name'   => $shipCustomerName,   // optional override from shipping_address
+                'customer_phone'  => $shipCustomerPhone,  // optional override from shipping_address
                 'customer_email'  => $user_email,
                 'shipping_address'=> $order->shipping_address,
 
                 // if you have separate columns for pin/city/state then map them here:
-                'shipping_pin'    => $order->shipping_pin ?? null,
-                'shipping_city'   => $order->shipping_city ?? null,
-                'shipping_state'  => $order->shipping_state ?? null,
+                'shipping_pin'    => $shippingPin,
+                'shipping_city'   => $shippingCity,
+                'shipping_state'  => $shippingState,
 
                 // Amounts
                 'payment_mode'    => $request->input('payment_mode', 'Prepaid'), // if you store it somewhere
@@ -290,6 +301,49 @@ class OrderController extends Controller
             // Return error response
             return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
         }
+    }
+    // Address parse
+    private function parseShippingAddress(string $raw): array
+    {
+        // Example raw:
+        // "Dhruv Taneja, 9310449009, Faridabad, Haryana, India, 121007, 1157, Sector 15"
+
+        $parts = array_values(array_filter(array_map('trim', explode(',', $raw)), fn($v) => $v !== ''));
+
+        $name    = $parts[0] ?? null;
+        $phone   = $parts[1] ?? null;
+        $city    = $parts[2] ?? null;
+        $state   = $parts[3] ?? null;
+        $country = $parts[4] ?? null;
+        $pin     = $parts[5] ?? null;
+
+        // Everything after pin is address parts
+        $addrParts = array_slice($parts, 6);
+
+        // As per your requirement:
+        // address line 1 = "1157, Sector 15" (take next 2 parts if available)
+        // if more than that => address line 2
+        $line1 = null;
+        $line2 = null;
+
+        if (count($addrParts) >= 2) {
+            $line1 = trim($addrParts[0] . ', ' . $addrParts[1]);
+            $line2 = count($addrParts) > 2 ? trim(implode(', ', array_slice($addrParts, 2))) : null;
+        } elseif (count($addrParts) === 1) {
+            $line1 = $addrParts[0];
+        }
+
+        return [
+            'name'     => $name,
+            'phone'    => $phone,
+            'city'     => $city,
+            'state'    => $state,
+            'country'  => $country,
+            'pin'      => $pin,
+            'line1'    => $line1,
+            'line2'    => $line2,
+            'parts'    => $parts,
+        ];
     }
     // Add this helper if you don’t already have it in this controller
     private function price(float $regular, float $discountPercent = 0): float
