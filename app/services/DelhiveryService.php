@@ -61,26 +61,62 @@ class DelhiveryService
         }
     }
 
-    public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
+    // public function getShippingCost($originPin, $destinationPin, $codAmount, $weight, $paymentType = 'Pre-paid')
+    // {
+    //     $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
+
+    //     try {
+    //         $response = $this->client->get($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //                 'Content-Type'  => 'application/json',
+    //                 'Accept'        => 'application/json',
+    //             ],
+    //             'query' => [
+    //                 'md'  => 'E',
+    //                 'ss'  => 'Delivered',
+    //                 'd_pin' => $destinationPin,
+    //                 'o_pin' => $originPin,
+    //                 'cgm'  => $weight,
+    //                 'pt'   => $paymentType,
+    //                 'cod'  => $paymentType === 'COD' ? $codAmount : 0,
+    //             ],
+    //         ]);
+
+    //         return json_decode($response->getBody()->getContents(), true);
+
+    //     } catch (ClientException $e) {
+    //         $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+    //         Log::error('Delhivery API Client Error (shipping cost): ' . json_encode($responseBody));
+    //         return ['error' => 'API Error: ' . ($responseBody['detail'] ?? $e->getMessage())];
+    //     } catch (\Exception $e) {
+    //         Log::error("Shipping cost calculation failed: " . $e->getMessage());
+    //         return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
+    //     }
+    // }
+    public function getShippingCost( string $originPin, string $destinationPin, float $codAmount, int $weightGrams, string $paymentType = 'Pre-paid', string $mode = 'E', string $shipmentStatus = 'Delivered') 
     {
         $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
 
         try {
+            $query = [
+                'md'    => $mode,            // E / S
+                'ss'    => $shipmentStatus,  // Delivered / RTO / DTO
+                'd_pin' => $destinationPin,
+                'o_pin' => $originPin,
+                'cgm'   => $weightGrams,     // ✅ grams
+            ];
+
+            // If your account supports these, keep them; otherwise you can remove them safely.
+            $query['pt']  = $paymentType;
+            $query['cod'] = ($paymentType === 'COD') ? $codAmount : 0;
+
             $response = $this->client->get($endpoint, [
                 'headers' => [
                     'Authorization' => 'Token ' . $this->apiKey,
-                    'Content-Type'  => 'application/json',
                     'Accept'        => 'application/json',
                 ],
-                'query' => [
-                    'md'  => 'E',
-                    'ss'  => 'Delivered',
-                    'd_pin' => $destinationPin,
-                    'o_pin' => $originPin,
-                    'cgm'  => $weight,
-                    'pt'   => $paymentType,
-                    'cod'  => $paymentType === 'COD' ? $codAmount : 0,
-                ],
+                'query' => $query,
             ]);
 
             return json_decode($response->getBody()->getContents(), true);
@@ -94,6 +130,7 @@ class DelhiveryService
             return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
         }
     }
+
 
     public function placeOrder(array $orderData): array
     {

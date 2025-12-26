@@ -205,13 +205,13 @@ class OrderController extends Controller
                 'products_description' => 'Order #'.$order->id.' items',
 
                 // Pickup info – if you have configured somewhere, you can fill from config
-                'pickup_location_id' => config('shipping.default_pickup.location_id', 1),
-                'pickup_name'     => config('shipping.default_pickup.name', 'Default Pickup'),
-                'pickup_address'  => config('shipping.default_pickup.address', ''),
-                'pickup_pin'      => config('shipping.default_pickup.pin', ''),
-                'pickup_city'     => config('shipping.default_pickup.city', ''),
-                'pickup_state'    => config('shipping.default_pickup.state', ''),
-                'pickup_phone'    => config('shipping.default_pickup.phone', ''),
+                'pickup_location_id' => config('shipping.pickup.location_id', 1),
+                'pickup_name'     => config('shipping.pickup.name', 'Default Pickup'),
+                'pickup_address'  => config('shipping.pickup.address', ''),
+                'pickup_pin'      => config('shipping.pickup.pin', ''),
+                'pickup_city'     => config('shipping.pickup.city', ''),
+                'pickup_state'    => config('shipping.pickup.state', ''),
+                'pickup_phone'    => config('shipping.pickup.phone', ''),
             ]);
 
             // Iterate through each cart item to add it to the order items table
