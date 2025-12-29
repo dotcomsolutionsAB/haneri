@@ -949,7 +949,9 @@ class OrderController extends Controller
             // 3) Build query
             $query = OrderModel::with([
                 'user:id,name,email,mobile,role,selected_type,gstin',
-                'payments:id,order_id,amount,status,created_at'
+                'payments:id,order_id,amount,status,created_at',
+                // ✅ add this
+                'latestShipment:id,order_id,courier,status,customer_name,customer_phone,customer_email,awb_no,courier_reference,booked_at'
             ]);
 
             // Order ID filter
@@ -1013,6 +1015,32 @@ class OrderController extends Controller
             // 6) Optional shaping (format money to 2 decimals)
             $money = fn ($v) => number_format((float) $v, 2, '.', '');
             $data  = $orders->map(function ($o) use ($money) {
+
+                $sh = $o->latestShipment;
+                $shipmentData = ['status' => 'pending']; // default if not eligible
+
+                if ($sh) {
+                    $shouldShowDetails =
+                        ($sh->status === 'pending')
+                        || !empty($sh->awb_no)
+                        || !empty($sh->booked_at);
+
+                    if ($shouldShowDetails) {
+                        $shipmentData = [
+                            'id'             => $sh->id,
+                            'order_id'        => $sh->order_id,
+                            'status'          => $sh->status,
+                            'courier'         => $sh->courier,
+                            'customer_name'   => $sh->customer_name,
+                            'customer_phone'  => $sh->customer_phone,
+                            'customer_email'  => $sh->customer_email,
+                            'awb_no'          => $sh->awb_no ?: null,
+                            'courier_reference' => $sh->courier_reference ?: null,
+                            'booked_at'       => optional($sh->booked_at)->toIso8601String(),
+                        ];
+                    }
+                }
+
                 return [
                     'id'                => $o->id,
                     'total_amount'      => $money($o->total_amount),
@@ -1038,6 +1066,7 @@ class OrderController extends Controller
                             'created_at' => optional($p->created_at)->toIso8601String(),
                         ])->values()
                         : [],
+                    'shipment'           => $shipmentData,   // ✅ ADD THIS
                 ];
             })->values();
 
@@ -1133,6 +1162,7 @@ class OrderController extends Controller
             'payments' => function ($pq) {
                 $pq->select('id','order_id','amount','status','created_at');
             },
+            
         ])->find($id);
 
         if (!$order) {

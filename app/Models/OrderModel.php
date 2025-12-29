@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\OrderShipment;
 
 class OrderModel extends Model
 {
@@ -46,6 +47,10 @@ class OrderModel extends Model
     public function shipments()
     {
         return $this->hasMany(OrderShipment::class, 'order_id', 'id');
+    }
+    public function latestShipment()
+    {
+        return $this->hasOne(OrderShipment::class, 'order_id')->latestOfMany();
     }
 
 }
