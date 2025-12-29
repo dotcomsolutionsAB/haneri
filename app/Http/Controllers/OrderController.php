@@ -950,8 +950,20 @@ class OrderController extends Controller
             $query = OrderModel::with([
                 'user:id,name,email,mobile,role,selected_type,gstin',
                 'payments:id,order_id,amount,status,created_at',
-                // ✅ add this
-                'latestShipment:id,order_id,courier,status,customer_name,customer_phone,customer_email,awb_no,courier_reference,booked_at'
+                'latestShipment' => function ($q) {
+                    $q->select([
+                        't_order_shipments.id',
+                        't_order_shipments.order_id',
+                        't_order_shipments.courier',
+                        't_order_shipments.status',
+                        't_order_shipments.customer_name',
+                        't_order_shipments.customer_phone',
+                        't_order_shipments.customer_email',
+                        't_order_shipments.awb_no',
+                        't_order_shipments.courier_reference',
+                        't_order_shipments.booked_at',
+                    ]);
+                },
             ]);
 
             // Order ID filter
