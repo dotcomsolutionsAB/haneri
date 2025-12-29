@@ -164,24 +164,20 @@ class DelhiveryServiceController extends Controller
     //         'data'    => $response,
     //     ]);
     // }
+
     public function getShippingCost(Request $request)
     {
+        // ✅ Your rules: prepaid always, cod always 0, ss always Delivered
         $validator = Validator::make($request->all(), [
-            'through'   => 'required|in:order,simple',
+            'through' => 'required|in:order,simple',
 
-            // when through = order
-            'order_id'  => 'required_if:through,order|integer|exists:t_orders,id',
+            // through = order
+            'order_id' => 'required_if:through,order|integer|exists:t_orders,id',
 
-            // when through = simple
+            // through = simple
             'origin_pin'      => 'required_if:through,simple|digits:6',
             'destination_pin' => 'required_if:through,simple|digits:6',
-            'cod_amount'      => 'required_if:through,simple|numeric|min:0',
-            'weight'          => 'required_if:through,simple|numeric|min:0.01', // assume KG
-            'payment_type'    => 'nullable|in:Pre-paid,COD',
-
-            // ✅ optional filters for Delhivery
-            'mode'            => 'nullable|in:E,S',
-            'shipment_status' => 'nullable|in:Delivered,RTO,DTO',
+            'weight'          => 'required_if:through,simple|numeric|min:0.01',
         ]);
 
         if ($validator->fails()) {
@@ -194,9 +190,10 @@ class DelhiveryServiceController extends Controller
         }
 
         $through = $request->input('through');
-        $mode    = $request->input('mode', 'E');
-        $ss      = $request->input('shipment_status', 'Delivered');
 
+        // =========================
+        // Resolve pins + weight
+        // =========================
         if ($through === 'order') {
             $orderId = (int) $request->input('order_id');
 
@@ -212,107 +209,101 @@ class DelhiveryServiceController extends Controller
 
             $originPin      = $shipment->pickup_pin;
             $destinationPin = $shipment->shipping_pin;
+            $weightInput    = $shipment->weight ?? 1; // assume kg in DB; adjust if you store grams
 
-            // ✅ assume DB weight is in KG; convert to grams for Delhivery
-            $weightKg    = (float) ($shipment->weight ?? 1);
-            $weightGrams = (int) round($weightKg * 1000);
-
-            $paymentMode = $shipment->payment_mode ?? 'Pre-paid';
-            $paymentType = ($paymentMode === 'COD') ? 'COD' : 'Pre-paid';
-
-            $codAmount = ($paymentType === 'COD')
-                ? (float) ($shipment->cod_amount ?? $shipment->total_amount ?? 0)
-                : 0.0;
-
+            if (!$originPin || !$destinationPin) {
+                return response()->json([
+                    'code'    => 422,
+                    'success' => false,
+                    'message' => 'Pickup pin / Shipping pin missing in shipment record.',
+                    'data'    => [],
+                ], 422);
+            }
         } else {
             $originPin      = $request->input('origin_pin');
             $destinationPin = $request->input('destination_pin');
-
-            $paymentType = $request->input('payment_type', 'Pre-paid');
-            $codAmount   = ($paymentType === 'COD') ? (float) $request->input('cod_amount') : 0.0;
-
-            // ✅ assume request weight is KG; convert to grams for Delhivery
-            $weightKg    = (float) $request->input('weight');
-            $weightGrams = (int) round($weightKg * 1000);
+            $weightInput    = $request->input('weight'); // in KG as per your payload
         }
+
+        // Delhivery expects cgm in GRAMS (doc: "Only in Grams Unit") :contentReference[oaicite:2]{index=2}
+        $cgm = $this->toDelhiveryGrams($weightInput);
+
+        $baseQuery = [
+            'ss'    => 'Delivered',     // ✅ delivery only (no RTO)
+            'd_pin' => $destinationPin,
+            'o_pin' => $originPin,
+            'cgm'   => $cgm,
+            'pt'    => 'Pre-paid',      // ✅ always prepaid
+            'cod'   => 0,               // ✅ always 0
+        ];
 
         $delhiveryService = new DelhiveryService();
 
-        $response = $delhiveryService->getShippingCost(
-            originPin: $originPin,
-            destinationPin: $destinationPin,
-            codAmount: $codAmount,
-            weightGrams: $weightGrams,
-            paymentType: $paymentType,
-            mode: $mode,
-            shipmentStatus: $ss
-        );
-
-        if (isset($response['error'])) {
-            return response()->json([
-                'code'    => 400,
-                'success' => false,
-                'message' => $response['error'],
-                'data'    => [],
-            ], 400);
-        }
-
-        // Delhivery returns array; take first item
-        $row = $response[0] ?? null;
-        if (!is_array($row)) {
-            return response()->json([
-                'code'    => 400,
-                'success' => false,
-                'message' => 'Unexpected Delhivery response format.',
-                'data'    => $response,
-            ], 400);
-        }
-
-        // ✅ Clean, short response (only important fields + rounding)
-        $tax = $row['tax_data'] ?? [];
-        $chargeKeys = [
-            'charge_DL' => 'delivery',
-            'charge_COD' => 'cod',
-            'charge_DPH' => 'dph',
-            'charge_LM' => 'last_mile',
-            'charge_pickup' => 'pickup',
+        // =========================
+        // 4 blocks as you want
+        // =========================
+        $shippings = [
+            'air' => [
+                'normal'  => $delhiveryService->getShippingCostBlock($baseQuery, 'E', 'normal'),
+                'express' => $delhiveryService->getShippingCostBlock($baseQuery, 'E', 'express'),
+            ],
+            'surface' => [
+                'normal'  => $delhiveryService->getShippingCostBlock($baseQuery, 'S', 'normal'),
+                'express' => $delhiveryService->getShippingCostBlock($baseQuery, 'S', 'express'),
+            ],
         ];
 
-        $charges = [];
-        foreach ($chargeKeys as $k => $label) {
-            $val = (float) ($row[$k] ?? 0);
-            if (abs($val) > 0.0001) {
-                $charges[$label] = round($val, 2);
+        // If EVERYTHING failed, return failure.
+        $allFailed = true;
+        foreach ($shippings as $mode) {
+            foreach ($mode as $tier) {
+                if (!empty($tier['ok'])) {
+                    $allFailed = false;
+                    break 2;
+                }
             }
         }
 
-        $clean = [
-            'zone'          => $row['zone'] ?? null,
-            'status'        => $row['status'] ?? null,
-            'charged_weight'=> (float) ($row['charged_weight'] ?? 0),
-            'gross_amount'  => round((float)($row['gross_amount'] ?? 0), 2),
-            'tax' => [
-                'cgst' => round((float)($tax['CGST'] ?? 0), 2),
-                'sgst' => round((float)($tax['SGST'] ?? 0), 2),
-                'igst' => round((float)($tax['IGST'] ?? 0), 2),
-            ],
-            'charges'       => $charges,
-            'total_amount'  => round((float)($row['total_amount'] ?? 0), 2),
-            'meta' => [
-                'mode' => $mode,
-                'shipment_status' => $ss,
-                'weight_grams_sent' => $weightGrams,
-                'payment_type' => $paymentType,
-                'cod_sent' => ($paymentType === 'COD') ? round((float)$codAmount, 2) : 0,
-            ],
-        ];
+        if ($allFailed) {
+            return response()->json([
+                'code'    => 400,
+                'success' => false,
+                'message' => 'Delhivery shipping cost fetch failed for all modes.',
+                'through' => $through,
+                'data'    => ['shippings' => $shippings],
+            ], 400);
+        }
 
         return response()->json([
             'code'    => 200,
             'success' => true,
             'message' => 'Shipping cost fetched.',
-            'data'    => $clean,
+            'through' => $through,
+            'data'    => [
+                'shippings' => $shippings,
+            ],
         ]);
+    }
+
+    /**
+     * Delhivery API wants grams (cgm).
+     * If user gives 1 (kg) => 1000 grams
+     * If someone passes already big number (e.g., 1200) we treat it as grams.
+     */
+    private function toDelhiveryGrams($weightInput): int
+    {
+        $w = (float) $weightInput;
+
+        if ($w <= 0) return 1000;
+
+        // Heuristic:
+        // - If <= 50 => treat as KG and convert to grams
+        // - If > 50 => likely already grams
+        if ($w <= 50) {
+            return (int) round($w * 1000);
+        }
+
+        return (int) round($w);
     }
 
 

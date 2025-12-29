@@ -94,43 +94,95 @@ class DelhiveryService
     //         return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
     //     }
     // }
-    public function getShippingCost( string $originPin, string $destinationPin, float $codAmount, int $weightGrams, string $paymentType = 'Pre-paid', string $mode = 'E', string $shipmentStatus = 'Delivered') 
+    
+    /**
+     * One “block” in your response: (air/surface) x (normal/express)
+     *
+     * NOTE:
+     * - Delhivery invoice charge API officially supports md=E/S and ss=Delivered/RTO/DTO.
+     * - “normal vs express” is not officially documented as a separate query param for same md.
+     * - So both tiers call same md unless you later add a real param in applyTierOverrides().
+     */
+    public function getShippingCostBlock(array $baseQuery, string $md, string $tier): array
     {
+        $query = array_merge($baseQuery, ['md' => $md]);
+
+        // Optional: if later you get a real “express” parameter from Delhivery,
+        // put it here (only place you need to change).
+        $query = $this->applyTierOverrides($query, $tier);
+
         $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
 
         try {
-            $query = [
-                'md'    => $mode,            // E / S
-                'ss'    => $shipmentStatus,  // Delivered / RTO / DTO
-                'd_pin' => $destinationPin,
-                'o_pin' => $originPin,
-                'cgm'   => $weightGrams,     // ✅ grams
-            ];
-
-            // If your account supports these, keep them; otherwise you can remove them safely.
-            $query['pt']  = $paymentType;
-            $query['cod'] = ($paymentType === 'COD') ? $codAmount : 0;
-
             $response = $this->client->get($endpoint, [
                 'headers' => [
                     'Authorization' => 'Token ' . $this->apiKey,
                     'Accept'        => 'application/json',
                 ],
                 'query' => $query,
+                'timeout' => 20,
             ]);
 
-            return json_decode($response->getBody()->getContents(), true);
+            $raw = json_decode($response->getBody()->getContents(), true) ?? [];
 
+            return [
+                'ok'      => true,
+                'request' => $query,
+                'summary' => $this->summarizeInvoiceResponse($raw),
+                'raw'     => $raw,
+            ];
         } catch (ClientException $e) {
-            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
-            Log::error('Delhivery API Client Error (shipping cost): ' . json_encode($responseBody));
-            return ['error' => 'API Error: ' . ($responseBody['detail'] ?? $e->getMessage())];
-        } catch (\Exception $e) {
-            Log::error("Shipping cost calculation failed: " . $e->getMessage());
-            return ['error' => 'Shipping cost calculation failed: ' . $e->getMessage()];
+            $rawErr = [];
+            try {
+                $rawErr = json_decode($e->getResponse()->getBody()->getContents(), true) ?? [];
+            } catch (\Throwable $t) {}
+
+            Log::error('Delhivery API Client Error (invoice charges): ' . json_encode($rawErr));
+
+            return [
+                'ok'      => false,
+                'request' => $query,
+                'summary' => [],
+                'raw'     => $rawErr,
+                'error'   => $rawErr['detail'] ?? $e->getMessage(),
+            ];
+        } catch (\Throwable $e) {
+            Log::error("Delhivery invoice charges failed: " . $e->getMessage());
+
+            return [
+                'ok'      => false,
+                'request' => $query,
+                'summary' => [],
+                'raw'     => [],
+                'error'   => $e->getMessage(),
+            ];
         }
     }
+    private function applyTierOverrides(array $query, string $tier): array
+    {
+        // ✅ Right now: no official “express vs normal” param is documented for invoice/charges.
+        // If Delhivery gives you one, add it here, e.g.:
+        // if ($tier === 'express') $query['service'] = 'EXPRESS';
 
+        return $query;
+    }
+    private function summarizeInvoiceResponse(array $raw): array
+    {
+        // We don’t know exact response keys because Delhivery doc UI doesn’t show sample JSON publicly,
+        // but it DOES mention total_amount exists. :contentReference[oaicite:3]{index=3}
+        $total = $raw['total_amount'] ?? null;
+
+        return [
+            'total_amount' => is_numeric($total) ? (float) $total : null,
+            'gross_amount' => isset($raw['gross_amount']) && is_numeric($raw['gross_amount']) ? (float) $raw['gross_amount'] : null,
+            'cgst'         => isset($raw['cgst']) && is_numeric($raw['cgst']) ? (float) $raw['cgst'] : null,
+            'sgst'         => isset($raw['sgst']) && is_numeric($raw['sgst']) ? (float) $raw['sgst'] : null,
+            'igst'         => isset($raw['igst']) && is_numeric($raw['igst']) ? (float) $raw['igst'] : null,
+
+            // ETA is NOT part of this API’s documented response; keep it ready if you add EDD API later.
+            'eta_days'     => null,
+        ];
+    }
 
     public function placeOrder(array $orderData): array
     {
