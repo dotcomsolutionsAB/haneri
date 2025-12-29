@@ -103,12 +103,9 @@ class DelhiveryService
      * - “normal vs express” is not officially documented as a separate query param for same md.
      * - So both tiers call same md unless you later add a real param in applyTierOverrides().
      */
-    public function getShippingCostBlock(array $baseQuery, string $md, string $tier): array
+    public function getShippingCostBlock(array $baseQuery, string $md, string $tier, bool $includeDebug = false): array
     {
         $query = array_merge($baseQuery, ['md' => $md]);
-
-        // Optional: if later you get a real “express” parameter from Delhivery,
-        // put it here (only place you need to change).
         $query = $this->applyTierOverrides($query, $tier);
 
         $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
@@ -125,39 +122,89 @@ class DelhiveryService
 
             $raw = json_decode($response->getBody()->getContents(), true) ?? [];
 
-            return [
+            $result = [
                 'ok'      => true,
-                'request' => $query,
                 'summary' => $this->summarizeInvoiceResponse($raw),
-                'raw'     => $raw,
             ];
-        } catch (ClientException $e) {
-            $rawErr = [];
-            try {
-                $rawErr = json_decode($e->getResponse()->getBody()->getContents(), true) ?? [];
-            } catch (\Throwable $t) {}
 
-            Log::error('Delhivery API Client Error (invoice charges): ' . json_encode($rawErr));
+            if ($includeDebug) {
+                $result['request'] = $query;
+                $result['raw']     = $raw;
+            }
 
-            return [
-                'ok'      => false,
-                'request' => $query,
-                'summary' => [],
-                'raw'     => $rawErr,
-                'error'   => $rawErr['detail'] ?? $e->getMessage(),
-            ];
+            return $result;
+
         } catch (\Throwable $e) {
-            Log::error("Delhivery invoice charges failed: " . $e->getMessage());
 
-            return [
+            $result = [
                 'ok'      => false,
-                'request' => $query,
                 'summary' => [],
-                'raw'     => [],
                 'error'   => $e->getMessage(),
             ];
+
+            if ($includeDebug) {
+                $result['request'] = $query;
+            }
+
+            return $result;
         }
     }
+
+    // public function getShippingCostBlock(array $baseQuery, string $md, string $tier): array
+    // {
+    //     $query = array_merge($baseQuery, ['md' => $md]);
+
+    //     // Optional: if later you get a real “express” parameter from Delhivery,
+    //     // put it here (only place you need to change).
+    //     $query = $this->applyTierOverrides($query, $tier);
+
+    //     $endpoint = $this->getBaseUrl() . '/api/kinko/v1/invoice/charges/.json';
+
+    //     try {
+    //         $response = $this->client->get($endpoint, [
+    //             'headers' => [
+    //                 'Authorization' => 'Token ' . $this->apiKey,
+    //                 'Accept'        => 'application/json',
+    //             ],
+    //             'query' => $query,
+    //             'timeout' => 20,
+    //         ]);
+
+    //         $raw = json_decode($response->getBody()->getContents(), true) ?? [];
+
+    //         return [
+    //             'ok'      => true,
+    //             'request' => $query,
+    //             'summary' => $this->summarizeInvoiceResponse($raw),
+    //             'raw'     => $raw,
+    //         ];
+    //     } catch (ClientException $e) {
+    //         $rawErr = [];
+    //         try {
+    //             $rawErr = json_decode($e->getResponse()->getBody()->getContents(), true) ?? [];
+    //         } catch (\Throwable $t) {}
+
+    //         Log::error('Delhivery API Client Error (invoice charges): ' . json_encode($rawErr));
+
+    //         return [
+    //             'ok'      => false,
+    //             'request' => $query,
+    //             'summary' => [],
+    //             'raw'     => $rawErr,
+    //             'error'   => $rawErr['detail'] ?? $e->getMessage(),
+    //         ];
+    //     } catch (\Throwable $e) {
+    //         Log::error("Delhivery invoice charges failed: " . $e->getMessage());
+
+    //         return [
+    //             'ok'      => false,
+    //             'request' => $query,
+    //             'summary' => [],
+    //             'raw'     => [],
+    //             'error'   => $e->getMessage(),
+    //         ];
+    //     }
+    // }
     private function applyTierOverrides(array $query, string $tier): array
     {
         // ✅ Right now: no official “express vs normal” param is documented for invoice/charges.
