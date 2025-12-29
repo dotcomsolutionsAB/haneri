@@ -264,6 +264,7 @@ class DelhiveryService
                     'quantity'       => $orderData['quantity'],              // Total items
                     'weight'         => $orderData['weight'],                // In kg
                     'shipping_mode'  => $orderData['shipping_mode'] ?? 'Surface',
+                    'service_level'  => $orderData['service_level'] ?? 'normal',
                     'address_type'   => $orderData['address_type'] ?? 'home',
                     // optional return address (else defaults to pickup)
                     'return_pin'     => $orderData['return_pin']     ?? $orderData['pickup_pin'],
@@ -279,16 +280,21 @@ class DelhiveryService
                 ],
             ];
 
-            // 2) Pickup location (from your warehouse / sender)
+            // 2) Pickup location (sender)
             $finalPayload = [
-                'pickup_name'  => $orderData['pickup_name'],
-                'pickup_add'   => $orderData['pickup_address'],
-                'pickup_pin'   => $orderData['pickup_pin'],
-                'pickup_city'  => $orderData['pickup_city'],
-                'pickup_state' => $orderData['pickup_state'],
-                'pickup_phone' => $orderData['pickup_phone'],
-                'shipments'    => $shipments,
+                'pickup_location' => [
+                    // THIS "name" must match Delhivery-registered warehouse name (case sensitive)
+                    'name'    => $orderData['pickup_name'],
+                    'add'     => $orderData['pickup_address'],
+                    'pin'     => (string)$orderData['pickup_pin'],
+                    'city'    => $orderData['pickup_city'],
+                    'state'   => $orderData['pickup_state'],
+                    'country' => 'India',
+                    'phone'   => (string)$orderData['pickup_phone'],
+                ],
+                'shipments' => $shipments,
             ];
+
 
             // 3) Call Delhivery CMU API
             $response = $this->client->post($endpoint, [

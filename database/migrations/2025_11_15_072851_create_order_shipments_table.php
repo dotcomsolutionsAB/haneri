@@ -77,6 +77,7 @@ return new class extends Migration
             $table->string('shipment_length', 255)->nullable()->default(null);
             $table->string('shipment_width', 255)->nullable()->default(null);
             $table->string('shipment_height', 255)->nullable()->default(null);
+            $table->string('service_level', 255)->nullable()->default(null);
             $table->string('shipping_mode', 255)->nullable()->default(null);
             $table->string('address_type', 255)->nullable()->default(null);
             $table->string('return_pin', 255)->nullable()->default(null);

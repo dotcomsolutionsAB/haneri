@@ -47,6 +47,7 @@ class OrderShipment extends Model
         'shipment_width',
         'shipment_height',
         'shipping_mode',
+        'service_level',
         'address_type',
         'return_pin',
         'return_city',

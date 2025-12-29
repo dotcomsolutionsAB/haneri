@@ -779,6 +779,10 @@ class DelhiveryServiceController extends Controller
         $validator = Validator::make($request->all(), [
             'order_id' => 'required|integer|exists:t_orders,id',
             'payload'  => 'required|array',  // This is the same payload you get from `check_shipment` API
+            'payload.courier'        => 'nullable|string',
+            'payload.shipping_mode'  => 'nullable|in:air,surface',
+            'payload.service_level'  => 'nullable|in:normal,express',
+            'payload.address_type'   => 'nullable|in:home,work',
         ]);
 
         if ($validator->fails()) {
@@ -791,6 +795,13 @@ class DelhiveryServiceController extends Controller
 
         $orderId = (int)$request->order_id;
         $payload = $request->input('payload');  // Get the payload from frontend (updated or not)
+        $payload['order_no'] = (string) $orderId;
+        // ✅ Normalize incoming values (user-friendly -> Delhivery expected)
+        $shippingMode = strtolower(trim($payload['shipping_mode'] ?? 'surface')); // air/surface
+        $serviceLevel = strtolower(trim($payload['service_level'] ?? 'normal'));  // normal/express
+
+        $payload['shipping_mode'] = ($shippingMode === 'air') ? 'Express' : 'Surface';
+        $payload['service_level'] = ($serviceLevel === 'express') ? 'express' : 'normal';
 
         try {
             // 1. Update the database with any changes from the payload (if needed)
@@ -800,7 +811,7 @@ class DelhiveryServiceController extends Controller
             $shipment->fill([
                 'order_id'             => $orderId,
                 // 'user_id'              => $payload['user_id'] ?? null,
-                // 'courier'              => $payload['courier'] ?? null,
+                'courier' => !empty($payload['courier']) ? strtolower(trim($payload['courier'])) : 'delhivery',
                 // 'status'               => $payload['status'] ?? null,
                 // 'customer_email'       => $payload['customer_email'] ?? null,
                 // 'pickup_location_id'   => $payload['pickup_location_id'] ?? null,
@@ -847,13 +858,14 @@ class DelhiveryServiceController extends Controller
                 'total_amount'         => $payload['total_amount'] ?? null,
                 'cod_amount'           => $payload['cod_amount'] ?? null,
                 'shipping_mode'        => $payload['shipping_mode'] ?? null,
+                'service_level'        => $payload['service_level'] ?? null,
                 'address_type'         => $payload['address_type'] ?? null,
                                 
                 // Resposne get
-                'awb_no'               => $payload['awb_no'] ?? null,  // AWB number if returned from Delhivery
+                'awb_no'               => null,  // AWB number if returned from Delhivery
                 'courier_reference'    => $payload['courier_reference'] ?? null,
                 'request_payload'      => $payload,  // Save the entire payload for reference
-                'response_payload'     => $payload,  // Save Delhivery's response (if available)
+                'response_payload'     => null,
                 'error_message'        => $payload['error_message'] ?? null,
                 
             ]);
@@ -875,10 +887,21 @@ class DelhiveryServiceController extends Controller
             }
 
             // 3. Update the shipment data with Delhivery's response (e.g., tracking number, waybill)
-            $shipment->awb_no = $apiResponse['packages'][0]['waybill']; // Update with AWB number from Delhivery
-            $shipment->status = 'booked';  // Example: Delhivery status
-            $shipment->response_payload = $apiResponse; // Save Delhivery response
-            $shipment->save();  // Save to DB
+            $waybill = data_get($apiResponse, 'packages.0.waybill');
+
+            if (!$waybill) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Delhivery response did not include waybill.',
+                    'data'    => $apiResponse,
+                ], 400);
+            }
+
+            $shipment->awb_no = $waybill;
+            $shipment->status = 'booked';
+            $shipment->response_payload = $apiResponse;
+            $shipment->save();
+
 
             return response()->json([
                 'success' => true,
@@ -893,7 +916,6 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
-
     // Build the shipment data for both checking and punching
     private function buildShipmentData(int $orderId, ?int $pickupLocationId = null, array $overrides = []): array
     {
@@ -1024,6 +1046,7 @@ class DelhiveryServiceController extends Controller
             'shipment_height'      => 10,
 
             'shipping_mode'        => 'Surface',
+            'service_level'        => 'normal',
             'address_type'         => 'home',
 
             'return_pin'           => $pickup->pin,
@@ -1037,7 +1060,7 @@ class DelhiveryServiceController extends Controller
         // ✅ Apply overrides (allow only safe keys)
         $allowed = [
             'customer_name','customer_address','phone',
-            'shipping_mode','address_type',
+            'shipping_mode','service_level','address_type',
             'shipment_length','shipment_width','shipment_height',
         ];
 
