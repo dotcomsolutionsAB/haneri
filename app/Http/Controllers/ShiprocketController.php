@@ -942,114 +942,218 @@ class ShiprocketController extends Controller
     // Get shipping Cost
     public function getShippingRates(Request $request, ShiprocketService $shiprocket)
     {
+        // ✅ SAME payload style as Delhivery
         $v = Validator::make($request->all(), [
-            'pickup_postcode'   => ['required','digits_between:4,10'],
-            'delivery_postcode' => ['required','digits_between:4,10'],
+            'through' => 'required|in:order,simple',
 
-            'order_id' => ['nullable','integer'],
-            'cod'      => ['required_without:order_id','in:0,1'],
-            'weight'   => ['required_without:order_id','numeric','min:0.1'],
+            // when through = order
+            'order_id' => 'required_if:through,order|integer|exists:t_orders,id',
 
-            'mode'     => ['nullable','string'], // air/surface
+            // when through = simple
+            'origin_pin'      => 'required_if:through,simple|digits_between:4,10',
+            'destination_pin' => 'required_if:through,simple|digits_between:4,10',
+            'weight'          => 'required_if:through,simple|numeric|min:0.1',
         ]);
 
         if ($v->fails()) {
             return response()->json([
-                'code' => 422,
+                'code'    => 422,
                 'success' => false,
                 'message' => 'Validation failed.',
-                'data' => $v->errors(),
+                'data'    => $v->errors(),
             ], 422);
         }
 
-        // ✅ build params as string (safe)
-        $params = [
-            'pickup_postcode'   => (string) $request->pickup_postcode,
-            'delivery_postcode' => (string) $request->delivery_postcode,
+        $through = (string) $request->input('through');
+
+        // =========================
+        // Resolve pickup/delivery + weight
+        // =========================
+        if ($through === 'order') {
+            $orderId = (int) $request->input('order_id');
+
+            $shipment = OrderShipment::where('order_id', $orderId)->orderByDesc('id')->first();
+
+            if (!$shipment) {
+                return response()->json([
+                    'code'    => 404,
+                    'success' => false,
+                    'message' => 'No shipment record found for this order.',
+                    'data'    => [],
+                ], 404);
+            }
+
+            $originPin      = (string) ($shipment->pickup_pin ?? '');
+            $destinationPin = (string) ($shipment->shipping_pin ?? '');
+            $weight         = (float) ($shipment->weight ?? 1); // assume KG in your DB
+        } else {
+            $originPin      = (string) $request->input('origin_pin');
+            $destinationPin = (string) $request->input('destination_pin');
+            $weight         = (float) $request->input('weight'); // KG
+        }
+
+        if ($originPin === '' || $destinationPin === '') {
+            return response()->json([
+                'code'    => 422,
+                'success' => false,
+                'message' => 'Origin pin / Destination pin missing.',
+                'data'    => [],
+            ], 422);
+        }
+
+        // ✅ Shiprocket expects COD as 0/1. You want prepaid always => cod=0
+        $baseParams = [
+            'pickup_postcode'   => $originPin,
+            'delivery_postcode' => $destinationPin,
+            'cod'               => 0,
+            'weight'            => $weight,
         ];
 
-        if ($request->filled('order_id')) {
-            $params['order_id'] = (int) $request->order_id;
-        } else {
-            $params['cod']    = (int) $request->cod;
-            $params['weight'] = (float) $request->weight;
+        // =========================
+        // Build 4 blocks
+        // =========================
+        $air     = $this->shiprocketModeBlock($shiprocket, $baseParams, 'Air');
+        $surface = $this->shiprocketModeBlock($shiprocket, $baseParams, 'Surface');
+
+        $shippings = [
+            'air' => [
+                'normal'  => $air['normal'],
+                'express' => $air['express'],
+            ],
+            'surface' => [
+                'normal'  => $surface['normal'],
+                'express' => $surface['express'],
+            ],
+        ];
+
+        $anyOk = $shippings['air']['normal']['ok']
+            || $shippings['air']['express']['ok']
+            || $shippings['surface']['normal']['ok']
+            || $shippings['surface']['express']['ok'];
+
+        if (!$anyOk) {
+            return response()->json([
+                'code'    => 200,
+                'success' => true,
+                'message' => 'No couriers returned for this lane.',
+                'through' => $through,
+                'data'    => [
+                    'shippings' => $shippings,
+                ],
+            ]);
         }
 
-        // ✅ normalize mode
-        if ($request->filled('mode')) {
-            $m = strtolower(trim((string)$request->mode));
-            $params['mode'] = ($m === 'air') ? 'Air' : 'Surface';
-        }
-
+        return response()->json([
+            'code'    => 200,
+            'success' => true,
+            'message' => 'Shipping rates fetched successfully.',
+            'through' => $through,
+            'data'    => [
+                'shippings' => $shippings,
+            ],
+        ]);
+    }
+    private function shiprocketModeBlock(ShiprocketService $shiprocket, array $baseParams, string $modeTitle): array
+    {
         try {
+            $params = $baseParams;
+            $params['mode'] = $modeTitle; // 'Air' or 'Surface'
+
             $res = $shiprocket->getCourierRates($params);
 
             $couriers = data_get($res, 'data.available_courier_companies', []);
             if (!is_array($couriers)) $couriers = [];
 
-            // ✅ keep only useful fields
-            $filtered = array_values(array_map(function ($c) {
+            // map -> keep minimal fields
+            $list = array_values(array_map(function ($c) {
                 return [
-                    'courier_company_id'       => data_get($c, 'courier_company_id'),
-                    'courier_name'             => data_get($c, 'courier_name'),
-                    'rate'                     => (float) data_get($c, 'rate', 0),
-                    'estimated_delivery_days'  => (int) data_get($c, 'estimated_delivery_days', 0),
-                    'etd'                      => data_get($c, 'etd'),
-                    'mode'                     => ((int) data_get($c, 'mode', 0) === 1) ? 'Air' : 'Surface',
-                    'cod'                      => (int) data_get($c, 'cod', 0),
-                    'rating'                   => (float) data_get($c, 'rating', 0),
-                    'pickup_availability'      => (int) data_get($c, 'pickup_availability', 0),
+                    'courier_company_id'      => data_get($c, 'courier_company_id'),
+                    'courier_name'            => (string) data_get($c, 'courier_name', ''),
+                    'rate'                    => (float) data_get($c, 'rate', 0),
+                    'estimated_delivery_days' => (int) data_get($c, 'estimated_delivery_days', 0),
+                    'etd'                     => data_get($c, 'etd'),
+                    'rating'                  => (float) data_get($c, 'rating', 0),
+                    'mode'                    => ((int) data_get($c, 'mode', 0) === 1) ? 'Air' : 'Surface',
                 ];
             }, $couriers));
 
-            if (count($filtered) === 0) {
-                return response()->json([
-                    'code' => 200,
-                    'success' => true,
-                    'message' => 'No couriers returned for this lane.',
-                    'data' => [
-                        'input' => $params,
-                        'couriers' => [],
-                    ],
-                ]);
+            // if Shiprocket already filtered by mode param, this is optional — still safe:
+            $list = array_values(array_filter($list, fn($c) => ($c['mode'] ?? '') === $modeTitle));
+
+            if (count($list) === 0) {
+                return [
+                    'normal'  => ['ok' => false, 'summary' => [], 'error' => 'No couriers returned.'],
+                    'express' => ['ok' => false, 'summary' => [], 'error' => 'No couriers returned.'],
+                ];
             }
 
-            // ✅ cheapest and fastest from filtered
-            $cheapest = null;
-            $fastest  = null;
+            // Sort by fastest (days asc), then cheapest (rate asc)
+            usort($list, function ($a, $b) {
+                $da = (int) ($a['estimated_delivery_days'] ?: 9999);
+                $db = (int) ($b['estimated_delivery_days'] ?: 9999);
+                if ($da !== $db) return $da <=> $db;
 
-            foreach ($filtered as $c) {
-                $rate = (float) ($c['rate'] ?? 0);
-                $days = (int) ($c['estimated_delivery_days'] ?? 0);
+                $ra = (float) ($a['rate'] ?: 999999);
+                $rb = (float) ($b['rate'] ?: 999999);
+                return $ra <=> $rb;
+            });
 
-                if ($rate > 0 && ($cheapest === null || $rate < (float) $cheapest['rate'])) {
-                    $cheapest = $c;
-                }
-                if ($days > 0 && ($fastest === null || $days < (int) $fastest['estimated_delivery_days'])) {
-                    $fastest = $c;
-                }
+            // NORMAL = fastest overall
+            $normalCourier = $list[0];
+
+            // EXPRESS = fastest among “express-like” couriers, else 2nd fastest, else normal
+            $expressCandidates = array_values(array_filter($list, function ($c) {
+                $name = strtolower((string) ($c['courier_name'] ?? ''));
+                return str_contains($name, 'express')
+                    || str_contains($name, 'priority')
+                    || str_contains($name, 'premium')
+                    || str_contains($name, 'air'); // optional heuristic
+            }));
+
+            if (count($expressCandidates) > 0) {
+                // candidates already in same sort order? not necessarily
+                usort($expressCandidates, function ($a, $b) {
+                    $da = (int) ($a['estimated_delivery_days'] ?: 9999);
+                    $db = (int) ($b['estimated_delivery_days'] ?: 9999);
+                    if ($da !== $db) return $da <=> $db;
+                    return ((float)$a['rate']) <=> ((float)$b['rate']);
+                });
+                $expressCourier = $expressCandidates[0];
+            } else {
+                $expressCourier = $list[1] ?? $normalCourier;
             }
 
-            return response()->json([
-                'code' => 200,
-                'success' => true,
-                'message' => 'Shipping rates fetched successfully.',
-                'data' => [
-                    'input' => $params,
-                    'cheapest' => $cheapest,
-                    'fastest' => $fastest,
-                    'couriers' => $filtered,
+            return [
+                'normal' => [
+                    'ok'      => true,
+                    'summary' => $this->shiprocketSummary($normalCourier, $modeTitle),
                 ],
-            ]);
-
+                'express' => [
+                    'ok'      => true,
+                    'summary' => $this->shiprocketSummary($expressCourier, $modeTitle),
+                ],
+            ];
         } catch (\Throwable $e) {
-            return response()->json([
-                'code' => 500,
-                'success' => false,
-                'message' => 'Failed to fetch Shiprocket rates.',
-                'data' => ['error' => $e->getMessage()],
-            ], 500);
+            return [
+                'normal'  => ['ok' => false, 'summary' => [], 'error' => $e->getMessage()],
+                'express' => ['ok' => false, 'summary' => [], 'error' => $e->getMessage()],
+            ];
         }
+    }
+    private function shiprocketSummary(array $c, string $modeTitle): array
+    {
+        return [
+            // keep same key name style as Delhivery
+            'total_amount'  => round((float) ($c['rate'] ?? 0), 2),
+            'eta_days'      => (int) ($c['estimated_delivery_days'] ?? 0) ?: null,
+            'etd'           => $c['etd'] ?? null,
+
+            // useful extras (optional)
+            'courier_name'  => $c['courier_name'] ?? null,
+            'courier_id'    => $c['courier_company_id'] ?? null,
+            'rating'        => isset($c['rating']) ? round((float)$c['rating'], 1) : null,
+            'mode'          => $modeTitle,
+        ];
     }
 
     public function getTat(Request $request, ShiprocketService $shiprocket)

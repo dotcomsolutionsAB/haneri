@@ -35,6 +35,7 @@ Route::post('/request-otp', [AuthController::class, 'request_otp']);
 Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
 Route::post('/delivery/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
 Route::post('/delivery/track', [DelhiveryServiceController::class, 'trackShipments']);
+Route::post('/shiprocket/rates', [ShiprocketController::class, 'getShippingRates']);
 
 // Route::middleware(['cors'])->group(function () {
     Route::prefix('cart')->group(function () {
@@ -159,8 +160,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/punch-order/{order_id}', [ShiprocketController::class, 'punchOrderById']); // Puunch by order
             Route::post('/punch-by-payload', [ShiprocketController::class, 'punchByPayload']); // Punch by payload
             Route::post('/cancel', [ShiprocketController::class, 'cancelOrder']);  // Cancel order
-            Route::post('/rates', [ShiprocketController::class, 'getShippingRates']); // get shipping cost
-            Route::post('/tat', [ShiprocketController::class, 'getTat']); // get shipping cost            
+            // Route::post('/rates', [ShiprocketController::class, 'getShippingRates']); // get shipping cost
+            Route::post('/tat', [ShiprocketController::class, 'getTat']); // get Tat            
             Route::post('/track', [ShiprocketController::class, 'trackShipment']);  // track 
         });
 
