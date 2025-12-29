@@ -149,7 +149,7 @@ class DelhiveryService
             return $result;
         }
     }
-
+    // full response
     // public function getShippingCostBlock(array $baseQuery, string $md, string $tier): array
     // {
     //     $query = array_merge($baseQuery, ['md' => $md]);
