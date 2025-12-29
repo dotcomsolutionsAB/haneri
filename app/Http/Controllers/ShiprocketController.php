@@ -544,6 +544,8 @@ class ShiprocketController extends Controller
         $v = Validator::make($request->all(), [
             'order_id' => ['required', 'integer', 'exists:t_orders,id'],
             'payload' => ['required', 'array'],
+            'payload.shipping_mode'  => ['nullable', 'in:air,surface'],
+            'payload.service_level'  => ['nullable', 'in:normal,express'],
 
             'payload.customer_name' => ['required', 'string', 'max:255'],
             'payload.customer_address' => ['required', 'string', 'max:500'],
@@ -552,7 +554,7 @@ class ShiprocketController extends Controller
             'payload.state' => ['required', 'string', 'max:100'],
             'payload.phone' => ['required', 'string', 'max:20'],
 
-            'payload.order_no' => ['required', 'string', 'max:50'],
+            'payload.order_no' => ['nullable', 'string', 'max:50'],
             'payload.payment_mode' => ['required', 'in:Prepaid,COD'],
             'payload.total_amount' => ['required', 'numeric', 'min:0'],
             'payload.cod_amount' => ['required', 'numeric', 'min:0'],
@@ -587,6 +589,7 @@ class ShiprocketController extends Controller
             'payload.return_phone' => ['nullable', 'string', 'max:20'],
             'payload.return_address' => ['nullable', 'string', 'max:500'],
             'payload.return_country' => ['nullable', 'string', 'max:100'],
+            'payload.address_type' => ['nullable', 'in:home,work'],
 
             // Optional: choose courier
             'courier_id' => ['nullable', 'integer'],
@@ -603,9 +606,20 @@ class ShiprocketController extends Controller
 
         $orderId = (int) $request->input('order_id');
         $p = $request->input('payload');
+        // ✅ force same order_no across system
+        $p['order_no'] = (string) $orderId;
+
+        // ✅ normalize shipping_mode + service_level
+        $shippingMode = strtolower(trim($p['shipping_mode'] ?? 'surface')); // air/surface
+        $serviceLevel = strtolower(trim($p['service_level'] ?? 'normal'));  // normal/express
+
+        // Keep DB consistent like Delhivery (Surface/Express)
+        $p['shipping_mode']  = ($shippingMode === 'air') ? 'Express' : 'Surface';
+        $p['service_level']  = ($serviceLevel === 'express') ? 'express' : 'normal';
+        $p['address_type'] = strtolower(trim($p['address_type'] ?? 'home'));
 
         // fetch order just to get user_id
-        $order = OrderModel::find($orderId);
+        $order = OrderModel::with('user')->findOrFail($orderId);
 
         // prevent duplicate shiprocket shipment
         $existing = OrderShipment::where('order_id', $orderId)
@@ -727,7 +741,7 @@ class ShiprocketController extends Controller
                 'order_id' => $orderId,
                 'user_id'  => $order->user_id,
 
-                'courier' => $courierName ?: 'Shiprocket',
+                'courier' => $courierName ? ('Shiprocket - ' . $courierName) : 'Shiprocket',
                 'status' => $mappedStatus,
 
                 'customer_name' => (string) $p['customer_name'],
@@ -750,6 +764,9 @@ class ShiprocketController extends Controller
                 'shipment_length' => (float) $p['shipment_length'],
                 'shipment_width'  => (float) $p['shipment_width'],
                 'shipment_height' => (float) $p['shipment_height'],
+                'shipping_mode' => $p['shipping_mode'] ?? null,
+                'service_level' => $p['service_level'] ?? null,
+                'address_type' => $p['address_type'],
 
                 'seller_name' => $p['seller_name'] ?? null,
                 'seller_address' => $p['seller_address'] ?? null,
