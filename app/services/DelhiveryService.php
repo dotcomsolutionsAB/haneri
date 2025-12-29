@@ -168,19 +168,25 @@ class DelhiveryService
     }
     private function summarizeInvoiceResponse(array $raw): array
     {
-        // We don’t know exact response keys because Delhivery doc UI doesn’t show sample JSON publicly,
-        // but it DOES mention total_amount exists. :contentReference[oaicite:3]{index=3}
-        $total = $raw['total_amount'] ?? null;
+        // Delhivery returns an array of charge objects
+        $row = isset($raw[0]) && is_array($raw[0]) ? $raw[0] : $raw;
+
+        $total = $row['total_amount'] ?? null;
+        $gross = $row['gross_amount'] ?? null;
+
+        $cgst = $row['tax_data']['CGST'] ?? null;
+        $sgst = $row['tax_data']['SGST'] ?? null;
+        $igst = $row['tax_data']['IGST'] ?? null;
 
         return [
-            'total_amount' => is_numeric($total) ? (float) $total : null,
-            'gross_amount' => isset($raw['gross_amount']) && is_numeric($raw['gross_amount']) ? (float) $raw['gross_amount'] : null,
-            'cgst'         => isset($raw['cgst']) && is_numeric($raw['cgst']) ? (float) $raw['cgst'] : null,
-            'sgst'         => isset($raw['sgst']) && is_numeric($raw['sgst']) ? (float) $raw['sgst'] : null,
-            'igst'         => isset($raw['igst']) && is_numeric($raw['igst']) ? (float) $raw['igst'] : null,
-
-            // ETA is NOT part of this API’s documented response; keep it ready if you add EDD API later.
-            'eta_days'     => null,
+            'total_amount'   => is_numeric($total) ? round((float)$total, 2) : null,
+            'gross_amount'   => is_numeric($gross) ? round((float)$gross, 2) : null,
+            'cgst'           => is_numeric($cgst) ? round((float)$cgst, 2) : null,
+            'sgst'           => is_numeric($sgst) ? round((float)$sgst, 2) : null,
+            'igst'           => is_numeric($igst) ? round((float)$igst, 2) : null,
+            'charged_weight' => $row['charged_weight'] ?? null,
+            'zone'           => $row['zone'] ?? null,
+            'eta_days'       => null, // not coming from this API response
         ];
     }
 
