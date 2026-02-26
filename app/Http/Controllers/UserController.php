@@ -69,11 +69,11 @@ class UserController extends Controller
         return User::create([
             'name'          => $attrs['name'],
             'email'         => $attrs['email'],
-            'password'      => Hash::make($attrs['password']),
+            'password'      => $attrs['password'], // plain; User model 'hashed' cast hashes once
             'mobile'        => $attrs['mobile'],
             'role'          => $attrs['role'] ?? 'customer',
             'selected_type' => $attrs['selected_type'] ?? null,
-            'gstin'         => $attrs['gstin'] ?? null, // ✅ FIXED
+            'gstin'         => $attrs['gstin'] ?? null,
         ]);
     }
 
@@ -98,7 +98,7 @@ class UserController extends Controller
             $user = $this->createUser([
                 'name'     => $validated['name'],
                 'email'    => $validated['email'],
-                'password' => $randomPassword, // (hashed inside createUser)
+                'password' => $randomPassword,
                 'mobile'   => $validated['mobile'],
                 'role'     => 'customer',
             ]);
@@ -152,16 +152,19 @@ class UserController extends Controller
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
             'mobile' => 'sometimes|string|unique:users,mobile,' . $user->id . '|min:10|max:15',
             'password' => 'sometimes|string|min:8',
-            'role' => 'sometimes|in:admin,customer,vendor',
+            'role' => 'sometimes|in:admin,customer,architect,dealer',
         ]);
 
-        $user->update([
-            'name' => $request->input('name', $user->name),
-            'email' => $request->input('email', $user->email),
-            'mobile' => $request->input('mobile', $user->mobile),
-            'password' => $request->input('password') ? Hash::make($request->input('password')) : $user->password,
-            'role' => $request->input('role', $user->role),
-        ]);
+        $updateData = [
+            'name'   => $request->input('name', $user->name),
+            'email'  => $request->input('email', $user->email),
+            'mobile'  => $request->input('mobile', $user->mobile),
+            'role'   => $request->input('role', $user->role),
+        ];
+        if ($request->filled('password')) {
+            $updateData['password'] = $request->input('password'); // plain; User model 'hashed' cast hashes once
+        }
+        $user->update($updateData);
 
         unset($user['id'], $user['created_at'], $user['updated_at']);
 
