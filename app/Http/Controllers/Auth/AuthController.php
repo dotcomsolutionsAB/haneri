@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\OtpModel;
 use App\Models\AddressModel;
 use App\Mail\WelcomeUserMail;
+use App\Utils\MobileHelper;
 
 class AuthController extends Controller
 {
@@ -43,10 +44,13 @@ class AuthController extends Controller
     }
     protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
     {
-        // 1️⃣ Basic validation for extra fields
+        // 1️⃣ Normalise mobile to rightmost 10 digits, then validate
+        if ($request->filled('mobile')) {
+            $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
+        }
         $validated = $request->validate([
             'idToken' => 'required|string',
-            'mobile'  => 'nullable|string|min:10|max:15',
+            'mobile'  => 'nullable|string|size:10|regex:/^[0-9]{10}$/',
             'role'    => 'nullable|in:customer,architect,dealer',   // used ONLY on first-time register
             'gstin'   => [
                 'nullable',
@@ -125,7 +129,7 @@ class AuthController extends Controller
             $user = User::create([
                 'name'          => $name,
                 'email'         => $email,
-                'mobile'        => $validated['mobile'] ?? null,
+                'mobile'        => ! empty($validated['mobile']) ? $validated['mobile'] : null,
                 'role'          => $role,              // ALWAYS 'customer' here
                 'selected_type' => $selectedType,      // store front choice
                 'gstin'         => $validated['gstin'] ?? null,
@@ -148,8 +152,8 @@ class AuthController extends Controller
                 $user->google_id = $googleId;
             }
 
-            // ✅ UPDATE ONLY SAFE FIELDS
-            if (! empty($validated['mobile'])) {
+            // ✅ UPDATE ONLY SAFE FIELDS (mobile already normalised to 10 digits)
+            if (! empty($validated['mobile']) && strlen($validated['mobile']) === 10) {
                 $user->mobile = $validated['mobile'];
             }
 
@@ -200,12 +204,15 @@ class AuthController extends Controller
             return $this->handleGoogleAuthFromIdToken($request, false);
         }
 
-        // NORMAL EMAIL + PASSWORD REGISTER
+        // NORMAL EMAIL + PASSWORD REGISTER – normalise mobile to rightmost 10 digits
+        $request->merge([
+            'mobile' => MobileHelper::normalize($request->input('mobile')),
+        ]);
         $validated = $request->validate([
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|string|min:8',
-            'mobile'   => 'required|string|unique:users,mobile|min:10|max:15',
+            'mobile'   => 'required|string|size:10|regex:/^[0-9]{10}$/|unique:users,mobile',
             'role'     => 'required|in:customer,architect,dealer',
             'gstin'    => [
                 'nullable',
@@ -214,7 +221,9 @@ class AuthController extends Controller
                 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
             ],
         ], [
-            'gstin.regex' => 'Invalid GSTIN format.',
+            'gstin.regex'   => 'Invalid GSTIN format.',
+            'mobile.regex'  => 'Mobile must be 10 digits.',
+            'mobile.size'   => 'Mobile must be 10 digits.',
         ]);
 
         $selectedType = $validated['role'];          // ⭐ store frontend choice
@@ -269,8 +278,9 @@ class AuthController extends Controller
 
     public function generate_otp(Request $request)
     {
+        $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
         $request->validate([
-            'mobile' => ['required', 'string', 'min:10', 'max:15'],
+            'mobile' => ['required', 'string', 'size:10', 'regex:/^[0-9]{10}$/'],
         ]);
 
         $mobile = $request->input('mobile');
@@ -368,8 +378,9 @@ class AuthController extends Controller
 
         // 2️⃣ OTP LOGIN
         if ($otp) {
+            $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
             $request->validate([
-                'mobile' => ['required', 'string'],
+                'mobile' => ['required', 'string', 'size:10', 'regex:/^[0-9]{10}$/'],
             ]);
 
             $otpRecord = User::select('otp', 'expires_at')
@@ -456,8 +467,9 @@ class AuthController extends Controller
     // Verify user by otp 
     public function request_otp(Request $request)
     {
+        $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
         $request->validate([
-            'mobile' => ['required', 'string', 'min:10', 'max:15'],
+            'mobile' => ['required', 'string', 'size:10', 'regex:/^[0-9]{10}$/'],
         ]);
 
         $mobile = $request->input('mobile');
@@ -529,8 +541,9 @@ class AuthController extends Controller
 
     public function verify_otp(Request $request)
     {
+        $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
         $request->validate([
-            'mobile' => ['required', 'string', 'min:10', 'max:15'],
+            'mobile' => ['required', 'string', 'size:10', 'regex:/^[0-9]{10}$/'],
             'otp'    => ['required', 'string', 'min:4', 'max:10'],
         ]);
 

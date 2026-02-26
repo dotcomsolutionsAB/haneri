@@ -17,6 +17,7 @@ use App\Models\OrderModel;
 use App\Models\BrandModel;
 use App\Models\CategoryModel;
 use App\Models\ProductModel;
+use App\Utils\MobileHelper;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -25,14 +26,15 @@ use Carbon\Carbon;
 class UserController extends Controller
 {
     //
-    // Register a new user
+    // Register a new user – mobile normalised to rightmost 10 digits
     public function register(Request $request)
     {
+        $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
             'email'         => 'required|email|unique:users,email',
             'password'      => 'required|string|min:8',
-            'mobile'        => 'required|string|unique:users,mobile|min:10|max:15',
+            'mobile'        => 'required|string|size:10|regex:/^[0-9]{10}$/|unique:users,mobile',
             'gstin'         => [
                                 'nullable',
                                 'string',
@@ -84,10 +86,11 @@ class UserController extends Controller
             return response()->json(['message' => 'Cart ID not found.'], 400);
         }
 
+        $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
         $validated = $request->validate([
             'name'   => 'required|string|max:255',
             'email'  => 'required|email|unique:users,email',
-            'mobile' => 'required|string|unique:users,mobile|min:10|max:15',
+            'mobile' => 'required|string|size:10|regex:/^[0-9]{10}$/|unique:users,mobile',
         ]);
 
         // Generate random password for the guest
@@ -147,10 +150,13 @@ class UserController extends Controller
             return response()->json(['message' => 'User not found.'], 404);
         }
 
+        if ($request->filled('mobile')) {
+            $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
+        }
         $request->validate([
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
-            'mobile' => 'sometimes|string|unique:users,mobile,' . $user->id . '|min:10|max:15',
+            'mobile' => 'sometimes|string|size:10|regex:/^[0-9]{10}$/|unique:users,mobile,' . $user->id,
             'password' => 'sometimes|string|min:8',
             'role' => 'sometimes|in:admin,customer,architect,dealer',
         ]);
@@ -158,7 +164,7 @@ class UserController extends Controller
         $updateData = [
             'name'   => $request->input('name', $user->name),
             'email'  => $request->input('email', $user->email),
-            'mobile'  => $request->input('mobile', $user->mobile),
+            'mobile' => $request->filled('mobile') ? $request->input('mobile') : $user->mobile,
             'role'   => $request->input('role', $user->role),
         ];
         if ($request->filled('password')) {
