@@ -31,6 +31,7 @@ class AuthController extends Controller
         $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_-=+';
         return substr(str_shuffle(str_repeat($chars, $length)), 0, $length);
     }
+
     private function sendWelcomeMail(User $user, string $appName = 'Haneri'): void
     {
         try {
@@ -40,6 +41,7 @@ class AuthController extends Controller
             Log::error('Welcome email failed', ['error' => $e->getMessage()]);
         }
     }
+
     protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
     {
         // 1️⃣ Basic validation for extra fields
@@ -523,6 +525,7 @@ class AuthController extends Controller
             'data'    => [],
         ], 200);
     }
+    
     public function verify_otp(Request $request)
     {
         $request->validate([
@@ -594,95 +597,6 @@ class AuthController extends Controller
             'data'    => [],
         ], 200);
     }
-
-
-    // user `login`
-    // public function login(Request $request, $otp = null)
-    // {
-    //     if ($otp) {
-    //         $request->validate([
-    //             'mobile' => ['required', 'string'],
-    //         ]);
-
-    //         $otpRecord = User::select('otp', 'expires_at')
-    //             ->where('mobile', $request->mobile)
-    //             ->first();
-
-    //         if ($otpRecord) {
-    //             if (!$otpRecord || $otpRecord->otp != $otp) {
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'Invalid OTP Entered',
-    //                 ], 200);
-    //             } elseif ($otpRecord->expires_at < now()) {
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'OTP has expired!',
-    //                 ], 200);
-    //             } else {
-    //                 // Remove OTP record after successful validation
-    //                 User::where('mobile', $request->mobile)
-    //                     ->update(['otp' => null, 'expires_at' => null]);
-
-    //                 // Retrieve the user
-    //                 $user = User::where('mobile', $request->mobile)->first();
-
-    //                 // Generate a Sanctum token
-    //                 $generated_token = $user->createToken('API TOKEN')->plainTextToken;
-
-    //                 return response()->json([
-    //                     'success' => true,
-    //                     'data' => [
-    //                         'token' => $generated_token,
-    //                         'name' => $user->name,
-    //                         'role' => $user->role,
-    //                         'id' => $user->id,
-    //                     ],
-    //                     'message' => 'User logged in successfully!',
-    //                 ], 200);
-    //             }
-    //         } else {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Username is not valid.',
-    //             ], 200);
-    //         }
-    //     } else {
-    //         $request->validate([
-    //             'email' => ['required', 'string'],
-    //             'password' => 'required',
-    //         ]);
-
-    //         // Find the user by email
-    //         $user = User::where('email', $request->username)->first();
-
-    //         if (Auth::attempt(['email' => $request->email, 'password' => $request->password])) {
-    //             $user = Auth::user();
-
-    //             // Generate a Sanctum token
-    //             $generated_token = $user->createToken('API TOKEN')->plainTextToken;
-
-    //             // Retrieve user permissions
-    //             // $permissions = $user->getAllPermissions()->pluck('name');
-
-    //             return response()->json([
-    //                 'success' => true,
-    //                 'data' => [
-    //                     'token' => $generated_token,
-    //                     'name' => $user->name,
-    //                     'role' => $user->role,
-    //                     'id' => $user->id,
-    //                 ],
-    //                 'message' => 'User logged in successfully!',
-    //             ], 200);
-    //         } else {
-    //             return response()->json([
-    //                 'success' => false,
-    //                 'message' => 'Invalid username or password.',
-    //             ], 200);
-    //         }
-    //     }
-    // }
 
     // user `logout`
     public function logout(Request $request)

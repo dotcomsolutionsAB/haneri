@@ -304,8 +304,8 @@ class CartController extends Controller
                         }
                     }
                 } else {
-                    // guest user — no login / no user_id
-                    $discount = 0;
+                    // guest user — apply customer discount for display (same as customer role)
+                    $discount = $cartItem->variant ? ($cartItem->variant->customer_discount ?? 0) : 0;
                 }
 
                 $cartItem->selling_price = $this->price($cartItem->variant->regular_price, $discount);
