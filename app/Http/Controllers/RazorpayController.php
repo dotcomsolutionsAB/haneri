@@ -128,7 +128,7 @@ class RazorpayController extends Controller
             });
 
             return redirect()->away(
-                'https://haneri.com/order-complete.php'
+                'https://haneri.com/account/order-complete.php'
                 . '?status=failed'
                 . '&method=' . urlencode('Razorpay')   // ✅ add this
                 . '&order_id=' . urlencode($orderId ?? 0)
@@ -171,7 +171,7 @@ class RazorpayController extends Controller
             });
 
             return redirect()->away(
-                'https://haneri.com/order-complete.php'
+                'https://haneri.com/account/order-complete.php'
                 . '?status=failed'
                 . '&method=' . urlencode('Razorpay')   // ✅ add this
                 . '&order_id=' . urlencode($orderId)
@@ -282,7 +282,7 @@ class RazorpayController extends Controller
         });
 
         // 🔁 Redirect user to frontend success page
-        $redirectUrl = 'https://haneri.com/order-complete.php'
+        $redirectUrl = 'https://haneri.com/account/order-complete.php'
             . '?status=success'
             . '&method=' . urlencode($methodLabel)   // ✅ ADD THIS
             . '&order_id=' . urlencode($orderId)
