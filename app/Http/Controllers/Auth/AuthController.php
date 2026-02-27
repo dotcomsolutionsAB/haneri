@@ -474,17 +474,17 @@ class AuthController extends Controller
 
         $mobile = $request->input('mobile');
 
-        if (
-            User::where('mobile', $mobile)->exists()
-            || AddressModel::where('contact_no', $mobile)->exists()
-        ) {
-            return response()->json([
-                'code'    => 200,
-                'success' => true,
-                'message' => 'Mobile already validated.',
-                'data'    => [],
-            ], 200);
-        }
+        // if (
+        //     User::where('mobile', $mobile)->exists()
+        //     || AddressModel::where('contact_no', $mobile)->exists()
+        // ) {
+        //     return response()->json([
+        //         'code'    => 200,
+        //         'success' => true,
+        //         'message' => 'Mobile already validated.',
+        //         'data'    => [],
+        //     ], 200);
+        // }
 
         $six_digit_otp = (string) random_int(100000, 999999);
 

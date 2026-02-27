@@ -8,29 +8,6 @@ use Illuminate\Support\Facades\Auth;
 
 class AddressController extends Controller
 {
-    //
-    // List all addresses for a user
-    // public function index(Request $request)
-    // {
-    //     $user = Auth::user(); 
-
-    //     // If the user is an admin, validate user_id in the request
-    //     if ($user->role == 'admin') {
-    //         $request->validate([
-    //             'user_id' => 'required|integer|exists:users,id',
-    //         ]);
-    //         $user_id =  $request->input('user_id');
-    //     } else {
-    //         $user_id =  $user->id;
-    //     }
-
-    //     $addresses = AddressModel::where('user_id', $user_id)->get();
-
-    //     return $addresses->isNotEmpty()
-    //     ? response()->json(['message' => 'Addresses retrieved successfully!', 'data' => $addresses->makeHidden(['created_at', 'updated_at']), 'count' => count($addresses)], 200)
-    //     : response()->json(['message' => 'No address found.'], 400);
-
-    // }
 
     public function index(Request $request)
     {
