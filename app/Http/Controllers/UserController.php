@@ -87,13 +87,31 @@ class UserController extends Controller
         }
 
         $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
+        $request->validate([
+            'mobile' => 'required|string|size:10|regex:/^[0-9]{10}$/',
+        ]);
+        $mobile = $request->input('mobile');
+
+        $existingUser = User::where('mobile', $mobile)->first();
+
+        if ($existingUser) {
+            CartModel::where('user_id', $cartId)->update(['user_id' => $existingUser->id]);
+            $token = $existingUser->createToken('authToken')->plainTextToken;
+
+            return response()->json([
+                'message'      => 'Welcome back! Cart updated.',
+                'token'        => $token,
+                'user'         => $existingUser->only(['name', 'email', 'mobile', 'role']),
+                'redirect_url' => config('app.redirect_after_register'),
+            ], 200);
+        }
+
         $validated = $request->validate([
             'name'   => 'required|string|max:255',
             'email'  => 'required|email|unique:users,email',
             'mobile' => 'required|string|size:10|regex:/^[0-9]{10}$/|unique:users,mobile',
         ]);
 
-        // Generate random password for the guest
         $randomPassword = $this->generateRandomPassword(12);
 
         // All-or-nothing: user creation + cart migration
@@ -124,10 +142,11 @@ class UserController extends Controller
         $token = $user->createToken('authToken')->plainTextToken;
 
         return response()->json([
-            'message'  => 'User registered successfully! Cart updated and login credentials sent to email.',
-            'password' => $randomPassword, // if you want to show it (optional)
-            'token'    => $token,
-            'user'     => $user->only(['name','email','mobile','role']),
+            'message'      => 'User registered successfully! Cart updated and login credentials sent to email.',
+            'password'     => $randomPassword,
+            'token'        => $token,
+            'user'         => $user->only(['name', 'email', 'mobile', 'role']),
+            'redirect_url' => config('app.redirect_after_register'),
         ], 201);
     }
 

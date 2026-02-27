@@ -124,4 +124,7 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    'redirect_after_register' => env('APP_REDIRECT_AFTER_REGISTER', env('APP_FRONTEND_URL', 'https://haneri.com')),
+    'redirect_after_login'    => env('APP_REDIRECT_AFTER_LOGIN', env('APP_FRONTEND_URL', 'https://haneri.com')),
+
 ];
