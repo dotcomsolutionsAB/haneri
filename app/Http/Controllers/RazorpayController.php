@@ -6,6 +6,10 @@ use Illuminate\Http\Request;
 use Razorpay\Api\Api;
 use App\Models\OrderModel;
 use App\Models\PaymentModel;
+use App\Models\User;
+use App\Models\OrderItemModel;
+use App\Mail\OrderPlacedMail;
+use Illuminate\Support\Facades\Mail;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -201,7 +205,7 @@ class RazorpayController extends Controller
 
 
         // ✅ Signature OK ⇒ mark payment as PAID in DB + send email once
-        DB::transaction(function () use ($orderId, $razorpayOrderId, $razorpayPaymentId) {
+        DB::transaction(function () use ($orderId, $razorpayOrderId, $razorpayPaymentId, $paymentMethodLower) {
 
             $order = OrderModel::where('id', $orderId)
                 ->where('razorpay_order_id', $razorpayOrderId)
@@ -228,10 +232,11 @@ class RazorpayController extends Controller
             if ($payment) {
                 $payment->status              = 'paid';
                 $payment->razorpay_payment_id = $razorpayPaymentId;
+                $payment->method              = $paymentMethodLower ?: $payment->method; // ✅ add this
                 $payment->save();
             } else {
                 PaymentModel::create([
-                    'method'              => 'upi',
+                    'method'              => $paymentMethodLower ?: 'razorpay',
                     'razorpay_payment_id' => $razorpayPaymentId,
                     'amount'              => $order->total_amount,
                     'status'              => 'paid',
