@@ -1,6 +1,21 @@
 <?php
 // dd(env('MAIL_ENCRYPTION'), config('mail.mailers.smtp'), env('MAIL_SCHEME'));
 
+$mailVerifyPeer = filter_var(env('MAIL_VERIFY_PEER', true), FILTER_VALIDATE_BOOLEAN);
+$mailUrl = env('MAIL_URL');
+if (! $mailVerifyPeer && $mailUrl) {
+    $mailUrl .= (str_contains($mailUrl, '?') ? '&' : '?') . 'verify_peer=0';
+} elseif (! $mailVerifyPeer) {
+    $enc = env('MAIL_ENCRYPTION', 'tls');
+    $scheme = ($enc === 'ssl') ? 'smtps' : 'smtp';
+    $host = env('MAIL_HOST', '127.0.0.1');
+    $port = (int) env('MAIL_PORT', 2525);
+    $user = env('MAIL_USERNAME');
+    $pass = env('MAIL_PASSWORD');
+    $auth = $user ? rawurlencode($user) . ($pass ? ':' . rawurlencode($pass) : '') . '@' : '';
+    $mailUrl = sprintf('%s://%s%s:%d?verify_peer=0', $scheme, $auth, $host, $port);
+}
+
 return [
 
     /*
@@ -42,7 +57,7 @@ return [
             'transport' => 'smtp',
             // Use smtps only for implicit SSL (port 465); for port 587 use smtp + STARTTLS
             'scheme' => (env('MAIL_ENCRYPTION') === 'ssl' || (int) env('MAIL_PORT', 2525) === 465) ? 'smtps' : 'smtp',
-            'url' => env('MAIL_URL'),
+            'url' => $mailUrl,
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),
             'encryption' => env('MAIL_ENCRYPTION', 'tls'),
