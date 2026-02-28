@@ -40,7 +40,8 @@ return [
 
         'smtp' => [
             'transport' => 'smtp',
-            'scheme' => 'smtps',
+            // Use smtps only for implicit SSL (port 465); for port 587 use smtp + STARTTLS
+            'scheme' => (env('MAIL_ENCRYPTION') === 'ssl' || (int) env('MAIL_PORT', 2525) === 465) ? 'smtps' : 'smtp',
             'url' => env('MAIL_URL'),
             'host' => env('MAIL_HOST', '127.0.0.1'),
             'port' => env('MAIL_PORT', 2525),
