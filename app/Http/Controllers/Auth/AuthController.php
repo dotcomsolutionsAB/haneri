@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\OtpModel;
 use App\Models\AddressModel;
 use App\Mail\WelcomeUserMail;
+use App\Models\EmailLog;
 use App\Utils\MobileHelper;
 
 class AuthController extends Controller
@@ -38,8 +39,16 @@ class AuthController extends Controller
         try {
             Log::info('Sending WelcomeUserMail to '.$user->email);
             Mail::to($user->email)->send(new WelcomeUserMail($user, $appName));
+            EmailLog::record($user->email, WelcomeUserMail::class, 'sent', [
+                'recipient_user_id' => $user->id,
+                'subject'           => 'Welcome to ' . $appName . ' 🎉',
+            ]);
         } catch (\Throwable $e) {
             Log::error('Welcome email failed', ['error' => $e->getMessage()]);
+            EmailLog::record($user->email, WelcomeUserMail::class, 'failed', [
+                'recipient_user_id' => $user->id,
+                'error_message'    => $e->getMessage(),
+            ]);
         }
     }
     protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)

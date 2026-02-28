@@ -18,6 +18,7 @@ use App\Models\BrandModel;
 use App\Models\CategoryModel;
 use App\Models\ProductModel;
 use App\Utils\MobileHelper;
+use App\Models\EmailLog;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -52,8 +53,16 @@ class UserController extends Controller
             try {
                 Log::info('Sending WelcomeUserMail to '.$user->email);
                 Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
+                EmailLog::record($user->email, WelcomeUserMail::class, 'sent', [
+                    'recipient_user_id' => $user->id,
+                    'subject'           => 'Welcome to Haneri 🎉',
+                ]);
             } catch (\Throwable $e) {
                 Log::error('Welcome email failed', ['error' => $e->getMessage()]);
+                EmailLog::record($user->email, WelcomeUserMail::class, 'failed', [
+                    'recipient_user_id' => $user->id,
+                    'error_message'     => $e->getMessage(),
+                ]);
             }
         }
 
@@ -133,10 +142,17 @@ class UserController extends Controller
         // Send credentials email to the user (don’t fail the whole flow if mail breaks)
         try {
             Mail::to($user->email)->send(new UserRegisteredMail($user, $randomPassword));
+            EmailLog::record($user->email, UserRegisteredMail::class, 'sent', [
+                'recipient_user_id' => $user->id,
+                'subject'           => 'User Registered Mail',
+            ]);
         } catch (\Throwable $e) {
             Log::error('UserRegisteredMail failed', ['error' => $e->getMessage()]);
+            EmailLog::record($user->email, UserRegisteredMail::class, 'failed', [
+                'recipient_user_id' => $user->id,
+                'error_message'     => $e->getMessage(),
+            ]);
         }
-
 
         // Log the user in
         $token = $user->createToken('authToken')->plainTextToken;
@@ -400,7 +416,15 @@ class UserController extends Controller
 
         try {
             Mail::to($user->email)->send(new PasswordResetMail($user, $newPassword));
+            EmailLog::record($user->email, PasswordResetMail::class, 'sent', [
+                'recipient_user_id' => $user->id,
+                'subject'           => 'Your Reset Password',
+            ]);
         } catch (\Exception $e) {
+            EmailLog::record($user->email, PasswordResetMail::class, 'failed', [
+                'recipient_user_id' => $user->id,
+                'error_message'     => $e->getMessage(),
+            ]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to send email. Try again later.',
