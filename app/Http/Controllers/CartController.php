@@ -326,13 +326,13 @@ class CartController extends Controller
 
                 return [
                     'id' => $cartItem->id,
-                    // 'user_name' => $cartItem->user->name ,
                     'user_name' => $cartItem->user?->name ?? $cartItem->user_id,
                     'product_id' => $cartItem->product->id,
                     'product_name' => $cartItem->product->name,
                     'variant_id' => $variant_id,
                     'variant_value' => $variantType,
                     'selling_price' => $cartItem->selling_price,
+                    'discount' => (float) $discount,
                     'quantity' => $cartItem->quantity,
                     'file_urls' => $fileUrls,
                 ];
