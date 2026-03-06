@@ -135,10 +135,13 @@ class AuthController extends Controller
                 ], 422);
             }
 
+            // mobile is required and unique in DB; use placeholder when not provided so new user can be created
+            $mobile = ! empty($validated['mobile']) ? $validated['mobile'] : ('google_' . $googleId);
+
             $user = User::create([
                 'name'          => $name,
                 'email'         => $email,
-                'mobile'        => ! empty($validated['mobile']) ? $validated['mobile'] : null,
+                'mobile'        => $mobile,
                 'role'          => $role,              // ALWAYS 'customer' here
                 'selected_type' => $selectedType,      // store front choice
                 'gstin'         => $validated['gstin'] ?? null,
