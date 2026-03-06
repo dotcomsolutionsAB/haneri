@@ -13,10 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use App\Models\EmailLog;
-use App\Mail\OrderPlacedMail;
-
 
 class RazorpayController extends Controller
 {
