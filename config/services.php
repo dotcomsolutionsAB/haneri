@@ -55,4 +55,10 @@ return [
         'pickup_location' => env('SHIPROCKET_PICKUP_LOCATION'),
     ],
 
+    'smsalert' => [
+        'api_key' => env('SMSALERT_API_KEY'),
+        'sender'  => env('SMSALERT_SENDER', 'HANERI'),
+        'url'     => env('SMSALERT_URL', 'https://www.smsalert.co.in/api/push.json'),
+    ],
+
 ];

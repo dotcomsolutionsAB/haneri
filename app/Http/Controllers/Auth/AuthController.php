@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Mail;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
-use App\Utils\sendWhatsAppUtility;
+use App\Utils\SendSmsAlertUtility;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\OtpModel;
@@ -326,40 +326,12 @@ class AuthController extends Controller
             ], 500);
         }
 
-        $templateParams = [
-            'name'      => 'ace_otp',
-            'language'  => ['code' => 'en'],
-            'components'=> [
-                [
-                    'type'       => 'body',
-                    'parameters' => [
-                        [
-                            'type' => 'text',
-                            'text' => $six_digit_otp,
-                        ],
-                    ],
-                ],
-                [
-                    'type'     => 'button',
-                    'sub_type' => 'url',
-                    'index'    => '0',
-                    'parameters' => [
-                        [
-                            'type' => 'text',
-                            'text' => $six_digit_otp,
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        $whatsappUtility = new sendWhatsAppUtility();
-        $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
+        SendSmsAlertUtility::sendOtp($mobile, (string) $six_digit_otp, '10');
 
         return response()->json([
             'code'    => 200,
             'success' => true,
-            'message' => 'OTP sent successfully!',
+            'message' => 'OTP sent successfully via SMS!',
             'data'    => [],          // nothing extra to send back
         ], 200);
     }
@@ -515,35 +487,12 @@ class AuthController extends Controller
             ], 500);
         }
 
-        // Send WhatsApp (same as your template)
-        $templateParams = [
-            'name'      => 'ace_otp',
-            'language'  => ['code' => 'en'],
-            'components'=> [
-                [
-                    'type'       => 'body',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => $six_digit_otp],
-                    ],
-                ],
-                [
-                    'type'     => 'button',
-                    'sub_type' => 'url',
-                    'index'    => '0',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => $six_digit_otp],
-                    ],
-                ],
-            ],
-        ];
-
-        $whatsappUtility = new sendWhatsAppUtility();
-        $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
+        SendSmsAlertUtility::sendOtp($mobile, $six_digit_otp, '2');
 
         return response()->json([
             'code'    => 200,
             'success' => true,
-            'message' => 'OTP sent successfully!',
+            'message' => 'OTP sent successfully via SMS!',
             'data'    => [],
         ], 200);
     }
