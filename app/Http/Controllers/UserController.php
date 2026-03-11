@@ -98,10 +98,17 @@ class UserController extends Controller
         $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
         $request->validate([
             'mobile' => 'required|string|size:10|regex:/^[0-9]{10}$/',
+            'email'  => 'nullable|email',
         ]);
         $mobile = $request->input('mobile');
 
-        $existingUser = User::where('mobile', $mobile)->first();
+        // Existing user: match by mobile or by email (if email provided)
+        $existingUser = User::where(function ($q) use ($mobile, $request) {
+            $q->where('mobile', $mobile);
+            if ($request->filled('email')) {
+                $q->orWhere('email', $request->input('email'));
+            }
+        })->first();
 
         if ($existingUser) {
             CartModel::where('user_id', $cartId)->update(['user_id' => $existingUser->id]);
