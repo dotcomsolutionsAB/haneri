@@ -56,9 +56,12 @@ return [
     ],
 
     'smsalert' => [
-        'api_key' => env('SMSALERT_API_KEY'),
-        'sender'  => env('SMSALERT_SENDER', 'HANERI'),
-        'url'     => env('SMSALERT_URL', 'https://www.smsalert.co.in/api/push.json'),
+        'api_key'      => env('SMSALERT_API_KEY'),
+        'sender'      => env('SMSALERT_SENDER', 'HANERI'),
+        'url'         => env('SMSALERT_URL', 'https://www.smsalert.co.in/api/push.json'),
+        'otp_template' => env('SMSALERT_OTP_TEMPLATE', 'Your OTP is {#var#}. Do not share this code with anyone. Team Haneri'),
+        'template_id' => env('SMSALERT_TEMPLATE_ID'),
+        'entity_id'   => env('SMSALERT_ENTITY_ID'),
     ],
 
 ];

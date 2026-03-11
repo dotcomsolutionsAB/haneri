@@ -34,14 +34,24 @@ class SendSmsAlertUtility
 
         $endpoint = $url . (str_contains($url, '?') ? '&' : '?') . 'apikey=' . urlencode($apiKey);
 
+        $payload = [
+            'sender'   => $sender,
+            'mobileno' => $mobileno,
+            'text'     => $message,
+        ];
+        $templateId = config('services.smsalert.template_id');
+        $entityId   = config('services.smsalert.entity_id');
+        if (! empty($templateId)) {
+            $payload['template_id'] = $templateId;
+        }
+        if (! empty($entityId)) {
+            $payload['entity_id'] = $entityId;
+        }
+
         try {
             $response = Http::asForm()
                 ->timeout(15)
-                ->post($endpoint, [
-                    'sender'   => $sender,
-                    'mobileno' => $mobileno,
-                    'text'     => $message,
-                ]);
+                ->post($endpoint, $payload);
 
             if ($response->successful()) {
                 return true;
@@ -62,11 +72,16 @@ class SendSmsAlertUtility
     }
 
     /**
-     * Send OTP message. Convenience method for consistent OTP wording.
+     * Send OTP using the approved DLT template.
+     * Template text is from config (default matches approved "Your OTP is {#var#}. Do not share...").
+     * The {#var#} placeholder is replaced with the actual OTP.
+     *
+     * @param  string  $validMinutes  Kept for API compatibility; not included in SMS body to match DLT template.
      */
     public static function sendOtp(string $mobile, string $otp, string $validMinutes = '10'): bool
     {
-        $message = "Your Haneri OTP is {$otp}. Valid for {$validMinutes} minutes. Do not share.";
+        $template = config('services.smsalert.otp_template', 'Your OTP is {#var#}. Do not share this code with anyone. Team Haneri');
+        $message  = str_replace('{#var#}', $otp, $template);
         return self::send($mobile, $message);
     }
 }
