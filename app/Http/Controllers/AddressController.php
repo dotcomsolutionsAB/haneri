@@ -63,6 +63,8 @@ class AddressController extends Controller
             $user_id =  $user->id;
         }
 
+        
+
         // If the user selects a default address, set all other addresses to not default
         if ($request->input('is_default') == true) {
             AddressModel::where('user_id', $user_id)->update(['is_default' => false]);

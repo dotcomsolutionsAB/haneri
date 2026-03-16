@@ -21,8 +21,7 @@ use App\Http\Controllers\DelhiveryServiceController;
 use App\Http\Controllers\ShiprocketController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\InvoiceController;
-
-
+use App\Http\Controllers\SmsAlertTestController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -33,6 +32,7 @@ Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 
 Route::post('/request-otp', [AuthController::class, 'request_otp']);
 Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
+Route::post('/test/sms-alert', [SmsAlertTestController::class, 'sendTestOtp']);
 Route::post('/delivery/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
 Route::post('/delivery/track', [DelhiveryServiceController::class, 'trackShipments']);
 Route::post('/shiprocket/rates', [ShiprocketController::class, 'getShippingRates']);

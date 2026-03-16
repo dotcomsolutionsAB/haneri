@@ -10,6 +10,7 @@ use App\Models\ProductModel;
 use App\Models\ProductVariantModel;
 use App\Mail\QuotationMail;
 use App\Models\User;
+use App\Models\EmailLog;
 use DB;
 use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
@@ -138,11 +139,18 @@ class QuotationController extends Controller
 
             // Send email with a notification to the authenticated user
             try {
-                // Send the email to the authenticated user's email
-                Mail::to($user->email)->send(new QuotationMail($quotation, $user));  
+                Mail::to($user->email)->send(new QuotationMail($quotation, $user));
                 \Log::info('Quotation email sent successfully to ' . $user->email);
+                EmailLog::record($user->email, QuotationMail::class, 'sent', [
+                    'recipient_user_id' => $user->id,
+                    'subject'           => 'Your Quotation has been generated!',
+                ]);
             } catch (\Exception $e) {
                 \Log::error('Failed to send quotation email: ' . $e->getMessage());
+                EmailLog::record($user->email, QuotationMail::class, 'failed', [
+                    'recipient_user_id' => $user->id,
+                    'error_message'     => $e->getMessage(),
+                ]);
             }
 
             // Prepare response

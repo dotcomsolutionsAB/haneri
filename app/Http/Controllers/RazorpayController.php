@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Mail;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-
+use App\Models\EmailLog;
 
 class RazorpayController extends Controller
 {
@@ -276,8 +276,16 @@ class RazorpayController extends Controller
                 Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
                 $order->mail_sent_at = now();
                 $order->save();
+                EmailLog::record($orderUser->email, OrderPlacedMail::class, 'sent', [
+                    'recipient_user_id' => $orderUser->id,
+                    'subject'            => 'Order Confirmed • #' . $order->id . ' • ' . config('app.name'),
+                ]);
             } catch (\Throwable $e) {
                 Log::warning('OrderPlacedMail failed in callback for order '.$orderId.': '.$e->getMessage());
+                EmailLog::record($orderUser->email, OrderPlacedMail::class, 'failed', [
+                    'recipient_user_id' => $orderUser->id,
+                    'error_message'     => $e->getMessage(),
+                ]);
             }
         });
 

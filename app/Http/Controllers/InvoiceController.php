@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use App\Models\OrderModel;
 use App\Models\UploadModel;
 use App\Mail\OrderStatusUpdate;
+use App\Models\EmailLog;
 use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
@@ -140,7 +141,19 @@ class InvoiceController extends Controller
         if ($oldStatus !== $order->status || $oldPaymentStatus !== $order->payment_status) {
             Log::info('Order status or payment status has changed. Sending email.');
             $user = $order->user;
-            Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+            try {
+                Mail::to($user->email)->send(new OrderStatusUpdate($order, $user, $order->status, $order->payment_status));
+                EmailLog::record($user->email, OrderStatusUpdate::class, 'sent', [
+                    'recipient_user_id' => $user->id,
+                    'subject'           => 'Order Status Updated - Order #' . $order->id,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('OrderStatusUpdate email failed: ' . $e->getMessage());
+                EmailLog::record($user->email, OrderStatusUpdate::class, 'failed', [
+                    'recipient_user_id' => $user->id,
+                    'error_message'     => $e->getMessage(),
+                ]);
+            }
         } else {
             Log::info('No status or payment status change. No email sent.');
         }

@@ -8,12 +8,13 @@ use Illuminate\Support\Facades\Mail;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
-use App\Utils\sendWhatsAppUtility;
+use App\Utils\SendSmsAlertUtility;
 use Illuminate\Http\Request;
 use App\Models\User;
 use App\Models\OtpModel;
 use App\Models\AddressModel;
 use App\Mail\WelcomeUserMail;
+use App\Models\EmailLog;
 use App\Utils\MobileHelper;
 
 class AuthController extends Controller
@@ -38,8 +39,16 @@ class AuthController extends Controller
         try {
             Log::info('Sending WelcomeUserMail to '.$user->email);
             Mail::to($user->email)->send(new WelcomeUserMail($user, $appName));
+            EmailLog::record($user->email, WelcomeUserMail::class, 'sent', [
+                'recipient_user_id' => $user->id,
+                'subject'           => 'Welcome to ' . $appName . ' 🎉',
+            ]);
         } catch (\Throwable $e) {
             Log::error('Welcome email failed', ['error' => $e->getMessage()]);
+            EmailLog::record($user->email, WelcomeUserMail::class, 'failed', [
+                'recipient_user_id' => $user->id,
+                'error_message'    => $e->getMessage(),
+            ]);
         }
     }
     protected function handleGoogleAuthFromIdToken(Request $request, bool $mustMatchEmail = false)
@@ -317,40 +326,12 @@ class AuthController extends Controller
             ], 500);
         }
 
-        $templateParams = [
-            'name'      => 'ace_otp',
-            'language'  => ['code' => 'en'],
-            'components'=> [
-                [
-                    'type'       => 'body',
-                    'parameters' => [
-                        [
-                            'type' => 'text',
-                            'text' => $six_digit_otp,
-                        ],
-                    ],
-                ],
-                [
-                    'type'     => 'button',
-                    'sub_type' => 'url',
-                    'index'    => '0',
-                    'parameters' => [
-                        [
-                            'type' => 'text',
-                            'text' => $six_digit_otp,
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        $whatsappUtility = new sendWhatsAppUtility();
-        $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
+        SendSmsAlertUtility::sendOtp($mobile, (string) $six_digit_otp, '10');
 
         return response()->json([
             'code'    => 200,
             'success' => true,
-            'message' => 'OTP sent successfully!',
+            'message' => 'OTP sent successfully via SMS!',
             'data'    => [],          // nothing extra to send back
         ], 200);
     }
@@ -506,35 +487,12 @@ class AuthController extends Controller
             ], 500);
         }
 
-        // Send WhatsApp (same as your template)
-        $templateParams = [
-            'name'      => 'ace_otp',
-            'language'  => ['code' => 'en'],
-            'components'=> [
-                [
-                    'type'       => 'body',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => $six_digit_otp],
-                    ],
-                ],
-                [
-                    'type'     => 'button',
-                    'sub_type' => 'url',
-                    'index'    => '0',
-                    'parameters' => [
-                        ['type' => 'text', 'text' => $six_digit_otp],
-                    ],
-                ],
-            ],
-        ];
-
-        $whatsappUtility = new sendWhatsAppUtility();
-        $whatsappUtility->sendWhatsApp($mobile, $templateParams, $mobile, 'OTP Campaign');
+        SendSmsAlertUtility::sendOtp($mobile, $six_digit_otp, '2');
 
         return response()->json([
             'code'    => 200,
             'success' => true,
-            'message' => 'OTP sent successfully!',
+            'message' => 'OTP sent successfully via SMS!',
             'data'    => [],
         ], 200);
     }
