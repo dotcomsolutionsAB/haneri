@@ -22,7 +22,7 @@ use App\Http\Controllers\ShiprocketController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\SmsAlertTestController;
-use App\Http\Controllers\Api\ContactFormController;
+use App\Http\Controllers\ContactFormController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
