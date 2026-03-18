@@ -69,7 +69,7 @@ Route::prefix('brands')->group(function () {
 });
 
 Route::post('/contact/create', [ContactFormController::class, 'create']);
-Route::get('/contact/fetch', [ContactFormController::class, 'fetch']);
+Route::post('/contact/fetch', [ContactFormController::class, 'fetch']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);     // Log out the user
