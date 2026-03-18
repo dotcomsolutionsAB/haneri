@@ -59,6 +59,7 @@ class ContactFormController extends Controller
         try {
             $limit  = max(1, (int) $request->input('limit', 10));
             $offset = max(0, (int) $request->input('offset', 0));
+
             $email  = trim((string) $request->input('email', ''));
             $mobile = trim((string) $request->input('mobile', ''));
 
