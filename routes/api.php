@@ -22,6 +22,7 @@ use App\Http\Controllers\ShiprocketController;
 use App\Http\Controllers\UploadController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\SmsAlertTestController;
+use App\Http\Controllers\Api\ContactFormController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -66,6 +67,9 @@ Route::prefix('brands')->group(function () {
     Route::post('/fetch', [BrandController::class, 'index']);            // List all brands
     Route::post('/fetch/{id}', [BrandController::class, 'show']);         // Get details of a single brand
 });
+
+Route::post('/contact/create', [ContactFormController::class, 'create']);
+Route::get('/contact/fetch', [ContactFormController::class, 'fetch']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);     // Log out the user
