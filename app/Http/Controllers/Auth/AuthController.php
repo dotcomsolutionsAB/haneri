@@ -135,6 +135,18 @@ class AuthController extends Controller
                 ], 422);
             }
 
+            if (! empty($validated['mobile'])) {
+                $mobileInUse = User::where('mobile', $validated['mobile'])->exists();
+                if ($mobileInUse) {
+                    return response()->json([
+                        'code'    => 422,
+                        'success' => false,
+                        'message' => 'This mobile number is already linked to another account.',
+                        'data'    => [],
+                    ], 422);
+                }
+            }
+
             $user = User::create([
                 'name'          => $name,
                 'email'         => $email,
@@ -163,6 +175,19 @@ class AuthController extends Controller
 
             // ✅ UPDATE ONLY SAFE FIELDS (mobile already normalised to 10 digits)
             if (! empty($validated['mobile']) && strlen($validated['mobile']) === 10) {
+                $mobileTakenByAnotherUser = User::where('mobile', $validated['mobile'])
+                    ->where('id', '!=', $user->id)
+                    ->exists();
+
+                if ($mobileTakenByAnotherUser) {
+                    return response()->json([
+                        'code'    => 422,
+                        'success' => false,
+                        'message' => 'This mobile number is already linked to another account.',
+                        'data'    => [],
+                    ], 422);
+                }
+
                 $user->mobile = $validated['mobile'];
             }
 
