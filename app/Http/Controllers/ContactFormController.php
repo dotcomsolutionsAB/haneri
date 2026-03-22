@@ -3,8 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Mail\ContactFormSubmittedMail;
 use App\Models\ContactFormModel;
+use App\Models\EmailLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 
 class ContactFormController extends Controller
@@ -34,6 +38,24 @@ class ContactFormController extends Controller
                 'mobile'   => $request->mobile,
                 'comments' => $request->comments,
             ]);
+
+            $recipient = config('mail.contact_form_recipient', 'info@haneri.com');
+            if (! empty($recipient)) {
+                try {
+                    Mail::to($recipient)->send(new ContactFormSubmittedMail($contact));
+                    EmailLog::record($recipient, ContactFormSubmittedMail::class, 'sent', [
+                        'subject' => 'New contact form submission • #' . $contact->id,
+                    ]);
+                } catch (\Throwable $e) {
+                    Log::warning('Contact form notification email failed: ' . $e->getMessage(), [
+                        'contact_id' => $contact->id,
+                    ]);
+                    EmailLog::record($recipient, ContactFormSubmittedMail::class, 'failed', [
+                        'subject'       => 'New contact form submission • #' . $contact->id,
+                        'error_message' => $e->getMessage(),
+                    ]);
+                }
+            }
 
             return response()->json([
                 'code'    => 201,

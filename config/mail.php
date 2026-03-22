@@ -138,4 +138,15 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Contact form notification recipient
+    |--------------------------------------------------------------------------
+    |
+    | Inbound website contact form submissions are emailed to this address.
+    |
+    */
+
+    'contact_form_recipient' => env('CONTACT_FROM_RECIPIENT', 'info@haneri.com'),
+
 ];
