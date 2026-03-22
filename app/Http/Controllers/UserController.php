@@ -33,9 +33,9 @@ class UserController extends Controller
         $request->merge(['mobile' => MobileHelper::normalize($request->input('mobile'))]);
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
-            'email'         => 'required|email|unique:users,email',
+            'email'         => 'required|email',
             'password'      => 'required|string|min:8',
-            'mobile'        => 'required|string|size:10|regex:/^[0-9]{10}$/|unique:users,mobile',
+            'mobile'        => 'required|string|size:10|regex:/^[0-9]{10}$/',
             'gstin'         => [
                                 'nullable',
                                 'string',
@@ -43,13 +43,26 @@ class UserController extends Controller
                                 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/i',
                             ],
             'selected_type' => 'nullable|string',
-            
+
         ]);
 
-        $user = $this->createUser($validated);
+        $byEmail  = User::where('email', $validated['email'])->first();
+        $byMobile = User::where('mobile', $validated['mobile'])->first();
 
-        // Optional: send welcome mail (skip if caller sets a flag)
-        if (!$request->boolean('suppress_welcome_mail')) {
+        // Mobile match wins (including when email matches a different account)
+        $isNewUser = false;
+
+        if ($byMobile) {
+            $user = $byMobile;
+        } elseif ($byEmail) {
+            $user = $byEmail;
+        } else {
+            $user      = $this->createUser($validated);
+            $isNewUser = true;
+        }
+
+        // Welcome mail only for brand-new users
+        if ($isNewUser && ! $request->boolean('suppress_welcome_mail')) {
             try {
                 Log::info('Sending WelcomeUserMail to '.$user->email);
                 Mail::to($user->email)->send(new WelcomeUserMail($user, 'Haneri'));
@@ -68,11 +81,19 @@ class UserController extends Controller
 
         $token = $user->createToken('authToken')->plainTextToken;
 
+        if ($isNewUser) {
+            return response()->json([
+                'message' => 'User registered successfully!',
+                'data'    => $user->only(['name', 'email', 'mobile', 'role', 'gstin', 'selected_type']),
+                'token'   => $token,
+            ], 201);
+        }
+
         return response()->json([
-            'message' => 'User registered successfully!',
-            'data'    => $user->only(['name','email','mobile','role','gstin','selected_type']),
+            'message' => 'User already exists. Signed in with new token.',
+            'data'    => $user->only(['name', 'email', 'mobile', 'role', 'gstin', 'selected_type']),
             'token'   => $token,
-        ], 201);
+        ], 200);
     }
 
     private function createUser(array $attrs): \App\Models\User

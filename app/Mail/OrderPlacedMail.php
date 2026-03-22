@@ -45,9 +45,10 @@ class OrderPlacedMail extends Mailable
         $this->supportEmail    = env('MAIL_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
         $this->techSupportEmail= env('MAIL_TECH_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
 
-        // Where the user can view the order on the website (adjust path if needed)
-        $this->orderUrl        = $this->frontendUrl . '/account/profile#order';
-        // $this->orderUrl        = $this->frontendUrl . '/profile/' . $this->order->id;
+        // Magic link: one-time API token so the frontend can sign the user in when they open the link
+        $plainToken = $user->createToken('order-placed-email')->plainTextToken;
+        $base       = rtrim((string) $this->frontendUrl, '/') . '/account/profile';
+        $this->orderUrl = $base . '?token=' . rawurlencode($plainToken) . '#order';
     }
 
     public function envelope(): Envelope
