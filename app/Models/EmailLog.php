@@ -16,11 +16,13 @@ class EmailLog extends Model
         'subject',
         'status',
         'error_message',
+        'metadata',
         'sent_at',
     ];
 
     protected $casts = [
-        'sent_at' => 'datetime',
+        'sent_at'  => 'datetime',
+        'metadata' => 'array',
     ];
 
     public function recipientUser(): BelongsTo
@@ -34,7 +36,7 @@ class EmailLog extends Model
      * @param  string  $recipientEmail
      * @param  string  $mailableClass  Fully qualified class name, e.g. App\Mail\WelcomeUserMail
      * @param  string  $status  'sent' or 'failed'
-     * @param  array{subject?: string, error_message?: string, recipient_user_id?: int}  $options
+     * @param  array{subject?: string, error_message?: string, recipient_user_id?: int, metadata?: array<string, mixed>}  $options
      */
     public static function record(
         string $recipientEmail,
@@ -49,6 +51,7 @@ class EmailLog extends Model
             'subject'            => $options['subject'] ?? null,
             'status'             => $status,
             'error_message'      => $options['error_message'] ?? null,
+            'metadata'           => $options['metadata'] ?? null,
             'sent_at'            => $options['sent_at'] ?? now(),
         ]);
     }

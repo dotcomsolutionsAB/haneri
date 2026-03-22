@@ -24,6 +24,13 @@ class ContactFormSubmittedMail extends Mailable
         $this->siteName = config('app.name', 'Haneri');
     }
 
+    public static function subjectForContact(ContactFormModel $contact, ?string $siteName = null): string
+    {
+        $site = $siteName ?? config('app.name', 'Haneri');
+
+        return 'New contact form submission • #' . $contact->id . ' • ' . $site;
+    }
+
     public function envelope(): Envelope
     {
         $replyTo = [];
@@ -32,7 +39,7 @@ class ContactFormSubmittedMail extends Mailable
         }
 
         return new Envelope(
-            subject: 'New contact form submission • #' . $this->contact->id . ' • ' . $this->siteName,
+            subject: self::subjectForContact($this->contact, $this->siteName),
             replyTo: $replyTo,
         );
     }

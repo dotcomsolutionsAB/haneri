@@ -39,22 +39,38 @@ class ContactFormController extends Controller
                 'comments' => $request->comments,
             ]);
 
-            $recipient = config('mail.contact_form_recipient', 'info@haneri.com');
-            if (! empty($recipient)) {
+            $recipient = trim((string) config('mail.contact_form_recipient', 'info@haneri.com'));
+            $logMeta   = [
+                'contact_form_id' => $contact->id,
+                'visitor_name'    => $contact->name,
+                'visitor_email'   => $contact->email,
+                'visitor_mobile'  => $contact->mobile,
+            ];
+            $subjectLine = ContactFormSubmittedMail::subjectForContact($contact);
+
+            if ($recipient !== '') {
                 try {
                     Mail::to($recipient)->send(new ContactFormSubmittedMail($contact));
                     EmailLog::record($recipient, ContactFormSubmittedMail::class, 'sent', [
-                        'subject' => 'New contact form submission • #' . $contact->id,
+                        'subject'  => $subjectLine,
+                        'metadata' => $logMeta,
                     ]);
                 } catch (\Throwable $e) {
                     Log::warning('Contact form notification email failed: ' . $e->getMessage(), [
                         'contact_id' => $contact->id,
                     ]);
                     EmailLog::record($recipient, ContactFormSubmittedMail::class, 'failed', [
-                        'subject'       => 'New contact form submission • #' . $contact->id,
+                        'subject'       => $subjectLine,
                         'error_message' => $e->getMessage(),
+                        'metadata'      => $logMeta,
                     ]);
                 }
+            } else {
+                EmailLog::record('_no_recipient_', ContactFormSubmittedMail::class, 'failed', [
+                    'subject'       => $subjectLine,
+                    'error_message' => 'CONTACT_FROM_RECIPIENT is not set or empty; notification email was not sent.',
+                    'metadata'      => $logMeta,
+                ]);
             }
 
             return response()->json([
