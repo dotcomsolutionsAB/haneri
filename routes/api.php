@@ -203,8 +203,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     Route::prefix('returns')->group(function () {
-        Route::get('/create', [ReturnRequestController::class, 'create']);            // List all orders for a user
-        Route::get('/fetch', [ReturnRequestController::class, 'fetch']);            // Create a new order
+        Route::post('/create', [ReturnRequestController::class, 'create']);            // List all orders for a user
+        Route::post('/fetch', [ReturnRequestController::class, 'fetch']);            // Create a new order
         Route::delete('delete/{id}', [ReturnRequestController::class, 'delete']);           // Create a new order
         Route::post('/update/{id}', [ReturnRequestController::class, 'update']);
     });
