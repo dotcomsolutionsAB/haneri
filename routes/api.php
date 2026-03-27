@@ -23,6 +23,8 @@ use App\Http\Controllers\UploadController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\SmsAlertTestController;
 use App\Http\Controllers\ContactFormController;
+use App\Http\Controllers\ReturnRequestController;
+
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -198,6 +200,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/', [OrderController::class, 'store']);           // Create a new order
         Route::delete('/{id}', [OrderController::class, 'delete']);           // Create a new order
         Route::post('/{id}/update-status', [OrderController::class, 'statusUpdate']);
+    });
+
+    Route::prefix('returns')->group(function () {
+        Route::get('/create', [ReturnRequestController::class, 'create']);            // List all orders for a user
+        Route::get('/fetch', [ReturnRequestController::class, 'fetch']);            // Create a new order
+        Route::delete('delete/{id}', [ReturnRequestController::class, 'delete']);           // Create a new order
+        Route::post('/update/{id}', [ReturnRequestController::class, 'update']);
     });
 
     // Setting Routes
