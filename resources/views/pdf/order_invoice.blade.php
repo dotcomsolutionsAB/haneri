@@ -313,12 +313,11 @@
                     @endphp
                     <tr>
                         <td class="text-center">{{ $loop->iteration }}</td>
-                        <td class="item-name-cell">
+                        <td class="item-name-cell" style="text-align:left;">
                             <table class="product-inner-table">
                                 <tr>
                                     <td class="product-img-td">
-                                        <img src="{{ asset('storage/upload/logo/Haneri_Favicon.jpg') }}"
-                                             class="product-image" alt="H">
+                                        <img src="{{ asset('storage/' . optional($item->variant->product->photo)->file_path) }}" class="product-image" alt="Fan">
                                     </td>
                                     <td class="product-info">
                                         <strong>{{ optional($item->product)->name ?? 'Product #'.$item->product_id }}</strong>

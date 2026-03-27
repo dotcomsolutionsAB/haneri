@@ -76,6 +76,13 @@ class OrderStatusUpdate extends Mailable
                         'techSupportEmail' => $this->techSupportEmail,
                         'invoice' => $this->invoice, // Pass invoice to view
                     ]);
+
+                    // Attach invoice PDF if the status is 'completed'
+        if ($this->status == 'completed' && $this->invoice) {
+            $email->attachFromStorageDisk('public', $this->invoice['url'], 'Invoice-' . $this->order->id . '.pdf');
+        }
+
+        return $email;
     }
 
     /**
