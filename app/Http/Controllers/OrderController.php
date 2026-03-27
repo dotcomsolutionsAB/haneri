@@ -678,6 +678,9 @@ class OrderController extends Controller
                         'invoiceFile',
                     ]);
 
+                    $order->order_date = $order->created_at->toDateString(); // or format it as needed
+                    $order->return = true;  // You can change this if needed to a dynamic value
+                    
                     // 5) Attach clean invoice data
                     $order->invoice = [
                         'id'  => $invoiceId,
