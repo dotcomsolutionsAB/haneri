@@ -179,6 +179,22 @@ class InvoiceController extends Controller
 
         $order->loadMissing(['user','items.product','items.variant']);
 
+        // Loop through order items to get the first photo from photo_id
+        foreach ($order->items as $item) {
+            // Check if there is a photo_id
+            if ($item->variant && $item->variant->photo_id) {
+                // Get the first photo_id from the comma-separated list
+                $firstPhotoId = explode(',', $item->variant->photo_id)[0];  // Get the first photo ID
+                
+                // Fetch the photo path using UploadModel
+                $photo = UploadModel::find($firstPhotoId);  // Find photo using the first ID
+                if ($photo) {
+                    // Set the photo URL
+                    $item->variant->photo_url = 'storage/' . $photo->file_path;
+                }
+            }
+        }
+
         // ===== INVOICE NUMBER ===== //
         $dt    = $order->created_at ?? now();
         $year  = $dt->format('Y');
