@@ -16,7 +16,7 @@ class ReturnRequestController extends Controller
         ]);
 
         // Create the return request with default status 'initiated'
-        $returnRequest = ReturnRequest::create([
+        $returnRequest = ReturnRequestModel::create([
             'order_id' => $validated['order_id'],
             'user_id'  => auth()->id(), // Store logged-in user's ID
             'amount'   => 0, // You can change this based on logic
@@ -41,7 +41,7 @@ class ReturnRequestController extends Controller
             'status'   => 'nullable|in:initiated,accepted,declined',
         ]);
 
-        $query = ReturnRequest::query();
+        $query = ReturnRequestModel::query();
 
         // Apply filters if present
         if ($validated['order_id'] ?? false) {
@@ -72,7 +72,7 @@ class ReturnRequestController extends Controller
     public function delete($id)
     {
         // Find the return request by ID
-        $returnRequest = ReturnRequest::find($id);
+        $returnRequest = ReturnRequestModel::find($id);
 
         if (!$returnRequest) {
             return response()->json([
@@ -96,7 +96,7 @@ class ReturnRequestController extends Controller
         ]);
 
         // Find the return request by ID
-        $returnRequest = ReturnRequest::find($id);
+        $returnRequest = ReturnRequestModel::find($id);
 
         if (!$returnRequest) {
             return response()->json([
