@@ -25,6 +25,7 @@ use App\Http\Controllers\SmsAlertTestController;
 use App\Http\Controllers\ContactFormController;
 use App\Http\Controllers\ReturnRequestController;
 
+use App\Http\Controllers\BlogController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -72,6 +73,8 @@ Route::prefix('brands')->group(function () {
 
 Route::post('/contact/create', [ContactFormController::class, 'create']);
 Route::post('/contact/fetch', [ContactFormController::class, 'fetch']);
+Route::get('/blogs', [BlogController::class, 'index']);
+Route::get('/blogs/{slug}', [BlogController::class, 'showBySlug']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);     // Log out the user
@@ -94,7 +97,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
     });
 
-    Route::middleware('role:admin')->group(function () {       
+    Route::middleware('role:admin')->group(function () {
+        Route::prefix('blogs')->group(function () {
+            Route::post('/fetch/{id?}', [BlogController::class, 'adminIndex']);
+            Route::post('/create', [BlogController::class, 'store']);
+            Route::post('/update/{id}', [BlogController::class, 'update']);
+            Route::delete('/delete/{id}', [BlogController::class, 'destroy']);
+        });
         
         // Product Routes
         Route::prefix('products')->group(function () {
