@@ -7,6 +7,7 @@ use App\Models\BlogModel;
 use App\Models\BlogTagModel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class BlogController extends Controller
@@ -123,9 +124,14 @@ class BlogController extends Controller
         $validated = $this->validatePayload($request);
         $slug = $this->resolveSlug($validated['slug'] ?? null, $validated['title']);
         $validated['slug'] = $this->uniqueSlug($slug);
+        $coverImagePath = $this->storeCoverImage($request);
 
-        $blog = DB::transaction(function () use ($validated) {
-            $blog = BlogModel::create($this->extractBlogData($validated));
+        $blog = DB::transaction(function () use ($validated, $coverImagePath) {
+            $blogData = $this->extractBlogData($validated);
+            if ($coverImagePath !== null) {
+                $blogData['cover_image'] = $coverImagePath;
+            }
+            $blog = BlogModel::create($blogData);
             $this->syncTags($blog, $validated['tags'] ?? []);
             $this->replaceFaqs($blog, $validated['faqs'] ?? []);
             return $blog->load(['tags:id,name,slug', 'faqs:id,blog_id,question,answer,sort_order']);
@@ -157,9 +163,18 @@ class BlogController extends Controller
             $slugBase = $this->resolveSlug(null, $validated['title']);
         }
         $validated['slug'] = $this->uniqueSlug($slugBase, $blog->id);
+        $coverImagePath = $this->storeCoverImage($request);
 
-        $updated = DB::transaction(function () use ($blog, $validated) {
-            $blog->update($this->extractBlogData($validated));
+        $updated = DB::transaction(function () use ($blog, $validated, $coverImagePath) {
+            $blogData = $this->extractBlogData($validated);
+            if ($coverImagePath !== null) {
+                // Remove previous file to avoid orphaned uploads.
+                if (! empty($blog->cover_image)) {
+                    Storage::disk('public')->delete($blog->cover_image);
+                }
+                $blogData['cover_image'] = $coverImagePath;
+            }
+            $blog->update($blogData);
 
             if (array_key_exists('tags', $validated)) {
                 $this->syncTags($blog, $validated['tags'] ?? []);
@@ -210,7 +225,7 @@ class BlogController extends Controller
             'sub_title' => 'nullable|string|max:255',
             'slug' => 'nullable|string|max:255',
             'content' => $required . '|string',
-            'cover_image' => 'nullable|string|max:1000',
+            'cover_image' => 'nullable|file|image|max:5120',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
             'meta_keywords' => 'nullable|string',
@@ -259,7 +274,7 @@ class BlogController extends Controller
     private function extractBlogData(array $validated): array
     {
         $keys = [
-            'title', 'sub_title', 'slug', 'content', 'cover_image',
+            'title', 'sub_title', 'slug', 'content',
             'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
             'og_title', 'og_description', 'og_image', 'is_published', 'published_at',
         ];
@@ -272,6 +287,20 @@ class BlogController extends Controller
         }
 
         return $payload;
+    }
+
+    private function storeCoverImage(Request $request): ?string
+    {
+        if (! $request->hasFile('cover_image')) {
+            return null;
+        }
+
+        $file = $request->file('cover_image');
+        if (! $file || ! $file->isValid()) {
+            return null;
+        }
+
+        return $file->store('blogs/covers', 'public');
     }
 
     private function syncTags(BlogModel $blog, array $tags): void
