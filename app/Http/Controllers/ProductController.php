@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
 use Auth;
 
 class ProductController extends Controller
@@ -236,8 +237,8 @@ class ProductController extends Controller
     public function upload3dFile(Request $request, int $variant)
     {
         $request->validate([
-            'file'    => 'required_without:glb_model|file|mimes:glb|max:102400',
-            'glb_model' => 'required_without:file|file|mimes:glb|max:102400',
+            'file'      => $this->glbUploadRules('required_without:glb_model'),
+            'glb_model' => $this->glbUploadRules('required_without:file'),
         ]);
 
         $variant = ProductVariantModel::findOrFail($variant);
@@ -251,7 +252,7 @@ class ProductController extends Controller
 
         DB::beginTransaction();
         try {
-            $ext = strtolower($file->getClientOriginalExtension());
+            $ext = 'glb';
             $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
             $base = Str::slug($origName) ?: 'model';
             $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
@@ -896,7 +897,6 @@ class ProductController extends Controller
     /* Helper function to extract product page type (e.g., 'ProductPage_Main') from file path */
     private function getBannerType($filePath)
     {
-        // Extract the type from the filename (assuming it follows the pattern as per your example)
         if (strpos($filePath, 'productpage-main') !== false) {
             return 'ProductPage_Main';
         } elseif (strpos($filePath, 'productpage-bldc') !== false) {
@@ -907,7 +907,26 @@ class ProductController extends Controller
             return 'ProductPage_Color';
         }
 
-        return 'Unknown'; // Return 'Unknown' for anything that doesn't match
+        return 'Unknown';
+    }
+
+    private function glbUploadRules(string $presenceRule): array
+    {
+        return [
+            $presenceRule,
+            'file',
+            'max:102400',
+            function (string $attribute, $value, \Closure $fail) {
+                if (!$value instanceof UploadedFile) {
+                    $fail('The uploaded file is invalid.');
+                    return;
+                }
+
+                if (strtolower($value->getClientOriginalExtension()) !== 'glb') {
+                    $fail('The file must have a .glb extension.');
+                }
+            },
+        ];
     }
 
     private function deleteUploadRecord(?int $uploadId): void
