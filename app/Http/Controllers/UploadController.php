@@ -155,5 +155,69 @@ class UploadController extends Controller
         ], 200);
     }
 
+    public function deleteVariant3dFile(int $variant)
+    {
+        $variant = ProductVariantModel::findOrFail($variant);
+        $uploadId = $variant->{'3d_file'} ? (int) $variant->{'3d_file'} : 0;
+
+        if (!$uploadId) {
+            return response()->json([
+                'success' => false,
+                'message' => '3D file not found for this variant.',
+            ], 404);
+        }
+
+        DB::transaction(function () use ($variant, $uploadId) {
+            $variant->{'3d_file'} = null;
+            $variant->save();
+
+            if ($upload = UploadModel::find($uploadId)) {
+                Storage::disk('public')->delete($upload->file_path);
+                $upload->delete();
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => '3D file deleted successfully.',
+            'data' => [
+                'variant_id' => $variant->id,
+                '3d_file'    => null,
+            ],
+        ], 200);
+    }
+
+    public function deleteVariant3dPlaceholder(int $variant)
+    {
+        $variant = ProductVariantModel::findOrFail($variant);
+        $uploadId = $variant->{'3d_placeholder'} ? (int) $variant->{'3d_placeholder'} : 0;
+
+        if (!$uploadId) {
+            return response()->json([
+                'success' => false,
+                'message' => '3D placeholder not found for this variant.',
+            ], 404);
+        }
+
+        DB::transaction(function () use ($variant, $uploadId) {
+            $variant->{'3d_placeholder'} = null;
+            $variant->save();
+
+            if ($upload = UploadModel::find($uploadId)) {
+                Storage::disk('public')->delete($upload->file_path);
+                $upload->delete();
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => '3D placeholder deleted successfully.',
+            'data' => [
+                'variant_id'      => $variant->id,
+                '3d_placeholder'  => null,
+            ],
+        ], 200);
+    }
+
 
 }

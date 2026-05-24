@@ -233,6 +233,105 @@ class ProductController extends Controller
         }
     }
 
+    public function upload3dFile(Request $request, int $variant)
+    {
+        $request->validate([
+            '3d_file' => 'required|file|mimes:glb|max:102400',
+        ]);
+
+        $variant = ProductVariantModel::findOrFail($variant);
+
+        DB::beginTransaction();
+        try {
+            $file = $request->file('3d_file');
+            $ext = strtolower($file->getClientOriginalExtension());
+            $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $base = Str::slug($origName) ?: 'model';
+            $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
+            $path = $file->storeAs('upload/product_3d', $filename, 'public');
+
+            $upload = UploadModel::create([
+                'type'      => '3d_model',
+                'file_path' => $path,
+                'size'      => (int) round($file->getSize() / 1024),
+                'alt_text'  => $filename,
+            ]);
+
+            $this->deleteUploadRecord($variant->{'3d_file'} ? (int) $variant->{'3d_file'} : null);
+
+            $variant->{'3d_file'} = $upload->id;
+            $variant->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message'    => '3D file uploaded successfully.',
+                'variant_id' => $variant->id,
+                '3d_file'    => [
+                    'id'  => $upload->id,
+                    'url' => Storage::disk('public')->url($path),
+                ],
+            ], 201);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to upload 3D file.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function upload3dPlaceholder(Request $request, int $variant)
+    {
+        $request->validate([
+            '3d_placeholder' => 'required|file|mimes:jpg,jpeg,png,webp|max:10240',
+        ]);
+
+        $variant = ProductVariantModel::findOrFail($variant);
+
+        DB::beginTransaction();
+        try {
+            $file = $request->file('3d_placeholder');
+            $ext = strtolower($file->getClientOriginalExtension());
+            if ($ext === 'jpeg') {
+                $ext = 'jpg';
+            }
+            $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $base = Str::slug($origName) ?: 'placeholder';
+            $filename = $base . '_' . now()->format('Ymd_His') . '_' . Str::random(6) . '.' . $ext;
+            $path = $file->storeAs('upload/product_3d_placeholder', $filename, 'public');
+
+            $upload = UploadModel::create([
+                'type'      => 'image',
+                'file_path' => $path,
+                'size'      => (int) round($file->getSize() / 1024),
+                'alt_text'  => $filename,
+            ]);
+
+            $this->deleteUploadRecord($variant->{'3d_placeholder'} ? (int) $variant->{'3d_placeholder'} : null);
+
+            $variant->{'3d_placeholder'} = $upload->id;
+            $variant->save();
+
+            DB::commit();
+
+            return response()->json([
+                'message'         => '3D placeholder uploaded successfully.',
+                'variant_id'      => $variant->id,
+                '3d_placeholder'  => [
+                    'id'  => $upload->id,
+                    'url' => Storage::disk('public')->url($path),
+                ],
+            ], 201);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Failed to upload 3D placeholder.',
+                'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     // Created
     public function store(Request $request)
     {
@@ -356,7 +455,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
                 ])->findOrFail($id);
 
                 // $user = auth()->user();
@@ -442,6 +541,8 @@ class ProductController extends Controller
                     }
                     $data['banner_urls'] = $bannerUrls;
 
+                    $this->resolveVariant3dForPublic($data);
+
                     /* 5. hide raw CSV & discount cols (do this ONCE) */
                     unset(
                         $data['photo_id'],
@@ -503,7 +604,7 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
             ])->where('is_active', '!=', 0);
 
             /* --- filters --- */
@@ -642,6 +743,8 @@ class ProductController extends Controller
                         }
                     }
                     $data['banner_urls'] = $bannerUrls;
+
+                    $this->resolveVariant3dForPublic($data);
 
                     /* 5. Clean-up and hide raw CSV & discount cols */
                     unset(
@@ -793,6 +896,62 @@ class ProductController extends Controller
         return 'Unknown'; // Return 'Unknown' for anything that doesn't match
     }
 
+    private function deleteUploadRecord(?int $uploadId): void
+    {
+        if (!$uploadId) {
+            return;
+        }
+
+        if ($upload = UploadModel::find($uploadId)) {
+            if (Storage::disk('public')->exists($upload->file_path)) {
+                Storage::disk('public')->delete($upload->file_path);
+            }
+            $upload->delete();
+        }
+    }
+
+    private function resolveVariant3dForPublic(array &$data): void
+    {
+        $threeDFileId = !empty($data['3d_file']) ? (int) $data['3d_file'] : 0;
+        $threeDPlaceholderId = !empty($data['3d_placeholder']) ? (int) $data['3d_placeholder'] : 0;
+        $ids = array_values(array_filter([$threeDFileId, $threeDPlaceholderId]));
+
+        $rows = $ids
+            ? UploadModel::whereIn('id', $ids)->get(['id', 'file_path'])->keyBy('id')
+            : collect();
+
+        $data['3d_file'] = ($threeDFileId && isset($rows[$threeDFileId]))
+            ? Storage::disk('public')->url($rows[$threeDFileId]->file_path)
+            : null;
+        $data['3d_placeholder'] = ($threeDPlaceholderId && isset($rows[$threeDPlaceholderId]))
+            ? Storage::disk('public')->url($rows[$threeDPlaceholderId]->file_path)
+            : null;
+    }
+
+    private function resolveVariant3dForAdmin(array &$data): void
+    {
+        $threeDFileId = !empty($data['3d_file']) ? (int) $data['3d_file'] : 0;
+        $threeDPlaceholderId = !empty($data['3d_placeholder']) ? (int) $data['3d_placeholder'] : 0;
+        $ids = array_values(array_filter([$threeDFileId, $threeDPlaceholderId]));
+
+        $rows = $ids
+            ? UploadModel::whereIn('id', $ids)->get(['id', 'file_path'])->keyBy('id')
+            : collect();
+
+        $data['3d_file'] = ($threeDFileId && isset($rows[$threeDFileId]))
+            ? [
+                'id'  => $threeDFileId,
+                'url' => Storage::disk('public')->url($rows[$threeDFileId]->file_path),
+            ]
+            : null;
+        $data['3d_placeholder'] = ($threeDPlaceholderId && isset($rows[$threeDPlaceholderId]))
+            ? [
+                'id'  => $threeDPlaceholderId,
+                'url' => Storage::disk('public')->url($rows[$threeDPlaceholderId]->file_path),
+            ]
+            : null;
+    }
+
     public function index_admin(Request $request, $id = null)
     {
         try {
@@ -802,7 +961,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
                 ])->findOrFail($id);
 
                 $user = auth()->user();
@@ -897,6 +1056,8 @@ class ProductController extends Controller
                         }
                     }
                     $data['banner_urls'] = $bannerObjs;
+
+                    $this->resolveVariant3dForAdmin($data);
 
                     /* 5) hide raw CSV & discount cols */
                     unset(
@@ -1788,6 +1949,9 @@ class ProductController extends Controller
                     $upload->delete();
                 }
             }
+
+            $this->deleteUploadRecord($variant->{'3d_file'} ? (int) $variant->{'3d_file'} : null);
+            $this->deleteUploadRecord($variant->{'3d_placeholder'} ? (int) $variant->{'3d_placeholder'} : null);
 
             // Finally, delete the variant itself
             $variant->delete();

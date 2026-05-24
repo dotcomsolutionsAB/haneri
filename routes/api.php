@@ -111,6 +111,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/{productId}/variants', [ProductController::class, 'addVariant']); // create variant(s)
             Route::post('/{variant_id}/banners', [ProductController::class, 'uploadBanner']); // upload banner by variant id
             Route::post('/{variant}/photos', [ProductController::class, 'uploadPhotos']); // upload banner by variant id
+            Route::post('/{variant}/3d-file', [ProductController::class, 'upload3dFile']);
+            Route::post('/{variant}/3d-placeholder', [ProductController::class, 'upload3dPlaceholder']);
+            Route::delete('/variants/{variant}/3d-file', [UploadController::class, 'deleteVariant3dFile']);
+            Route::delete('/variants/{variant}/3d-placeholder', [UploadController::class, 'deleteVariant3dPlaceholder']);
             Route::delete('/variants/{variantId}', [ProductController::class, 'deleteVariant']); // Delete variant by id
             Route::delete('/variants/{variant}/photos/{upload}',  [UploadController::class, 'deleteVariantPhoto']);
             Route::delete('/variants/{variant}/banners/{upload}', [UploadController::class, 'deleteVariantBanner']);
