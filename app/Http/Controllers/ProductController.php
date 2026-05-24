@@ -236,14 +236,21 @@ class ProductController extends Controller
     public function upload3dFile(Request $request, int $variant)
     {
         $request->validate([
-            '3d_file' => 'required|file|mimes:glb|max:102400',
+            'file'    => 'required_without:glb_model|file|mimes:glb|max:102400',
+            'glb_model' => 'required_without:file|file|mimes:glb|max:102400',
         ]);
 
         $variant = ProductVariantModel::findOrFail($variant);
+        $file = $request->file('file') ?? $request->file('glb_model');
+
+        if (!$file) {
+            return response()->json([
+                'message' => 'No file received. Use "file" or "glb_model" field.',
+            ], 422);
+        }
 
         DB::beginTransaction();
         try {
-            $file = $request->file('3d_file');
             $ext = strtolower($file->getClientOriginalExtension());
             $origName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
             $base = Str::slug($origName) ?: 'model';
@@ -284,14 +291,21 @@ class ProductController extends Controller
     public function upload3dPlaceholder(Request $request, int $variant)
     {
         $request->validate([
-            '3d_placeholder' => 'required|file|mimes:jpg,jpeg,png,webp|max:10240',
+            'file' => 'required_without:placeholder|file|mimes:jpg,jpeg,png,webp|max:10240',
+            'placeholder' => 'required_without:file|file|mimes:jpg,jpeg,png,webp|max:10240',
         ]);
 
         $variant = ProductVariantModel::findOrFail($variant);
+        $file = $request->file('file') ?? $request->file('placeholder');
+
+        if (!$file) {
+            return response()->json([
+                'message' => 'No file received. Use "file" or "placeholder" field.',
+            ], 422);
+        }
 
         DB::beginTransaction();
         try {
-            $file = $request->file('3d_placeholder');
             $ext = strtolower($file->getClientOriginalExtension());
             if ($ext === 'jpeg') {
                 $ext = 'jpg';
