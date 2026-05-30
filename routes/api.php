@@ -26,6 +26,7 @@ use App\Http\Controllers\ContactFormController;
 use App\Http\Controllers\ReturnRequestController;
 
 use App\Http\Controllers\BlogController;
+use App\Http\Controllers\SiteConfigController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -71,6 +72,7 @@ Route::prefix('brands')->group(function () {
     Route::post('/fetch/{id}', [BrandController::class, 'show']);         // Get details of a single brand
 });
 
+Route::get('/site/config', [SiteConfigController::class, 'index']);
 Route::post('/contact/create', [ContactFormController::class, 'create']);
 Route::post('/contact/fetch', [ContactFormController::class, 'fetch']);
 Route::get('/blogs', [BlogController::class, 'index']);
