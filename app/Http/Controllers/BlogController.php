@@ -81,8 +81,31 @@ class BlogController extends Controller
         ], 200);
     }
 
-    public function adminIndex(Request $request)
+    public function adminIndex(Request $request, $id = null)
     {
+        if ($id !== null && $id !== '') {
+            $blog = BlogModel::with([
+                'tags:id,name,slug',
+                'faqs:id,blog_id,question,answer,sort_order',
+            ])->find($id);
+
+            if (! $blog) {
+                return response()->json([
+                    'code' => 404,
+                    'success' => false,
+                    'message' => 'Blog not found.',
+                    'data' => [],
+                ], 404);
+            }
+
+            return response()->json([
+                'code' => 200,
+                'success' => true,
+                'message' => 'Blog fetched successfully.',
+                'data' => $blog,
+            ], 200);
+        }
+
         $limit = max(1, (int) $request->input('limit', 10));
         $offset = max(0, (int) $request->input('offset', 0));
         $status = $request->input('is_published', null);
@@ -131,6 +154,9 @@ class BlogController extends Controller
             if ($coverImagePath !== null) {
                 $blogData['cover_image'] = $coverImagePath;
             }
+            if (array_key_exists('is_published', $validated)) {
+                $blogData['is_published'] = filter_var($validated['is_published'], FILTER_VALIDATE_BOOLEAN);
+            }
             $blog = BlogModel::create($blogData);
             $this->syncTags($blog, $validated['tags'] ?? []);
             $this->replaceFaqs($blog, $validated['faqs'] ?? []);
@@ -173,6 +199,9 @@ class BlogController extends Controller
                     Storage::disk('public')->delete($blog->cover_image);
                 }
                 $blogData['cover_image'] = $coverImagePath;
+            }
+            if (array_key_exists('is_published', $validated)) {
+                $blogData['is_published'] = filter_var($validated['is_published'], FILTER_VALIDATE_BOOLEAN);
             }
             $blog->update($blogData);
 
@@ -220,7 +249,7 @@ class BlogController extends Controller
     {
         $required = $isUpdate ? 'sometimes' : 'required';
 
-        return $request->validate([
+        $validated = $request->validate([
             'title' => $required . '|string|max:255',
             'sub_title' => 'nullable|string|max:255',
             'slug' => 'nullable|string|max:255',
@@ -229,7 +258,7 @@ class BlogController extends Controller
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
             'meta_keywords' => 'nullable|string',
-            'canonical_url' => 'nullable|url|max:1000',
+            'canonical_url' => 'nullable|string|max:1000',
             'og_title' => 'nullable|string|max:255',
             'og_description' => 'nullable|string',
             'og_image' => 'nullable|string|max:1000',
@@ -242,6 +271,14 @@ class BlogController extends Controller
             'faqs.*.answer' => 'required_with:faqs|string',
             'faqs.*.sort_order' => 'nullable|integer|min:0',
         ]);
+
+        if (! empty($validated['canonical_url']) && ! filter_var($validated['canonical_url'], FILTER_VALIDATE_URL)) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'canonical_url' => ['The canonical URL must be a valid URL.'],
+            ]);
+        }
+
+        return $validated;
     }
 
     private function resolveSlug(?string $incoming, string $title): string
