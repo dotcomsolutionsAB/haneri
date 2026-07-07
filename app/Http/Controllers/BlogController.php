@@ -190,8 +190,9 @@ class BlogController extends Controller
         }
         $validated['slug'] = $this->uniqueSlug($slugBase, $blog->id);
         $coverImagePath = $this->storeCoverImage($request);
+        $removeCoverImage = $request->boolean('remove_cover_image');
 
-        $updated = DB::transaction(function () use ($blog, $validated, $coverImagePath) {
+        $updated = DB::transaction(function () use ($blog, $validated, $coverImagePath, $removeCoverImage) {
             $blogData = $this->extractBlogData($validated);
             if ($coverImagePath !== null) {
                 // Remove previous file to avoid orphaned uploads.
@@ -199,6 +200,11 @@ class BlogController extends Controller
                     Storage::disk('public')->delete($blog->cover_image);
                 }
                 $blogData['cover_image'] = $coverImagePath;
+            } elseif ($removeCoverImage) {
+                if (! empty($blog->cover_image)) {
+                    Storage::disk('public')->delete($blog->cover_image);
+                }
+                $blogData['cover_image'] = null;
             }
             if (array_key_exists('is_published', $validated)) {
                 $blogData['is_published'] = filter_var($validated['is_published'], FILTER_VALIDATE_BOOLEAN);
@@ -255,6 +261,7 @@ class BlogController extends Controller
             'slug' => 'nullable|string|max:255',
             'content' => $required . '|string',
             'cover_image' => 'nullable|file|image|max:5120',
+            'remove_cover_image' => 'nullable|boolean',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
             'meta_keywords' => 'nullable|string',
