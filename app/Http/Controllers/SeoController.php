@@ -25,7 +25,6 @@ class SeoController extends Controller
         'shipping-policy' => 'Shipping Policy',
         'privacy-policy' => 'Privacy Policy',
         'wir-policy' => 'Warranty, Installation and Returns Policy',
-        'live' => 'Live',
     ];
 
     public function show(string $pageKey): JsonResponse
