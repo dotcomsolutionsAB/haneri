@@ -1217,6 +1217,11 @@ class ProductController extends Controller
                     ? $prod->features->toArray()
                     : $prod->features;
 
+                $hasSeo = (bool) (
+                    $prod->meta_title || $prod->meta_description || $prod->meta_keywords ||
+                    $prod->canonical_url || $prod->og_title || $prod->og_description || $prod->og_image
+                );
+
                 return [
                     'id' => $prod->id,
                     'slug' => $prod->slug,
@@ -1224,6 +1229,7 @@ class ProductController extends Controller
                     'description' => $prod->description,
                     'type' => $prod->type,
                     'is_active' => $prod->is_active,
+                    'has_seo' => $hasSeo,
                     'image' => $image,
                     'variants' => $variants,
                     'brand' => $brand,
