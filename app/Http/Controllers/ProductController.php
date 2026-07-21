@@ -357,6 +357,13 @@ class ProductController extends Controller
             'slug' => 'required|string|unique:t_products,slug',
             'description' => 'required|string',
             'is_active' => 'required|boolean',
+            'meta_title' => 'nullable|string|max:255',
+            'meta_description' => 'nullable|string|max:1000',
+            'meta_keywords' => 'nullable|string|max:2000',
+            'canonical_url' => 'nullable|url|max:2048',
+            'og_title' => 'nullable|string|max:255',
+            'og_description' => 'nullable|string|max:1000',
+            'og_image' => 'nullable|url|max:2048',
             // Validate product features
             'features' => 'nullable|array',
             'features.*.feature_name' => 'required_with:features|string',
@@ -390,6 +397,13 @@ class ProductController extends Controller
             'slug' => $request->input('slug'),
             'description' => $request->input('description'),
             'is_active' => $request->input('is_active'),
+            'meta_title' => $this->nullableString($request->input('meta_title')),
+            'meta_description' => $this->nullableString($request->input('meta_description')),
+            'meta_keywords' => $this->nullableString($request->input('meta_keywords')),
+            'canonical_url' => $this->nullableString($request->input('canonical_url')),
+            'og_title' => $this->nullableString($request->input('og_title')),
+            'og_description' => $this->nullableString($request->input('og_description')),
+            'og_image' => $this->nullableString($request->input('og_image')),
         ]);
 
         // Add product features
@@ -1263,7 +1277,22 @@ class ProductController extends Controller
     public function show($slug)
     {
         $product = ProductModel::with(['photo', 'variants', 'features', 'brand', 'category'])
-        ->select('id', 'name', 'brand_id', 'category_id', 'slug', 'description', 'is_active')
+        ->select(
+            'id',
+            'name',
+            'brand_id',
+            'category_id',
+            'slug',
+            'description',
+            'is_active',
+            'meta_title',
+            'meta_description',
+            'meta_keywords',
+            'canonical_url',
+            'og_title',
+            'og_description',
+            'og_image'
+        )
         ->where('slug', $slug)
         ->first();
 
@@ -1279,6 +1308,13 @@ class ProductController extends Controller
                 'slug' => $product->slug,
                 'description' => $product->description,
                 'is_active' => $product->is_active,
+                'meta_title' => $product->meta_title,
+                'meta_description' => $product->meta_description,
+                'meta_keywords' => $product->meta_keywords,
+                'canonical_url' => $product->canonical_url,
+                'og_title' => $product->og_title,
+                'og_description' => $product->og_description,
+                'og_image' => $product->og_image,
                 'variants' => $product->variants ? $product->variants->makeHidden(['id', 'created_at', 'updated_at']) : null,
                 'features' => $product->features ? $product->features->makeHidden(['id', 'created_at', 'updated_at']) : null,
             ];
@@ -1305,6 +1341,13 @@ class ProductController extends Controller
             'slug' => 'sometimes|string|unique:t_products,slug,' . $id,
             'description' => 'sometimes|string',
             'is_active' => 'sometimes|boolean',
+            'meta_title' => 'nullable|string|max:255',
+            'meta_description' => 'nullable|string|max:1000',
+            'meta_keywords' => 'nullable|string|max:2000',
+            'canonical_url' => 'nullable|url|max:2048',
+            'og_title' => 'nullable|string|max:255',
+            'og_description' => 'nullable|string|max:1000',
+            'og_image' => 'nullable|url|max:2048',
 
             'features' => 'nullable|array',
             'features.*.id' => 'nullable|integer|exists:t_product_features,id',
@@ -1342,6 +1385,13 @@ class ProductController extends Controller
                 'slug' => $request->input('slug', $product->slug),
                 'description' => $request->input('description', $product->description),
                 'is_active' => $request->input('is_active', $product->is_active),
+                'meta_title' => $request->exists('meta_title') ? $this->nullableString($request->input('meta_title')) : $product->meta_title,
+                'meta_description' => $request->exists('meta_description') ? $this->nullableString($request->input('meta_description')) : $product->meta_description,
+                'meta_keywords' => $request->exists('meta_keywords') ? $this->nullableString($request->input('meta_keywords')) : $product->meta_keywords,
+                'canonical_url' => $request->exists('canonical_url') ? $this->nullableString($request->input('canonical_url')) : $product->canonical_url,
+                'og_title' => $request->exists('og_title') ? $this->nullableString($request->input('og_title')) : $product->og_title,
+                'og_description' => $request->exists('og_description') ? $this->nullableString($request->input('og_description')) : $product->og_description,
+                'og_image' => $request->exists('og_image') ? $this->nullableString($request->input('og_image')) : $product->og_image,
             ]);
 
             // ✅ Features upsert (scoped to this product)
@@ -2108,6 +2158,16 @@ class ProductController extends Controller
                 'data' => ['error' => $e->getMessage()]
             ], 500);
         }
+    }
+
+    private function nullableString($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $trimmed = trim((string) $value);
+        return $trimmed === '' ? null : $trimmed;
     }
 
 }

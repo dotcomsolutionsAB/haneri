@@ -24,6 +24,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\SmsAlertTestController;
 use App\Http\Controllers\ContactFormController;
 use App\Http\Controllers\ReturnRequestController;
+use App\Http\Controllers\SeoController;
 
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\SiteConfigController;
@@ -74,9 +75,9 @@ Route::prefix('brands')->group(function () {
 
 Route::get('/site/config', [SiteConfigController::class, 'index']);
 Route::post('/contact/create', [ContactFormController::class, 'create']);
-Route::post('/contact/fetch', [ContactFormController::class, 'fetch']);
 Route::get('/blogs', [BlogController::class, 'index']);
 Route::get('/blogs/{slug}', [BlogController::class, 'showBySlug']);
+Route::get('/seo/pages/{pageKey}', [SeoController::class, 'show']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);     // Log out the user
@@ -100,6 +101,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     });
 
     Route::middleware('role:admin')->group(function () {
+        Route::get('/seo/pages', [SeoController::class, 'index']);
+        Route::put('/seo/pages/{pageKey}', [SeoController::class, 'update']);
+
         Route::prefix('blogs')->group(function () {
             Route::post('/fetch/{id?}', [BlogController::class, 'adminIndex']);
             Route::post('/create', [BlogController::class, 'store']);
@@ -210,6 +214,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::post('/update/{id}', [CouponController::class, 'update']);
             Route::delete('/delete/{id}', [CouponController::class, 'delete']);
         });
+
+        Route::post('/contact/fetch', [ContactFormController::class, 'fetch']);
+
+        Route::prefix('settings')->group(function () {
+            Route::get('/', [SettingController::class, 'index']);
+            Route::put('/{key}', [SettingController::class, 'update']);
+        });
     });
 
     // Order Routes
@@ -226,12 +237,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/fetch', [ReturnRequestController::class, 'fetch']);            // Create a new order
         Route::delete('delete/{id}', [ReturnRequestController::class, 'delete']);           // Create a new order
         Route::post('/update/{id}', [ReturnRequestController::class, 'update']);
-    });
-
-    // Setting Routes
-    Route::prefix('settings')->group(function () {
-        Route::get('/', [SettingController::class, 'index']);          // Retrieve all settings (Admin only)
-        Route::put('/{key}', [SettingController::class, 'update']);    // Update a specific setting (Admin)
     });
 
     // Coupon Routes (customer validation only)
