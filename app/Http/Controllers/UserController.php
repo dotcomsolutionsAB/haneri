@@ -221,14 +221,12 @@ class UserController extends Controller
             'email' => 'sometimes|email|unique:users,email,' . $user->id,
             'mobile' => 'sometimes|string|size:10|regex:/^[0-9]{10}$/|unique:users,mobile,' . $user->id,
             'password' => 'sometimes|string|min:8',
-            'role' => 'sometimes|in:admin,customer,architect,dealer',
         ]);
 
         $updateData = [
             'name'   => $request->input('name', $user->name),
             'email'  => $request->input('email', $user->email),
             'mobile' => $request->filled('mobile') ? $request->input('mobile') : $user->mobile,
-            'role'   => $request->input('role', $user->role),
         ];
         if ($request->filled('password')) {
             $updateData['password'] = $request->input('password'); // plain; User model 'hashed' cast hashes once

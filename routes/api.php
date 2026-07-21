@@ -188,24 +188,28 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 
         Route::post('/switch_user', [UserController::class, 'switchUser']);
-    });
 
-    // Category Routes
-    Route::prefix('categories')->group(function () {
-        // Route::get('/', [CategoryController::class, 'index']);         // List all categories
-        // Route::get('/{id}', [CategoryController::class, 'show']);      // Get details of a single category
-        Route::post('/', [CategoryController::class, 'store']);        // Add a new category (Admin only)
-        Route::put('/{id}', [CategoryController::class, 'update']);    // Update a category (Admin only)
-        Route::delete('/{id}', [CategoryController::class, 'destroy']);// Delete a category (Admin only)
-    });
+        // Category mutations (admin only)
+        Route::prefix('categories')->group(function () {
+            Route::post('/', [CategoryController::class, 'store']);
+            Route::put('/{id}', [CategoryController::class, 'update']);
+            Route::delete('/{id}', [CategoryController::class, 'destroy']);
+        });
 
-    // Brand Routes
-    Route::prefix('brands')->group(function () {
-        // Route::get('/', [BrandController::class, 'index']);            // List all brands
-        // Route::get('/{id}', [BrandController::class, 'show']);         // Get details of a single brand
-        Route::post('/', [BrandController::class, 'store']);           // Add a new brand (Admin only)
-        Route::put('/{id}', [BrandController::class, 'update']);       // Update a brand (Admin only)
-        Route::delete('/{id}', [BrandController::class, 'destroy']);   // Delete a brand (Admin only)
+        // Brand mutations (admin only)
+        Route::prefix('brands')->group(function () {
+            Route::post('/', [BrandController::class, 'store']);
+            Route::put('/{id}', [BrandController::class, 'update']);
+            Route::delete('/{id}', [BrandController::class, 'destroy']);
+        });
+
+        // Coupon admin mutations
+        Route::prefix('coupons')->group(function () {
+            Route::post('/fetch', [CouponController::class, 'fetchAll']);
+            Route::post('/create', [CouponController::class, 'create']);
+            Route::post('/update/{id}', [CouponController::class, 'update']);
+            Route::delete('/delete/{id}', [CouponController::class, 'delete']);
+        });
     });
 
     // Order Routes
@@ -230,13 +234,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::put('/{key}', [SettingController::class, 'update']);    // Update a specific setting (Admin)
     });
 
-    // Coupon Routes
+    // Coupon Routes (customer validation only)
     Route::prefix('coupons')->group(function () {
-        Route::post('/fetch', [CouponController::class, 'fetchAll']);           // List all coupons
-        Route::post('/create', [CouponController::class, 'create']);          // Add a new coupon
-        Route::post('/update/{id}', [CouponController::class, 'update']);          // Add a new coupon
-        Route::delete('/delete/{id}', [CouponController::class, 'delete']);  // Delete a coupon
-        Route::post('/check', [CouponController::class, 'checkValidation']);  // Delete a coupon
+        Route::post('/check', [CouponController::class, 'checkValidation']);
     });
 
     // Address Routes
