@@ -229,6 +229,25 @@ class BlogController extends Controller
         ], 200);
     }
 
+    public function uploadContentImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|file|image|max:5120',
+        ]);
+
+        $path = $request->file('image')->store('blogs/content', 'public');
+
+        return response()->json([
+            'code' => 200,
+            'success' => true,
+            'message' => 'Image uploaded successfully.',
+            'data' => [
+                'path' => $path,
+                'url' => Storage::disk('public')->url($path),
+            ],
+        ], 200);
+    }
+
     public function destroy(int $id)
     {
         $blog = BlogModel::find($id);

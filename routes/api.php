@@ -107,6 +107,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::prefix('blogs')->group(function () {
             Route::post('/fetch/{id?}', [BlogController::class, 'adminIndex']);
             Route::post('/create', [BlogController::class, 'store']);
+            Route::post('/upload-image', [BlogController::class, 'uploadContentImage']);
             Route::post('/update/{id}', [BlogController::class, 'update']);
             Route::delete('/delete/{id}', [BlogController::class, 'destroy']);
         });
