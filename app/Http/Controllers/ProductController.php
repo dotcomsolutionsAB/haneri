@@ -20,6 +20,25 @@ use Auth;
 
 class ProductController extends Controller
 {
+    public function uploadDescriptionImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|file|image|max:5120',
+        ]);
+
+        $path = $request->file('image')->store('products/descriptions', 'public');
+
+        return response()->json([
+            'code' => 200,
+            'success' => true,
+            'message' => 'Image uploaded successfully.',
+            'data' => [
+                'path' => $path,
+                'url' => Storage::disk('public')->url($path),
+            ],
+        ], 200);
+    }
+
     //upload product banner
     public function uploadBanner(Request $request, int $variant)
     {

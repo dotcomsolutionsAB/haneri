@@ -15,6 +15,8 @@ class SiteConfigController extends Controller
             $data['google_sheets_enquiry_url'] = config('site.google_sheets_enquiry_url', '');
         }
 
+        $data['analytics'] = SettingController::publicAnalytics();
+
         return response()->json([
             'code'    => 200,
             'success' => true,
