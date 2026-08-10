@@ -205,6 +205,9 @@ class BlogController extends Controller
                     Storage::disk('public')->delete($blog->cover_image);
                 }
                 $blogData['cover_image'] = null;
+                if (! array_key_exists('cover_image_alt', $blogData)) {
+                    $blogData['cover_image_alt'] = null;
+                }
             }
             if (array_key_exists('is_published', $validated)) {
                 $blogData['is_published'] = filter_var($validated['is_published'], FILTER_VALIDATE_BOOLEAN);
@@ -280,6 +283,7 @@ class BlogController extends Controller
             'slug' => 'nullable|string|max:255',
             'content' => $required . '|string',
             'cover_image' => 'nullable|file|image|max:5120',
+            'cover_image_alt' => 'nullable|string|max:255',
             'remove_cover_image' => 'nullable|boolean',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string',
@@ -337,7 +341,7 @@ class BlogController extends Controller
     private function extractBlogData(array $validated): array
     {
         $keys = [
-            'title', 'sub_title', 'slug', 'content',
+            'title', 'sub_title', 'slug', 'content', 'cover_image_alt',
             'meta_title', 'meta_description', 'meta_keywords', 'canonical_url',
             'og_title', 'og_description', 'og_image', 'is_published', 'published_at',
         ];

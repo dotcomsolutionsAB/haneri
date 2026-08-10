@@ -14,6 +14,7 @@ class BlogModel extends Model
         'slug',
         'content',
         'cover_image',
+        'cover_image_alt',
         'meta_title',
         'meta_description',
         'meta_keywords',
