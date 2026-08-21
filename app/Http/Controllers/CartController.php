@@ -9,6 +9,7 @@ use App\Models\OrderItemModel; // not needed here, ignore
 use App\Models\User; // if needed
 use App\Models\UsersDiscountModel;
 use App\Models\UploadModel;
+use App\Models\ProductModel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -28,6 +29,14 @@ class CartController extends Controller
             'quantity' => 'required|integer|min:1',
             'cart_id' => 'nullable|string'
         ]);
+
+        $product = ProductModel::find($request->input('product_id'));
+        if (!$product || !$product->is_ecommerce) {
+            return response()->json([
+                'message' => 'This product is not available for purchase. Please send an enquiry instead.',
+                'data' => [],
+            ], 422);
+        }
 
         $token = $request->bearerToken();
         $user = null;
@@ -149,6 +158,11 @@ class CartController extends Controller
                 $variantId = $qi->variant_id ? (int)$qi->variant_id : null;
                 $qty       = max(1, (int)$qi->quantity);
 
+                $product = ProductModel::find($productId);
+                if (!$product || !$product->is_ecommerce) {
+                    continue;
+                }
+
                 // Find existing cart row for same product + same variant/null variant
                 $existing = CartModel::where('user_id', (string)$userId)
                     ->where('product_id', $productId)
@@ -179,6 +193,18 @@ class CartController extends Controller
 
             // Return updated cart (you can also include product/variant if you want)
             $cart = CartModel::where('user_id', (string)$userId)->get();
+
+            if ($cart->isEmpty()) {
+                return response()->json([
+                    'message' => 'No purchasable products found in this quotation.',
+                    'data' => [
+                        'quotation_id' => $quotation->id,
+                        'user_id'      => $userId,
+                        'mode'         => $mode,
+                        'cart'         => $cart,
+                    ]
+                ], 422);
+            }
 
             return response()->json([
                 'message' => 'Cart created from quotation successfully!',

@@ -16,6 +16,7 @@ class ProductModel extends Model
         'slug',
         'description',
         'is_active',
+        'is_ecommerce',
         'meta_title',
         'meta_description',
         'meta_keywords',
@@ -23,6 +24,11 @@ class ProductModel extends Model
         'og_title',
         'og_description',
         'og_image',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
+        'is_ecommerce' => 'boolean',
     ];
 
      /**

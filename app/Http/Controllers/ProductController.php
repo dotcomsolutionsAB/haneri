@@ -376,6 +376,7 @@ class ProductController extends Controller
             'slug' => 'required|string|unique:t_products,slug',
             'description' => 'required|string',
             'is_active' => 'required|boolean',
+            'is_ecommerce' => 'required|boolean',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:1000',
             'meta_keywords' => 'nullable|string|max:2000',
@@ -416,6 +417,7 @@ class ProductController extends Controller
             'slug' => $request->input('slug'),
             'description' => $request->input('description'),
             'is_active' => $request->input('is_active'),
+            'is_ecommerce' => $request->input('is_ecommerce'),
             'meta_title' => $this->nullableString($request->input('meta_title')),
             'meta_description' => $this->nullableString($request->input('meta_description')),
             'meta_keywords' => $this->nullableString($request->input('meta_keywords')),
@@ -819,6 +821,7 @@ class ProductController extends Controller
                     'description' => $prod->description,
                     'type' => $prod->type,
                     'is_active' => $prod->is_active,
+                    'is_ecommerce' => (bool) $prod->is_ecommerce,
                     'image' => $image,
                     'variants' => $variants,
                     'brand' => $brand,
@@ -1248,6 +1251,7 @@ class ProductController extends Controller
                     'description' => $prod->description,
                     'type' => $prod->type,
                     'is_active' => $prod->is_active,
+                    'is_ecommerce' => (bool) $prod->is_ecommerce,
                     'has_seo' => $hasSeo,
                     'image' => $image,
                     'variants' => $variants,
@@ -1310,6 +1314,7 @@ class ProductController extends Controller
             'slug',
             'description',
             'is_active',
+            'is_ecommerce',
             'meta_title',
             'meta_description',
             'meta_keywords',
@@ -1333,6 +1338,7 @@ class ProductController extends Controller
                 'slug' => $product->slug,
                 'description' => $product->description,
                 'is_active' => $product->is_active,
+                'is_ecommerce' => (bool) $product->is_ecommerce,
                 'meta_title' => $product->meta_title,
                 'meta_description' => $product->meta_description,
                 'meta_keywords' => $product->meta_keywords,
@@ -1366,6 +1372,7 @@ class ProductController extends Controller
             'slug' => 'sometimes|string|unique:t_products,slug,' . $id,
             'description' => 'sometimes|string',
             'is_active' => 'sometimes|boolean',
+            'is_ecommerce' => 'sometimes|boolean',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:1000',
             'meta_keywords' => 'nullable|string|max:2000',
@@ -1410,6 +1417,7 @@ class ProductController extends Controller
                 'slug' => $request->input('slug', $product->slug),
                 'description' => $request->input('description', $product->description),
                 'is_active' => $request->input('is_active', $product->is_active),
+                'is_ecommerce' => $request->input('is_ecommerce', $product->is_ecommerce),
                 'meta_title' => $request->exists('meta_title') ? $this->nullableString($request->input('meta_title')) : $product->meta_title,
                 'meta_description' => $request->exists('meta_description') ? $this->nullableString($request->input('meta_description')) : $product->meta_description,
                 'meta_keywords' => $request->exists('meta_keywords') ? $this->nullableString($request->input('meta_keywords')) : $product->meta_keywords,
@@ -1558,6 +1566,7 @@ class ProductController extends Controller
                 'description' => $product->description,
                 'type' => $product->type ?? 'simple',
                 'is_active' => (int) $product->is_active,
+                'is_ecommerce' => (bool) $product->is_ecommerce,
                 'image' => [], // keeping as per your original response
             ];
 
@@ -1714,6 +1723,7 @@ class ProductController extends Controller
                         'category_id' => $category->id, // Link the product to the category
                         'slug' => Str::slug($row['Product Name']) . '-' . time(), // Generate SEO-friendly slug
                         'is_active' => true, // Set product status (this can be changed based on CSV data)
+                        'is_ecommerce' => true,
                     ]);
 
                     // Handle features dynamically
