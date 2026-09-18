@@ -138,7 +138,7 @@ class UserController extends Controller
             return response()->json([
                 'message'      => 'Welcome back! Cart updated.',
                 'token'        => $token,
-                'user'         => $existingUser->only(['name', 'email', 'mobile', 'role']),
+                'user'         => $existingUser->only(['id', 'name', 'email', 'mobile', 'role']),
                 'redirect_url' => config('app.redirect_after_register'),
             ], 200);
         }
@@ -189,7 +189,7 @@ class UserController extends Controller
             'message'      => 'User registered successfully! Cart updated and login credentials sent to email.',
             'password'     => $randomPassword,
             'token'        => $token,
-            'user'         => $user->only(['name', 'email', 'mobile', 'role']),
+            'user'         => $user->only(['id', 'name', 'email', 'mobile', 'role']),
             'redirect_url' => config('app.redirect_after_register'),
         ], 201);
     }
