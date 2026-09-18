@@ -506,7 +506,13 @@ class ProductController extends Controller
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
                     'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
-                ])->findOrFail($id);
+                ])
+                    ->when(is_numeric($id), function ($query) use ($id) {
+                        $query->where('id', $id);
+                    }, function ($query) use ($id) {
+                        $query->where('slug', $id);
+                    })
+                    ->firstOrFail();
 
                 // $user = auth()->user();
 
@@ -616,7 +622,7 @@ class ProductController extends Controller
                     'success' => true,
                     'message' => 'Product details fetched successfully!',
                     'data'    => collect($response)
-                        ->except(['id', 'brand_id', 'category_id', 'created_at', 'updated_at']),
+                        ->except(['brand_id', 'category_id', 'created_at', 'updated_at']),
                 ], 200);
             }
 
