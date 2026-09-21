@@ -544,8 +544,8 @@ class AuthController extends Controller
             ], 404);
         }
 
-        // If already verified
-        if ($row->status === 'valid') {
+        // If already verified (the same OTP must be presented again)
+        if ($row->status === 'valid' && (string) $row->otp === (string) $otp) {
             return response()->json([
                 'code'    => 200,
                 'success' => true,
@@ -556,8 +556,10 @@ class AuthController extends Controller
 
         // Check OTP match
         if ((string)$row->otp !== (string)$otp) {
-            // keep invalid
-            $row->update(['status' => 'invalid']);
+            // A wrong guess must not revoke a mobile that is already verified
+            if ($row->status !== 'valid') {
+                $row->update(['status' => 'invalid']);
+            }
 
             return response()->json([
                 'code'    => 400,

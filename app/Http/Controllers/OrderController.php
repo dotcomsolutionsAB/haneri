@@ -36,12 +36,13 @@ class OrderController extends Controller
             'coupon_code' => 'nullable|string|max:100',
         ]);
 
-        $user = Auth::user(); 
+        $user = Auth::user();
+        $isAdmin = $user->role == 'admin';
 
-        if ($user->role == 'admin') {
+        if ($isAdmin) {
             $request->validate([
                 'user_id' => 'required|integer|exists:users,id',
-            ]);  
+            ]);
             $user_id =  $request->input('user_id');
         }
 
@@ -59,14 +60,19 @@ class OrderController extends Controller
         $user_email = $orderUser->email;  // Fetch email
         $user_phone = $orderUser->mobile;  // Fetch mobile (Ensure the column exists in the `users` table)
 
+        // A customer never chooses the state of their own order: it stays unpaid until Razorpay
+        // confirms the payment (verify-payment / webhook / resync). Only admins may set it.
+        $orderStatus   = $isAdmin ? $request->input('status', 'pending') : 'pending';
+        $paymentStatus = $isAdmin ? $request->input('payment_status', 'pending') : 'pending';
+        $paymentMode   = $request->input('payment_mode', 'Prepaid');
+
         // Start a transaction to ensure all operations are atomic
         DB::beginTransaction();
 
         try{
-            // Fetch all items from the cart for the user
-            // $cartItems = CartModel::where('user_id', $user_id)->get();
-            $cartItems = CartModel::where('user_id', (string)$user_id)->get();
-
+            // Fetch all items from the cart for the user (locked, so a double-submit cannot
+            // turn one cart into two orders)
+            $cartItems = CartModel::where('user_id', (string)$user_id)->lockForUpdate()->get();
 
             // Check if the cart is empty
             if ($cartItems->isEmpty()) {
@@ -74,17 +80,56 @@ class OrderController extends Controller
                 return response()->json(['message' => 'Sorry, cart is empty.'], 400);
             }
 
-            // Calculate the total amount by iterating through the cart items
+            // Only products that are live for sale can be ordered
+            $productIds  = $cartItems->pluck('product_id')->unique();
+            $purchasable = \App\Models\ProductModel::whereIn('id', $productIds)->where('is_ecommerce', true)->count();
+            if ($purchasable !== $productIds->count()) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'One or more items in your cart are no longer available for purchase.',
+                ], 422);
+            }
+
+            // Price every line on the server (never trust client totals)
+            $lines = [];
             $totalAmount = 0.0;
 
             foreach ($cartItems as $cartItem) {
                 $linePrice = $this->getFinalPrice($orderUser, $cartItem->product_id, $cartItem->variant_id);
+                if ($linePrice <= 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'An item in your cart is no longer available. Please review your cart.',
+                    ], 422);
+                }
+                $lines[] = [
+                    'product_id' => (int) $cartItem->product_id,
+                    'variant_id' => $cartItem->variant_id ? (int) $cartItem->variant_id : null,
+                    'quantity'   => (int) $cartItem->quantity,
+                    'price'      => $linePrice,
+                ];
                 $totalAmount += $linePrice * (int)$cartItem->quantity;
             }
-            
+
+            // Cash on delivery only for variants that allow it (admins may override)
+            if (!$isAdmin && $paymentMode === 'COD') {
+                $codVariantIds = \App\Models\ProductVariantModel::whereIn('id', $cartItems->pluck('variant_id')->filter())
+                    ->where('is_cod', 1)
+                    ->pluck('id');
+                foreach ($cartItems as $cartItem) {
+                    if (!$cartItem->variant_id || !$codVariantIds->contains((int) $cartItem->variant_id)) {
+                        DB::rollBack();
+                        return response()->json([
+                            'message' => 'Cash on delivery is not available for one or more items.',
+                        ], 422);
+                    }
+                }
+            }
+
             // ✅ COUPON: validate + apply discount on subtotal (products total)
             $couponCode = trim((string) $request->input('coupon_code', ''));
             $discountAmount = 0.0;
+            $coupon = null;
 
             if ($couponCode !== '') {
 
@@ -96,6 +141,7 @@ class OrderController extends Controller
                         $qq->whereNull('user_id')
                         ->orWhere('user_id', $user_id);
                     })
+                    ->lockForUpdate()
                     ->first();
 
                 if (!$coupon) {
@@ -105,13 +151,8 @@ class OrderController extends Controller
                     ], 422);
                 }
 
-                // If you treat "count" as remaining usable count, block when <= 0
-                if ((int)$coupon->count <= 0) {
-                    DB::rollBack();
-                    return response()->json([
-                        'message' => 'Coupon usage limit exceeded.',
-                    ], 422);
-                }
+                // (the remaining-uses check happens below, after a pending order for this same
+                // cart has had the chance to be re-used — that order already holds its use)
 
                 // Calculate discount amount
                 if ($coupon->discount_type === 'percentage') {
@@ -130,14 +171,53 @@ class OrderController extends Controller
             // shipping charge from request (default 0)
             $shippingCharge = (float) $request->input('shipping_charge', 0);
             // Final payable amount in rupees
-            $finalAmount = (float) $totalAmount + (float) $shippingCharge;
+            $finalAmount = round((float) $totalAmount + (float) $shippingCharge, 2);
 
-            // Convert to paise for Razorpay (must be integer)
-            // $amountInPaise = (int) round($finalAmount * 100);
-            $amountInPaise = (int) ($finalAmount * 100);
+            // Convert to paise for Razorpay (must be an exact integer; a plain (int) cast
+            // truncates e.g. 599528.9999999999 to 599528 and the charge ends up 1 paisa short)
+            $amountInPaise = (int) round($finalAmount * 100);
+
+            if ($amountInPaise < 100) {
+                DB::rollBack();
+                return response()->json(['message' => 'Order total must be at least ₹1.'], 422);
+            }
+
+            // Retrying checkout with the same cart (payment window closed, page reloaded,
+            // double click…) re-opens the pending order instead of creating duplicates.
+            if ($paymentStatus === 'pending') {
+                $existing = OrderModel::where('user_id', $user_id)
+                    ->where('status', 'pending')
+                    ->where('payment_status', 'pending')
+                    ->where('razorpay_order_id', '!=', '')
+                    ->where('shipping_address', $request->input('shipping_address'))
+                    ->where('created_at', '>=', now()->subHours(6))
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($existing && $this->orderMatchesCart($existing, $lines, $finalAmount)) {
+                    DB::commit();
+
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Order already created, continue with payment.',
+                        'data' => [
+                            'message' => 'Order already created, continue with payment.',
+                            'data' => $this->orderPayload($existing, $orderUser),
+                        ],
+                    ], 200);
+                }
+            }
+
+            // "count" is the number of remaining uses: a NEW order needs one left
+            if ($coupon && (int) $coupon->count <= 0) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Coupon usage limit exceeded.',
+                ], 422);
+            }
 
             // Call Razorpay Order API Before Saving Order in DB
-            $razorpayController = new RazorpayController(); 
+            $razorpayController = app(RazorpayController::class);
             $razorpayRequest = new Request([
                 'amount'   => $amountInPaise, // paise
                 'currency' => 'INR'
@@ -158,8 +238,8 @@ class OrderController extends Controller
                 'user_id' => $user_id,
                 'total_amount' => $finalAmount, // include shipping
                 'shipping_charge' => $shippingCharge, // if you have this column (recommended)
-                'status' => $request->input('status', 'pending'),
-                'payment_status' => $request->input('payment_status', 'pending'),
+                'status' => $orderStatus,
+                'payment_status' => $paymentStatus,
                 'shipping_address' => $request->input('shipping_address'),
                 'razorpay_order_id' => $razorpayData['order']['id'],
             ]);
@@ -193,9 +273,9 @@ class OrderController extends Controller
                 'shipping_state'  => $shippingState,
 
                 // Amounts
-                'payment_mode'    => $request->input('payment_mode', 'Prepaid'), // if you store it somewhere
+                'payment_mode'    => $paymentMode,
                 'total_amount'    => $order->total_amount,
-                'cod_amount'      => $request->input('payment_mode') === 'COD'
+                'cod_amount'      => $paymentMode === 'COD'
                                     ? $order->total_amount
                                     : 0,
 
@@ -214,21 +294,24 @@ class OrderController extends Controller
                 'pickup_phone'    => config('shipping.pickup.phone', ''),
             ]);
 
-            // Iterate through each cart item to add it to the order items table
-            foreach ($cartItems as $cartItem) {
-                $linePrice = $this->getFinalPrice($orderUser, $cartItem->product_id, $cartItem->variant_id);
-
+            // Add every priced cart line to the order items table
+            foreach ($lines as $line) {
                 OrderItemModel::create([
                     'order_id'   => $order->id,
-                    'product_id' => $cartItem->product_id,
-                    'variant_id' => $cartItem->variant_id,
-                    'quantity'   => $cartItem->quantity,
-                    'price'      => $linePrice, // lock the computed selling price
+                    'product_id' => $line['product_id'],
+                    'variant_id' => $line['variant_id'],
+                    'quantity'   => $line['quantity'],
+                    'price'      => $line['price'], // lock the computed selling price
                 ]);
             }
 
-            // After successfully adding order items, delete the cart items
-            CartModel::where('user_id', (string)$user_id)->delete();
+            // The cart is only emptied once the order is settled: for prepaid orders that happens
+            // when the payment is confirmed (RazorpayController::markOrderPaid), so an abandoned or
+            // failed payment does not lose the customer's cart.
+            if ($paymentStatus === 'paid' || $paymentMode === 'COD') {
+                CartModel::where('user_id', (string)$user_id)->delete();
+            }
+
             /**
              * 🔹 Create initial payment record (in t_payment_records)
              * - status = same as order payment_status (usually "pending" here)
@@ -239,55 +322,31 @@ class OrderController extends Controller
                 'method'             => $request->input('payment_mode', 'razorpay'),
                 'razorpay_payment_id'=> null,  // will be updated after successful payment
                 'amount'             => $finalAmount,
-                'status'             => $request->input('payment_status', 'pending'),
+                'status'             => $paymentStatus,
                 'order_id'           => $order->id,
                 'razorpay_order_id'  => $order->razorpay_order_id,
                 'user'               => $user_id, // assuming this column stores user_id
             ]);
 
+            // Consume one use of the coupon (rolled back with everything else on failure)
+            if ($coupon) {
+                $coupon->decrement('count');
+            }
+
             // Commit the transaction
             DB::commit();
 
-            // Build line items for the email (with product/variant names)
-            $items = OrderItemModel::with(['product:id,name', 'variant:id,variant_type,variant_value'])
-                ->where('order_id', $order->id)
-                ->get()
-                ->map(function($it) {
-                    // Build a human label like "Size: Large" (fallbacks handled)
-                    $vType  = optional($it->variant)->variant_type;
-                    $vValue = optional($it->variant)->variant_value;
-                    $variantLabel = $vValue
-                        ? ($vType ? ($vType . ': ' . $vValue) : $vValue)
-                        : null;
-
-                    return [
-                        'name'    => optional($it->product)->name ?? ('Product #'.$it->product_id),
-                        'variant' => $variantLabel,
-                        'qty'     => (int) $it->quantity,
-                        'price'   => (float) $it->price,
-                        'total'   => (float) $it->price * (int)$it->quantity,
-                    ];
-                })
-                ->toArray();
-
-            // Prepare response
-            $response = [
-                'message' => 'Order created successfully!',
-                'data' => [
-                    'order_id' => $order->id,
-                    'total_amount' => $order->total_amount,
-                    'status' => $order->status,
-                    'payment_status' => $order->payment_status,
-                    'shipping_address' => $order->shipping_address,
-                    'razorpay_order_id' => $order->razorpay_order_id,
-                    'name' => $user_name,
-                    'email' => $user_email, 
-                    'phone' => $user_phone, 
-                ]
-            ];
+            $payload = $this->orderPayload($order, $orderUser);
 
             // Return success response
-            return response()->json(['message' => 'Order created successfully!', 'data' => $response], 201);
+            return response()->json([
+                'success' => true,
+                'message' => 'Order created successfully!',
+                'data' => [
+                    'message' => 'Order created successfully!',
+                    'data' => $payload,
+                ],
+            ], 201);
         }
 
         catch(\Exception $e)
@@ -299,9 +358,58 @@ class OrderController extends Controller
             DB::rollBack();
 
             // Return error response
-            return response()->json(['message' => 'Failed to create order. Please try again.', 'error' => $e->getMessage()], 500);
+            return response()->json([
+                'message' => 'Failed to create order. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
         }
     }
+
+    // Data the checkout needs to open Razorpay for an order
+    private function orderPayload(OrderModel $order, User $orderUser): array
+    {
+        return [
+            'order_id' => $order->id,
+            'total_amount' => $order->total_amount,
+            'status' => $order->status,
+            'payment_status' => $order->payment_status,
+            'shipping_address' => $order->shipping_address,
+            'razorpay_order_id' => $order->razorpay_order_id,
+            // exact amount of the Razorpay order (paise) and the public key it was created with,
+            // so checkout always uses the matching test/live pair from the server configuration
+            'razorpay_amount' => (int) round(((float) $order->total_amount) * 100),
+            'razorpay_key' => config('services.razorpay.key'),
+            'name' => $orderUser->name,
+            'email' => $orderUser->email,
+            'phone' => $orderUser->mobile,
+        ];
+    }
+
+    // Does an existing pending order describe exactly the current cart (same lines, prices and total)?
+    private function orderMatchesCart(OrderModel $order, array $lines, float $finalAmount): bool
+    {
+        if (abs((float) $order->total_amount - $finalAmount) > 0.005) {
+            return false;
+        }
+
+        $key = fn ($product, $variant, $qty, $price) => implode('|', [
+            (int) $product,
+            (int) $variant,
+            (int) $qty,
+            number_format((float) $price, 2, '.', ''),
+        ]);
+
+        $mine = collect($lines)
+            ->map(fn ($l) => $key($l['product_id'], $l['variant_id'], $l['quantity'], $l['price']))
+            ->sort()->values()->all();
+
+        $theirs = OrderItemModel::where('order_id', $order->id)->get()
+            ->map(fn ($i) => $key($i->product_id, $i->variant_id, $i->quantity, $i->price))
+            ->sort()->values()->all();
+
+        return $mine === $theirs;
+    }
+
     // Address parse
     private function parseShippingAddress(string $raw): array
     {
@@ -849,6 +957,65 @@ class OrderController extends Controller
         }
     }
 
+    /**
+     * Customer: confirm a Razorpay Checkout payment. The browser hands over the payment id and
+     * signature Razorpay returned; only a valid HMAC signature (made with the account secret) marks
+     * the order paid, so a customer cannot claim a payment they never made.
+     */
+    public function verifyPayment(Request $request, $orderId)
+    {
+        $data = $request->validate([
+            'razorpay_order_id'   => 'required|string',
+            'razorpay_payment_id' => 'required|string',
+            'razorpay_signature'  => 'required|string',
+        ]);
+
+        $user = Auth::user();
+
+        $order = OrderModel::where('id', $orderId)->where('user_id', $user->id)->first();
+        if (! $order) {
+            return response()->json(['success' => false, 'message' => 'Order not found.'], 404);
+        }
+
+        $secret = (string) config('services.razorpay.secret');
+        if ($secret === '') {
+            // An empty secret would make every signature forgeable
+            Log::error('Razorpay verify-payment rejected: RAZORPAY_SECRET is not set');
+            return response()->json(['success' => false, 'message' => 'Payment gateway is not configured.'], 500);
+        }
+
+        if (! hash_equals((string) $order->razorpay_order_id, $data['razorpay_order_id'])) {
+            return response()->json(['success' => false, 'message' => 'This payment does not belong to the order.'], 422);
+        }
+
+        $expected = hash_hmac('sha256', $data['razorpay_order_id'] . '|' . $data['razorpay_payment_id'], $secret);
+        if (! hash_equals($expected, $data['razorpay_signature'])) {
+            Log::warning('Razorpay verify-payment: signature mismatch', ['order_id' => $order->id]);
+            return response()->json(['success' => false, 'message' => 'Payment verification failed.'], 422);
+        }
+
+        // Idempotent: marks order + payment paid, empties the cart, sends the confirmation email once.
+        // The payment method is filled in later by the webhook.
+        app(RazorpayController::class)->applyCapturedPayment(
+            (int) $order->id,
+            (string) $order->razorpay_order_id,
+            $data['razorpay_payment_id'],
+            null
+        );
+
+        $order->refresh();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment verified successfully.',
+            'data'    => [
+                'order_id'       => $order->id,
+                'payment_status' => $order->payment_status,
+                'status'         => $order->status,
+            ],
+        ], 200);
+    }
+
     // Update order & payment statuses (user side on punched order)
     public function statusUpdate(Request $request, $orderId)
     {
@@ -890,6 +1057,35 @@ class OrderController extends Controller
                     'message' => 'Order not found for this user.',
                     'data'    => [],
                 ], 404);
+            }
+
+            // Customers must not be able to mark their own order paid/completed or change the
+            // delivery state (payment is confirmed by verify-payment / webhook, the rest by admin).
+            // The only thing a customer may do here is cancel an order that is still unpaid.
+            if ($user->role !== 'admin') {
+                $cancelOnly = ($validated['status'] ?? null) === 'cancelled'
+                    && !array_key_exists('payment_status', $validated)
+                    && !array_key_exists('delivery_status', $validated);
+
+                if (!$cancelOnly) {
+                    DB::rollBack();
+                    return response()->json([
+                        'code'    => 403,
+                        'success' => false,
+                        'message' => 'You are not allowed to change payment or delivery status.',
+                        'data'    => [],
+                    ], 403);
+                }
+
+                if ($order->payment_status === 'paid' || $order->status !== 'pending') {
+                    DB::rollBack();
+                    return response()->json([
+                        'code'    => 422,
+                        'success' => false,
+                        'message' => 'This order can no longer be cancelled.',
+                        'data'    => [],
+                    ], 422);
+                }
             }
 
             // 🔹 Update order fields
@@ -999,6 +1195,7 @@ class OrderController extends Controller
 
         // Build final response data (only required fields)
         $data = [
+            'id'                => $order->id,
             'invoice_id'        => $order->invoice_id,
             'total_amount'      => $order->total_amount,
             'status'            => $order->status,
@@ -1006,6 +1203,8 @@ class OrderController extends Controller
             'delivery_status'   => $order->delivery_status,
             'shipping_address'  => $order->shipping_address,
             'razorpay_order_id' => $order->razorpay_order_id,
+            'shipping_charge'   => $order->shipping_charge,
+            'order_date'        => $order->created_at,
             'items'             => $items,
             'user'              => $userData,
         ];
@@ -1027,12 +1226,24 @@ class OrderController extends Controller
             // Fetch the order with relations (optional but nice)
             $order = OrderModel::with(['items', 'payments', 'shipments'])->find($orderId);
 
-            if (!$order) {
+            // Admins may delete any order; a customer only their own, and never a paid one
+            $me = Auth::user();
+            $isAdmin = $me && $me->role === 'admin';
+
+            if (!$order || (!$isAdmin && (int) $order->user_id !== (int) optional($me)->id)) {
                 DB::rollBack(); // rollback before returning
                 return response()->json([
                     'success' => false,
                     'message' => 'Order not found!',
                 ], 404);
+            }
+
+            if (!$isAdmin && $order->payment_status === 'paid') {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A paid order cannot be deleted.',
+                ], 403);
             }
 
             // Delete related order items
@@ -1281,6 +1492,17 @@ class OrderController extends Controller
     }
     public function fetchOrderDetails($id)
     {
+        $me = Auth::user();
+        if (!$me || $me->role !== 'admin') {
+            return response()->json([
+                'code'    => 403,
+                'success' => false,
+                'message' => 'Unauthorized',
+                'data'    => null,
+            ], 403);
+        }
+
+        try {
         // Money format helpers
         $money = function ($v) {
             return number_format((float) $v, 2, '.', '');
@@ -1341,7 +1563,7 @@ class OrderController extends Controller
                 'code' => 404,
                 'success' => false,
                 'message' => 'Order not found.',
-                'data' => [],
+                'data' => null,
             ], 404);
         }
 
@@ -1387,7 +1609,7 @@ class OrderController extends Controller
                         'regular_price' => $money($it->variant->regular_price),
                     ] : null,
                 ];
-            })->values(),
+            })->values()->all(),
             'payments'          => $order->payments->map(function ($p) use ($money) {
                 return [
                     'id'         => $p->id,
@@ -1395,7 +1617,7 @@ class OrderController extends Controller
                     'status'     => $p->status,
                     'created_at' => optional($p->created_at)->toIso8601String(),
                 ];
-            })->values(),
+            })->values()->all(),
         ];
 
         return response()->json([
@@ -1404,6 +1626,18 @@ class OrderController extends Controller
             'message' => 'Order details fetched successfully!',
             'data'    => $data,
         ], 200);
+        } catch (\Throwable $e) {
+            Log::error('fetchOrderDetails failed: '.$e->getMessage(), [
+                'order_id' => $id,
+            ]);
+
+            return response()->json([
+                'code'    => 500,
+                'success' => false,
+                'message' => 'Unable to load order details.',
+                'data'    => null,
+            ], 500);
+        }
     }
 
 }

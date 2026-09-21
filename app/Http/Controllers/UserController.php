@@ -18,6 +18,8 @@ use App\Models\BrandModel;
 use App\Models\CategoryModel;
 use App\Models\ProductModel;
 use App\Utils\MobileHelper;
+use App\Utils\GuestCart;
+use App\Models\OtpModel;
 use App\Models\EmailLog;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
@@ -112,7 +114,7 @@ class UserController extends Controller
     public function guest_register(Request $request)
     {
         $cartId = $request->input('cart_id');
-        if (!$cartId) {
+        if (!GuestCart::valid($cartId)) {
             return response()->json(['message' => 'Cart ID not found.'], 400);
         }
 
@@ -123,17 +125,24 @@ class UserController extends Controller
         ]);
         $mobile = $request->input('mobile');
 
-        // Existing user: match by mobile or by email (if email provided)
-        $existingUser = User::where(function ($q) use ($mobile, $request) {
-            $q->where('mobile', $mobile);
-            if ($request->filled('email')) {
-                $q->orWhere('email', $request->input('email'));
-            }
-        })->first();
+        // Issuing a login token is only allowed for a mobile that has just passed OTP
+        // verification (request-otp / verify-otp). Without this anyone could take over
+        // an existing account by posting its mobile number.
+        $otpRow = OtpModel::where('mobile', $mobile)->where('status', 'valid')->first();
+        if (! $otpRow || $otpRow->updated_at->lt(now()->subMinutes(30))) {
+            return response()->json([
+                'message' => 'Mobile number is not verified. Please verify the OTP and try again.',
+            ], 403);
+        }
+
+        // Existing user: match by the verified mobile only. Matching by email would let
+        // someone verify their own mobile and sign in as the owner of any email address.
+        $existingUser = User::where('mobile', $mobile)->first();
 
         if ($existingUser) {
             CartModel::where('user_id', $cartId)->update(['user_id' => $existingUser->id]);
             $token = $existingUser->createToken('authToken')->plainTextToken;
+            $otpRow->update(['status' => 'invalid', 'otp' => null]);
 
             return response()->json([
                 'message'      => 'Welcome back! Cart updated.',
@@ -184,6 +193,7 @@ class UserController extends Controller
 
         // Log the user in
         $token = $user->createToken('authToken')->plainTextToken;
+        $otpRow->update(['status' => 'invalid', 'otp' => null]);
 
         return response()->json([
             'message'      => 'User registered successfully! Cart updated and login credentials sent to email.',

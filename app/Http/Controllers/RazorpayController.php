@@ -8,6 +8,7 @@ use App\Models\OrderModel;
 use App\Models\PaymentModel;
 use App\Models\User;
 use App\Models\OrderItemModel;
+use App\Models\CartModel;
 use App\Mail\OrderPlacedMail;
 use Illuminate\Support\Facades\Mail;
 use Exception;
@@ -425,6 +426,9 @@ class RazorpayController extends Controller
                 $order->payment_status = 'paid';
                 // Keep order status as-is: DB enum is pending|completed|cancelled|refunded
                 $order->save();
+
+                // Checkout leaves the cart untouched until the payment is confirmed
+                $this->clearCartForOrder($order);
             }
 
             $payment = PaymentModel::where('order_id', $order->id)
@@ -497,6 +501,28 @@ class RazorpayController extends Controller
                 ]);
             }
         });
+    }
+
+    /**
+     * Remove the cart lines that were turned into this order (products the customer added
+     * after placing the order stay in the cart).
+     */
+    private function clearCartForOrder(OrderModel $order): void
+    {
+        $items = OrderItemModel::where('order_id', $order->id)->get(['product_id', 'variant_id']);
+
+        foreach ($items as $item) {
+            CartModel::where('user_id', (string) $order->user_id)
+                ->where('product_id', $item->product_id)
+                ->where(function ($q) use ($item) {
+                    if ($item->variant_id) {
+                        $q->where('variant_id', $item->variant_id);
+                    } else {
+                        $q->whereNull('variant_id');
+                    }
+                })
+                ->delete();
+        }
     }
 
     /**

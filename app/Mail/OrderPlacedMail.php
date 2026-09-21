@@ -38,17 +38,17 @@ class OrderPlacedMail extends Mailable
         $this->order = $order;
         $this->items = $items;
 
-        // All from .env (per your preference)
-        $this->siteName        = env('APP_NAME', 'Haneri');
-        $this->frontendUrl     = env('APP_FRONTEND_URL');
-        $this->loginUrl        = env('APP_LOGIN_URL');
-        $this->supportEmail    = env('MAIL_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
-        $this->techSupportEmail= env('MAIL_TECH_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
+        // All from .env (per your preference). Cast/default so a missing variable can never
+        // throw a TypeError here — that used to swallow the confirmation email silently.
+        $this->siteName        = (string) env('APP_NAME', 'Haneri');
+        $this->frontendUrl     = (string) env('APP_FRONTEND_URL', 'https://haneri.com');
+        $this->loginUrl        = (string) env('APP_LOGIN_URL', rtrim($this->frontendUrl, '/') . '/login');
+        $this->supportEmail    = (string) env('MAIL_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
+        $this->techSupportEmail= (string) env('MAIL_TECH_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
 
-        // Magic link: one-time API token so the frontend can sign the user in when they open the link
-        $plainToken = $user->createToken('order-placed-email')->plainTextToken;
-        $base       = rtrim((string) $this->frontendUrl, '/') . '/account/profile';
-        $this->orderUrl = $base . '?token=' . rawurlencode($plainToken) . '#order';
+        // Plain link to the order page; the storefront asks the customer to sign in when needed.
+        // (No API token in the URL: a never-expiring credential in an email link is a liability.)
+        $this->orderUrl = rtrim($this->frontendUrl, '/') . '/orders/' . $order->id;
     }
 
     public function envelope(): Envelope

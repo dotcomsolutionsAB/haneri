@@ -36,8 +36,8 @@ Route::post('/generate-otp', [AuthController::class, 'generate_otp']); // Genera
 Route::post('/make_user', [UserController::class, 'guest_register']);
 Route::post('/forgot_password', [UserController::class, 'forgotPassword']);
 
-Route::post('/request-otp', [AuthController::class, 'request_otp']);
-Route::post('/verify-otp', [AuthController::class, 'verify_otp']);
+Route::post('/request-otp', [AuthController::class, 'request_otp'])->middleware('throttle:otp-request');
+Route::post('/verify-otp', [AuthController::class, 'verify_otp'])->middleware('throttle:otp-verify');
 Route::post('/test/sms-alert', [SmsAlertTestController::class, 'sendTestOtp']);
 Route::post('/delivery/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
 Route::post('/delivery/track', [DelhiveryServiceController::class, 'trackShipments']);
@@ -234,6 +234,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/', [OrderController::class, 'store']);           // Create a new order
         Route::delete('/{id}', [OrderController::class, 'delete']);           // Create a new order
         Route::post('/{id}/update-status', [OrderController::class, 'statusUpdate']);
+        Route::post('/{id}/verify-payment', [OrderController::class, 'verifyPayment']); // Razorpay signature check → paid
         Route::post('/{id}/resync-payment', [OrderController::class, 'resyncPayment']);
     });
 

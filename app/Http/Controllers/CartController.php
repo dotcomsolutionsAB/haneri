@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Facades\Cookie;
+use App\Utils\GuestCart;
 use Str;
 use Hash;
 
@@ -49,7 +50,7 @@ class CartController extends Controller
             $userId = $user->id;
         } else {
             $cartId = $request->input('cart_id');
-            if (!$cartId) {
+            if (!GuestCart::valid($cartId)) {
                 do {
                     $cartId = (string) Str::uuid();
                 } while (CartModel::where('user_id', $cartId)->exists());
@@ -260,7 +261,7 @@ class CartController extends Controller
             $cartId = $request->input('cart_id');
 
             // Check if the cart_id exists in the cookies
-            if (!$cartId) {
+            if (!GuestCart::valid($cartId)) {
                 return response()->json(['message' => 'Cart not found.'], 404);
             }
 
@@ -423,7 +424,7 @@ class CartController extends Controller
             // For guest users, get cart_id from request input
             $cartId = $request->input('cart_id');
     
-            if (!$cartId) {
+            if (!GuestCart::valid($cartId)) {
                 return response()->json(['message' => 'Your cart is empty.'], 400);
             }
     
@@ -471,7 +472,7 @@ class CartController extends Controller
             // For guest users, get cart_id from request input
             $cartId = $request->input('cart_id');
     
-            if (!$cartId) {
+            if (!GuestCart::valid($cartId)) {
                 return response()->json(['message' => 'Your cart is empty.'], 400);
             }
     
