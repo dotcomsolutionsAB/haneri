@@ -59,8 +59,19 @@ class BlogController extends Controller
 
     public function showBySlug(string $slug)
     {
+        $aliases = [
+            'what-makes-haneri-ceiling-fans-different-from-regular-fans' => 'haneri-ceiling-fans-vs-regular-fans',
+            // reverse lookup while migration is rolling out
+            'haneri-ceiling-fans-vs-regular-fans' => 'what-makes-haneri-ceiling-fans-different-from-regular-fans',
+        ];
+
+        $candidates = array_values(array_unique(array_filter([
+            $slug,
+            $aliases[$slug] ?? null,
+        ])));
+
         $blog = BlogModel::with(['tags:id,name,slug', 'faqs:id,blog_id,question,answer,sort_order'])
-            ->where('slug', $slug)
+            ->whereIn('slug', $candidates)
             ->where('is_published', true)
             ->first();
 
