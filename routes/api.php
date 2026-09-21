@@ -234,6 +234,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/', [OrderController::class, 'store']);           // Create a new order
         Route::delete('/{id}', [OrderController::class, 'delete']);           // Create a new order
         Route::post('/{id}/update-status', [OrderController::class, 'statusUpdate']);
+        Route::post('/{id}/resync-payment', [OrderController::class, 'resyncPayment']);
     });
 
     Route::prefix('returns')->group(function () {
@@ -268,3 +269,4 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/payments', [PaymentController::class, 'store']);
 });
 Route::post('/razorpay/callback', [RazorpayController::class, 'handleCallback']);
+Route::post('/razorpay/webhook', [RazorpayController::class, 'handleWebhook']);

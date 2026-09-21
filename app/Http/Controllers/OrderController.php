@@ -646,7 +646,7 @@ class OrderController extends Controller
 
             $orders = OrderModel::with(['items', 'user', 'invoiceFile'])
                 ->where('user_id', $user_id)
-                ->where('payment_status', 'paid')   // only paid orders
+                ->orderByDesc('id')
                 ->get()
                 ->map(function ($order) {
                     // 1) Build invoice URL (prefer DB row, fallback to pattern)
@@ -705,6 +705,146 @@ class OrderController extends Controller
             return response()->json([
                 'message' => 'An error occurred while fetching orders.',
                 'error'   => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Customer: re-check Razorpay for a pending/failed order and mark paid if captured.
+     */
+    public function resyncPayment($orderId)
+    {
+        try {
+            $user = Auth::user();
+            if (! $user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthenticated.',
+                ], 401);
+            }
+
+            $order = OrderModel::where('id', $orderId)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (! $order) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order not found.',
+                ], 404);
+            }
+
+            $paymentStatus = strtolower((string) $order->payment_status);
+            if ($paymentStatus === 'paid') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment is already confirmed.',
+                    'data' => [
+                        'order_id' => $order->id,
+                        'payment_status' => $order->payment_status,
+                        'status' => $order->status,
+                        'synced' => false,
+                    ],
+                ], 200);
+            }
+
+            $razorpayOrderId = trim((string) ($order->razorpay_order_id ?? ''));
+            if ($razorpayOrderId === '') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No Razorpay order linked to this order.',
+                ], 422);
+            }
+
+            $razorpay = app(RazorpayController::class);
+            $api = new \Razorpay\Api\Api(
+                config('services.razorpay.key'),
+                config('services.razorpay.secret')
+            );
+
+            $paymentsPayload = $api->order->fetch($razorpayOrderId)->payments();
+            $payments = is_array($paymentsPayload)
+                ? ($paymentsPayload['items'] ?? [])
+                : (method_exists($paymentsPayload, 'toArray')
+                    ? ($paymentsPayload->toArray()['items'] ?? [])
+                    : []);
+
+            $captured = null;
+            foreach ($payments as $payment) {
+                $row = is_array($payment) ? $payment : (array) $payment;
+                $status = strtolower((string) ($row['status'] ?? ''));
+                if (in_array($status, ['captured', 'authorized'], true)) {
+                    // Prefer captured; keep searching for captured over authorized
+                    if ($status === 'captured') {
+                        $captured = $row;
+                        break;
+                    }
+                    $captured = $captured ?? $row;
+                }
+            }
+
+            if (! $captured) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'No successful payment found on Razorpay yet. If you just paid, wait a moment and try again.',
+                    'data' => [
+                        'order_id' => $order->id,
+                        'payment_status' => $order->payment_status,
+                        'status' => $order->status,
+                        'synced' => false,
+                    ],
+                ], 200);
+            }
+
+            $paymentId = (string) ($captured['id'] ?? '');
+            $method = strtolower((string) ($captured['method'] ?? 'razorpay'));
+
+            // If only authorized, attempt capture when auto-capture might have failed
+            if (strtolower((string) ($captured['status'] ?? '')) === 'authorized' && $paymentId !== '') {
+                try {
+                    $amount = (int) ($captured['amount'] ?? 0);
+                    if ($amount > 0) {
+                        $api->payment->fetch($paymentId)->capture(['amount' => $amount]);
+                        $captured['status'] = 'captured';
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Razorpay resync capture failed', [
+                        'order_id' => $order->id,
+                        'payment_id' => $paymentId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            $razorpay->applyCapturedPayment(
+                (int) $order->id,
+                $razorpayOrderId,
+                $paymentId !== '' ? $paymentId : null,
+                $method !== '' ? $method : null
+            );
+
+            $order->refresh();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payment synced successfully. Your order is now marked as paid.',
+                'data' => [
+                    'order_id' => $order->id,
+                    'payment_status' => $order->payment_status,
+                    'status' => $order->status,
+                    'synced' => true,
+                ],
+            ], 200);
+        } catch (\Throwable $e) {
+            Log::error('Order payment resync failed', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Could not sync payment right now. Please try again later.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
     }
