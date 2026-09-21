@@ -423,9 +423,7 @@ class RazorpayController extends Controller
 
             if (! $alreadyPaid) {
                 $order->payment_status = 'paid';
-                if ($order->status === 'pending') {
-                    $order->status = 'confirmed';
-                }
+                // Keep order status as-is: DB enum is pending|completed|cancelled|refunded
                 $order->save();
             }
 
