@@ -10,6 +10,7 @@ use Mpdf\Mpdf;
 use Illuminate\Http\Request;
 use App\Models\OrderModel;
 use App\Models\UploadModel;
+use App\Models\PaymentModel;
 use App\Mail\OrderStatusUpdate;
 use App\Models\EmailLog;
 use Illuminate\Support\Facades\Storage;
@@ -105,6 +106,20 @@ class InvoiceController extends Controller
             'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
             'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
         ]));
+
+        // Keep payment records in sync when admin changes payment status
+        if (array_key_exists('payment_status', $validated) && $validated['payment_status']) {
+            try {
+                PaymentModel::where('order_id', $order->id)->update([
+                    'status' => $validated['payment_status'],
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to sync payment record status: '.$e->getMessage(), [
+                    'order_id' => $order->id,
+                    'payment_status' => $validated['payment_status'],
+                ]);
+            }
+        }
 
         /**
          * 🔥 Invoice Generation Condition Updated
