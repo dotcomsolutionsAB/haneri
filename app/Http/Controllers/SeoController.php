@@ -58,6 +58,7 @@ class SeoController extends Controller
             return $stored->get($key) ?: [
                 'page_key' => $key,
                 'page_name' => $name,
+                'h1' => null,
                 'meta_title' => null,
                 'meta_description' => null,
                 'meta_keywords' => null,
@@ -101,6 +102,7 @@ class SeoController extends Controller
     public static function rules(): array
     {
         return [
+            'h1' => 'nullable|string|max:255',
             'meta_title' => 'nullable|string|max:255',
             'meta_description' => 'nullable|string|max:1000',
             'meta_keywords' => 'nullable|string|max:2000',

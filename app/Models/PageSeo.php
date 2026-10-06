@@ -11,6 +11,7 @@ class PageSeo extends Model
     protected $fillable = [
         'page_key',
         'page_name',
+        'h1',
         'meta_title',
         'meta_description',
         'meta_keywords',
