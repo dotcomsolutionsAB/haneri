@@ -46,9 +46,10 @@ return [
     ],
 
     'recaptcha' => [
-        // Google reCAPTCHA v2 ("I'm not a robot") — pair with NEXT_PUBLIC_RECAPTCHA_SITE_KEY on the frontend
+        // Google reCAPTCHA v3 (score-based). Site key is exposed via GET /api/site/config.
         'site_key' => env('RECAPTCHA_SITE_KEY'),
         'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+        'min_score' => env('RECAPTCHA_MIN_SCORE', 0.5),
     ],
     
     'firebase' => [

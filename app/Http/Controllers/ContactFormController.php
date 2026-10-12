@@ -38,7 +38,7 @@ class ContactFormController extends Controller
                 ], 422);
             }
 
-            if (!$recaptcha->verify($request->input('recaptcha_token'), $request->ip())) {
+            if (!$recaptcha->verify($request->input('recaptcha_token'), $request->ip(), 'contact')) {
                 return response()->json([
                     'code'    => 422,
                     'success' => false,

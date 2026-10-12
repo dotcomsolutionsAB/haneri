@@ -22,13 +22,23 @@ class RecaptchaService
         return trim((string) config('services.recaptcha.secret_key', ''));
     }
 
-    public function verify(?string $token, ?string $remoteIp = null): bool
+    public function minScore(): float
+    {
+        $score = (float) config('services.recaptcha.min_score', 0.5);
+        if ($score < 0) {
+            return 0.0;
+        }
+        if ($score > 1) {
+            return 1.0;
+        }
+        return $score;
+    }
+
+    public function verify(?string $token, ?string $remoteIp = null, ?string $expectedAction = null): bool
     {
         if (!$this->isConfigured()) {
             return true;
         }
-
-        $secret = $this->secretKey();
 
         $token = trim((string) $token);
         if ($token === '') {
@@ -37,7 +47,7 @@ class RecaptchaService
 
         try {
             $payload = [
-                'secret' => $secret,
+                'secret' => $this->secretKey(),
                 'response' => $token,
             ];
             if ($remoteIp) {
@@ -55,8 +65,23 @@ class RecaptchaService
                 return false;
             }
 
-            $body = $response->json();
-            return (bool) ($body['success'] ?? false);
+            $body = $response->json() ?: [];
+            if (!($body['success'] ?? false)) {
+                return false;
+            }
+
+            // v3 responses include score + action; v2 checkbox responses omit them.
+            if (array_key_exists('score', $body)) {
+                if ((float) $body['score'] < $this->minScore()) {
+                    return false;
+                }
+            }
+
+            if ($expectedAction && !empty($body['action']) && $body['action'] !== $expectedAction) {
+                return false;
+            }
+
+            return true;
         } catch (\Throwable $e) {
             Log::warning('reCAPTCHA verification failed: ' . $e->getMessage());
             return false;
