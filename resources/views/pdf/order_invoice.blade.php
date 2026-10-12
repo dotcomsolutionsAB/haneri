@@ -317,10 +317,11 @@
                             <table class="product-inner-table">
                                 <tr>
                                     <td class="product-img-td">
-                                        @if($item->variant->photo_url)
-                                            <img src="{{ asset($item->variant->photo_url) }}" class="product-image" alt="Fan Image">
-                                        @else
-                                            <img src="{{ asset('storage/upload/logo/Haneri_Favicon.jpg') }}" class="product-image" alt="Fallback Image">
+                                        @php
+                                            $imageSrc = optional($item->variant)->photo_url ?: ($fallbackLogo ?? null);
+                                        @endphp
+                                        @if($imageSrc)
+                                            <img src="{{ $imageSrc }}" class="product-image" alt="Fan Image">
                                         @endif
                                     </td>
                                     <td class="product-info">

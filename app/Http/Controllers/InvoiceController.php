@@ -80,49 +80,74 @@ class InvoiceController extends Controller
 
     public function regenerateOrderInvoice(int $id)
     {
-        $order = OrderModel::find($id);
+        try {
+            $order = OrderModel::find($id);
 
-        if (!$order) {
-            return response()->json([
-                'code' => 404,
-                'success' => false,
-                'message' => 'Order not found.',
-                'data' => [],
-            ], 404);
-        }
-
-        if ($order->status !== 'completed' || $order->payment_status === 'pending') {
-            return response()->json([
-                'code' => 422,
-                'success' => false,
-                'message' => 'Invoice can only be regenerated for completed, paid orders.',
-                'data' => [],
-            ], 422);
-        }
-
-        $this->generateOrderInvoice($order, true);
-        $order->refresh();
-
-        $invoice = null;
-        if ($order->invoice_id) {
-            $upload = UploadModel::find($order->invoice_id);
-            if ($upload) {
-                $invoice = [
-                    'id' => $upload->id,
-                    'url' => asset('storage/' . $upload->file_path),
-                ];
+            if (!$order) {
+                return response()->json([
+                    'code' => 404,
+                    'success' => false,
+                    'message' => 'Order not found.',
+                    'data' => [],
+                ], 404);
             }
-        }
 
-        return response()->json([
-            'code' => 200,
-            'success' => true,
-            'message' => 'Invoice regenerated successfully.',
-            'data' => [
-                'order' => $order,
-                'invoice' => $invoice,
-            ],
-        ]);
+            $status = strtolower((string) $order->status);
+            $paymentStatus = strtolower((string) $order->payment_status);
+
+            if ($status !== 'completed' || $paymentStatus === 'pending') {
+                return response()->json([
+                    'code' => 422,
+                    'success' => false,
+                    'message' => 'Invoice can only be regenerated for completed, paid orders.',
+                    'data' => [],
+                ], 422);
+            }
+
+            $this->generateOrderInvoice($order, true);
+            $order->refresh();
+
+            $invoice = null;
+            if ($order->invoice_id) {
+                $upload = UploadModel::find($order->invoice_id);
+                if ($upload && $upload->file_path) {
+                    $invoice = [
+                        'id' => $upload->id,
+                        'url' => asset('storage/' . ltrim($upload->file_path, '/')),
+                    ];
+                }
+            }
+
+            if (!$invoice) {
+                return response()->json([
+                    'code' => 500,
+                    'success' => false,
+                    'message' => 'Invoice generation finished but no PDF file was saved.',
+                    'data' => [],
+                ], 500);
+            }
+
+            return response()->json([
+                'code' => 200,
+                'success' => true,
+                'message' => 'Invoice regenerated successfully.',
+                'data' => [
+                    'invoice' => $invoice,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('regenerateOrderInvoice failed: '.$e->getMessage(), [
+                'order_id' => $id,
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to regenerate invoice: '.$e->getMessage(),
+                'data' => [],
+            ], 500);
+        }
     }
 
     public function updateOrderStatus(Request $request, int $id)
@@ -244,13 +269,27 @@ class InvoiceController extends Controller
 
         $order->loadMissing(['user', 'items.product', 'items.variant']);
 
+        $fallbackLogo = storage_path('app/public/upload/logo/Haneri_Favicon.jpg');
+        if (!is_file($fallbackLogo)) {
+            $fallbackLogo = public_path('storage/upload/logo/Haneri_Favicon.jpg');
+        }
+
         foreach ($order->items as $item) {
+            $photoUrl = is_file($fallbackLogo) ? $fallbackLogo : null;
             if ($item->variant && $item->variant->photo_id) {
-                $firstPhotoId = explode(',', $item->variant->photo_id)[0];
-                $photo = UploadModel::find($firstPhotoId);
-                if ($photo) {
-                    $item->variant->photo_url = 'storage/' . $photo->file_path;
+                $firstPhotoId = trim((string) explode(',', (string) $item->variant->photo_id)[0]);
+                if ($firstPhotoId !== '') {
+                    $photo = UploadModel::find($firstPhotoId);
+                    if ($photo && $photo->file_path) {
+                        $absolute = storage_path('app/public/' . ltrim($photo->file_path, '/'));
+                        if (is_file($absolute)) {
+                            $photoUrl = $absolute;
+                        }
+                    }
                 }
+            }
+            if ($item->variant) {
+                $item->variant->photo_url = $photoUrl;
             }
         }
 
@@ -260,7 +299,8 @@ class InvoiceController extends Controller
 
         if ($existingUpload && $existingUpload->alt_text) {
             $invoiceNumber = $existingUpload->alt_text;
-            $relativePath = $existingUpload->file_path ?: ('upload/order_invoice/' . $invoiceNumber . '.pdf');
+            $relativePath = $existingUpload->file_path
+                ?: ('upload/order_invoice/' . $invoiceNumber . '.pdf');
         } else {
             $dt = $order->created_at ?? now();
             $year = $dt->format('Y');
@@ -273,6 +313,7 @@ class InvoiceController extends Controller
             $relativePath = 'upload/order_invoice/' . $invoiceNumber . '.pdf';
         }
 
+        $relativePath = ltrim(str_replace('\\', '/', (string) $relativePath), '/');
         $fullPath = storage_path('app/public/' . $relativePath);
 
         $itemsSubtotal = (float) $order->items->sum(function ($item) {
@@ -305,11 +346,17 @@ class InvoiceController extends Controller
         }
 
         try {
+            $tempDir = storage_path('app/mpdf');
+            if (!File::isDirectory($tempDir)) {
+                File::makeDirectory($tempDir, 0755, true, true);
+            }
+
             $mpdf = new \Mpdf\Mpdf([
                 'format' => 'A4',
                 'default_font' => 'dejavusans',
                 'margin_top' => 0,
                 'margin_bottom' => 0,
+                'tempDir' => $tempDir,
             ]);
 
             $html = view('pdf.order_invoice', [
@@ -324,16 +371,27 @@ class InvoiceController extends Controller
                 'couponCode' => $order->coupon_code,
                 'grandTotal' => $grandTotal,
                 'totalAmount' => $total,
+                'fallbackLogo' => is_file($fallbackLogo) ? $fallbackLogo : null,
             ])->render();
 
             $mpdf->WriteHTML($html);
             $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
-        } catch (\Mpdf\MpdfException $e) {
-            Log::error('mPDF order invoice error: '.$e->getMessage(), ['order_id' => $order->id]);
-            return;
+        } catch (\Throwable $e) {
+            Log::error('mPDF order invoice error: '.$e->getMessage(), [
+                'order_id' => $order->id,
+            ]);
+            throw new \RuntimeException(
+                'Unable to write invoice PDF: '.$e->getMessage(),
+                0,
+                $e
+            );
         }
 
-        $size = File::exists($fullPath) ? File::size($fullPath) : 0;
+        if (!File::exists($fullPath)) {
+            throw new \RuntimeException('Invoice PDF was not created on disk.');
+        }
+
+        $size = File::size($fullPath);
 
         if ($existingUpload) {
             $existingUpload->update([
