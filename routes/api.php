@@ -139,6 +139,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::post('/fetch_all', [OrderController::class, 'fetchOrders']); // List all orders for admin
         Route::get('/fetch_order_detail/{id}', [OrderController::class, 'fetchOrderDetails']); //Fetch order detail for admin
         Route::post('/status/{id}/update', [InvoiceController::class, 'updateOrderStatus']); // updated order status
+        Route::post('/orders/{id}/regenerate-invoice', [InvoiceController::class, 'regenerateOrderInvoice']);
 
         // for all users 
         Route::post('/all_users', [UserController::class, 'fetchUsers']); // List all users for admin

@@ -359,7 +359,9 @@
                         <td class="summary-value">₹{{ number_format($shippingCharge, 2) }}</td>
                     </tr>
                     <tr>
-                        <td class="summary-label">Discount:</td>
+                        <td class="summary-label">
+                            Discount@if(!empty($couponCode)) ({{ $couponCode }})@endif:
+                        </td>
                         <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
                     </tr>
                 </table>

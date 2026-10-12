@@ -99,6 +99,8 @@ class CheckoutSchema
             $t->timestamp('mail_sent_at')->nullable();
             $t->string('delivery_status')->default('pending');
             $t->string('shipping_charge')->default('0');
+            $t->string('coupon_code')->nullable();
+            $t->decimal('discount_amount', 10, 2)->default(0);
             $t->text('shipping_address');
             $t->string('razorpay_order_id')->nullable();
             $t->timestamps();

@@ -78,6 +78,53 @@ class InvoiceController extends Controller
         }
     }
 
+    public function regenerateOrderInvoice(int $id)
+    {
+        $order = OrderModel::find($id);
+
+        if (!$order) {
+            return response()->json([
+                'code' => 404,
+                'success' => false,
+                'message' => 'Order not found.',
+                'data' => [],
+            ], 404);
+        }
+
+        if ($order->status !== 'completed' || $order->payment_status === 'pending') {
+            return response()->json([
+                'code' => 422,
+                'success' => false,
+                'message' => 'Invoice can only be regenerated for completed, paid orders.',
+                'data' => [],
+            ], 422);
+        }
+
+        $this->generateOrderInvoice($order, true);
+        $order->refresh();
+
+        $invoice = null;
+        if ($order->invoice_id) {
+            $upload = UploadModel::find($order->invoice_id);
+            if ($upload) {
+                $invoice = [
+                    'id' => $upload->id,
+                    'url' => asset('storage/' . $upload->file_path),
+                ];
+            }
+        }
+
+        return response()->json([
+            'code' => 200,
+            'success' => true,
+            'message' => 'Invoice regenerated successfully.',
+            'data' => [
+                'order' => $order,
+                'invoice' => $invoice,
+            ],
+        ]);
+    }
+
     public function updateOrderStatus(Request $request, int $id)
     {
         $validated = $request->validate([
@@ -122,18 +169,19 @@ class InvoiceController extends Controller
         }
 
         /**
-         * 🔥 Invoice Generation Condition Updated
-         * - Status changed from PENDING → COMPLETED
-         * - Payment status is NOT 'pending'   (means paid/failed/whatever next)
-         * - Invoice not already generated
+         * Invoice generation / refresh
+         * - Completed + payment not pending
+         * - Create if missing; regenerate when an invoice already exists so coupon/discount fixes apply
          */
         if (
-            $oldStatus === 'pending' &&
             $order->status === 'completed' &&
             $order->payment_status !== 'pending' &&
-            !$order->invoice_id
+            (
+                !$order->invoice_id ||
+                ($oldStatus === 'pending' || array_key_exists('payment_status', $validated))
+            )
         ) {
-            $this->generateOrderInvoice($order);
+            $this->generateOrderInvoice($order, (bool) $order->invoice_id);
             $order->refresh();
         }
 
@@ -188,103 +236,120 @@ class InvoiceController extends Controller
         ], 200);
     }
     
-    private function generateOrderInvoice(OrderModel $order): void
+    private function generateOrderInvoice(OrderModel $order, bool $force = false): void
     {
-        if ($order->invoice_id) return; // avoid duplicate
+        if ($order->invoice_id && !$force) {
+            return;
+        }
 
-        $order->loadMissing(['user','items.product','items.variant']);
+        $order->loadMissing(['user', 'items.product', 'items.variant']);
 
-        // Loop through order items to get the first photo from photo_id
         foreach ($order->items as $item) {
-            // Check if there is a photo_id
             if ($item->variant && $item->variant->photo_id) {
-                // Get the first photo_id from the comma-separated list
-                $firstPhotoId = explode(',', $item->variant->photo_id)[0];  // Get the first photo ID
-                
-                // Fetch the photo path using UploadModel
-                $photo = UploadModel::find($firstPhotoId);  // Find photo using the first ID
+                $firstPhotoId = explode(',', $item->variant->photo_id)[0];
+                $photo = UploadModel::find($firstPhotoId);
                 if ($photo) {
-                    // Set the photo URL
                     $item->variant->photo_url = 'storage/' . $photo->file_path;
                 }
             }
         }
 
-        // ===== INVOICE NUMBER ===== //
-        $dt    = $order->created_at ?? now();
-        $year  = $dt->format('Y');
-        $month = $dt->format('m');
+        $existingUpload = $order->invoice_id
+            ? UploadModel::find($order->invoice_id)
+            : null;
 
-        $orderIdStr = (string) $order->id;
-        $series = strlen($orderIdStr) < 4 ? str_pad($orderIdStr, 4, '0', STR_PAD_LEFT) : $orderIdStr;
-
-        $invoiceNumber = "HAN-INV-{$year}-{$month}-{$series}";
-        $fileName      = $invoiceNumber . '.pdf';
-        $relativePath  = 'upload/order_invoice/' . $fileName;
-        $fullPath      = storage_path('app/public/' . $relativePath);
-
-        // ===== PRICE BREAKUP ===== //
-        $total    = (float) $order->total_amount;
-        $taxRate  = 0.18;
-
-        if ($total > 0) {
-            $subTotal  = round($total / (1 + $taxRate), 2);
-            $taxAmount = round($total - $subTotal, 2);
+        if ($existingUpload && $existingUpload->alt_text) {
+            $invoiceNumber = $existingUpload->alt_text;
+            $relativePath = $existingUpload->file_path ?: ('upload/order_invoice/' . $invoiceNumber . '.pdf');
         } else {
-            $subTotal  = 0.00;
+            $dt = $order->created_at ?? now();
+            $year = $dt->format('Y');
+            $month = $dt->format('m');
+            $orderIdStr = (string) $order->id;
+            $series = strlen($orderIdStr) < 4
+                ? str_pad($orderIdStr, 4, '0', STR_PAD_LEFT)
+                : $orderIdStr;
+            $invoiceNumber = "HAN-INV-{$year}-{$month}-{$series}";
+            $relativePath = 'upload/order_invoice/' . $invoiceNumber . '.pdf';
+        }
+
+        $fullPath = storage_path('app/public/' . $relativePath);
+
+        $itemsSubtotal = (float) $order->items->sum(function ($item) {
+            return ((float) $item->price) * ((int) $item->quantity);
+        });
+        $shippingCharge = round((float) ($order->shipping_charge ?? 0), 2);
+        $storedDiscount = round((float) ($order->discount_amount ?? 0), 2);
+        $inferredDiscount = max(
+            0,
+            round($itemsSubtotal + $shippingCharge - (float) $order->total_amount, 2)
+        );
+        $discount = $storedDiscount > 0 ? $storedDiscount : $inferredDiscount;
+
+        // Merchandise after coupon is tax-inclusive; split for display
+        $merchandiseIncl = max(0, round($itemsSubtotal - $discount, 2));
+        $taxRate = 0.18;
+        if ($merchandiseIncl > 0) {
+            $subTotal = round($merchandiseIncl / (1 + $taxRate), 2);
+            $taxAmount = round($merchandiseIncl - $subTotal, 2);
+        } else {
+            $subTotal = 0.00;
             $taxAmount = 0.00;
         }
 
-        // === ⭐ Shipping & Discount Rules ⭐ ===
-        $shippingCharge = $subTotal < 5000 ? 120 : 0;
-        $discount       = 0; // default
+        $total = (float) $order->total_amount;
+        $grandTotal = round($subTotal + $taxAmount + $shippingCharge, 2);
 
-        // Net + shipping
-        $grandTotal = $subTotal + $taxAmount + $shippingCharge - $discount;
-
-        // Ensure directory
         if (!File::isDirectory(dirname($fullPath))) {
             File::makeDirectory(dirname($fullPath), 0755, true, true);
         }
 
         try {
             $mpdf = new \Mpdf\Mpdf([
-                'format'        => 'A4',
-                'default_font'  => 'dejavusans',
-                'margin_top'    => 0,
+                'format' => 'A4',
+                'default_font' => 'dejavusans',
+                'margin_top' => 0,
                 'margin_bottom' => 0,
             ]);
 
             $html = view('pdf.order_invoice', [
-                'order'          => $order,
-                'user'           => $order->user,
-                'items'          => $order->items,
-                'invoiceNumber'  => $invoiceNumber,
-
-                // 🔥 send all values to blade
-                'subTotal'       => $subTotal,
-                'taxAmount'      => $taxAmount,
+                'order' => $order,
+                'user' => $order->user,
+                'items' => $order->items,
+                'invoiceNumber' => $invoiceNumber,
+                'subTotal' => $subTotal,
+                'taxAmount' => $taxAmount,
                 'shippingCharge' => $shippingCharge,
-                'discount'       => $discount,
-                'grandTotal'     => $grandTotal,
-                'totalAmount'    => $total, // original saved total
+                'discount' => $discount,
+                'couponCode' => $order->coupon_code,
+                'grandTotal' => $grandTotal,
+                'totalAmount' => $total,
             ])->render();
 
             $mpdf->WriteHTML($html);
             $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
-
         } catch (\Mpdf\MpdfException $e) {
-            \Log::error('mPDF order invoice error: '.$e->getMessage(), ['order_id'=>$order->id]);
+            Log::error('mPDF order invoice error: '.$e->getMessage(), ['order_id' => $order->id]);
             return;
         }
 
         $size = File::exists($fullPath) ? File::size($fullPath) : 0;
 
+        if ($existingUpload) {
+            $existingUpload->update([
+                'file_path' => $relativePath,
+                'type' => 'order_invoice',
+                'size' => $size,
+                'alt_text' => $invoiceNumber,
+            ]);
+            return;
+        }
+
         $upload = UploadModel::create([
             'file_path' => $relativePath,
-            'type'      => 'order_invoice',
-            'size'      => $size,
-            'alt_text'  => $invoiceNumber
+            'type' => 'order_invoice',
+            'size' => $size,
+            'alt_text' => $invoiceNumber,
         ]);
 
         $order->invoice_id = $upload->id;

@@ -238,6 +238,8 @@ class OrderController extends Controller
                 'user_id' => $user_id,
                 'total_amount' => $finalAmount, // include shipping
                 'shipping_charge' => $shippingCharge, // if you have this column (recommended)
+                'coupon_code' => $coupon?->coupon_code,
+                'discount_amount' => round((float) $discountAmount, 2),
                 'status' => $orderStatus,
                 'payment_status' => $paymentStatus,
                 'shipping_address' => $request->input('shipping_address'),
@@ -1204,6 +1206,8 @@ class OrderController extends Controller
             'shipping_address'  => $order->shipping_address,
             'razorpay_order_id' => $order->razorpay_order_id,
             'shipping_charge'   => $order->shipping_charge,
+            'coupon_code'       => $order->coupon_code,
+            'discount_amount'   => $order->discount_amount,
             'order_date'        => $order->created_at,
             'items'             => $items,
             'user'              => $userData,
@@ -1567,15 +1571,54 @@ class OrderController extends Controller
             ], 404);
         }
 
-        // Compute totals split (inclusive -> base + tax)
-        $split = $splitInclusive($order->total_amount, 18); // 18% GST
+        $items = $order->items->map(function ($it) use ($money, $mulMoney) {
+            return [
+                'id'         => $it->id,
+                'product_id' => $it->product_id,
+                'variant_id' => $it->variant_id,
+                'quantity'   => (int) $it->quantity,
+                'price'      => $money($it->price),
+                'subtotal'   => $mulMoney($it->price, $it->quantity),
+                'product'    => $it->product ? [
+                    'id'   => $it->product->id,
+                    'name' => $it->product->name,
+                    'slug' => $it->product->slug,
+                ] : null,
+                'variant'    => $it->variant ? [
+                    'id'            => $it->variant->id,
+                    'variant_value' => $it->variant->variant_value,
+                    'regular_price' => $money($it->variant->regular_price),
+                ] : null,
+            ];
+        })->values()->all();
+
+        $itemsSubtotal = 0.0;
+        foreach ($items as $item) {
+            $itemsSubtotal += (float) $item['subtotal'];
+        }
+        $itemsSubtotal = round($itemsSubtotal, 2);
+        $shippingCharge = round((float) ($order->shipping_charge ?? 0), 2);
+        $storedDiscount = round((float) ($order->discount_amount ?? 0), 2);
+        $inferredDiscount = max(
+            0,
+            round($itemsSubtotal + $shippingCharge - (float) $order->total_amount, 2)
+        );
+        $discountAmount = $storedDiscount > 0 ? $storedDiscount : $inferredDiscount;
+
+        // GST split on merchandise after coupon (excl. shipping)
+        $merchandiseIncl = max(0, round($itemsSubtotal - $discountAmount, 2));
+        $split = $splitInclusive($merchandiseIncl, 18);
 
         // Shape data
         $data = [
             'id'                => $order->id,
-            'total_amount'      => $money($order->total_amount), // gross (incl. GST)
-            'total'             => $split['base'],               // base amount (excl. GST)
-            'tax'               => $split['tax'],                // GST portion
+            'total_amount'      => $money($order->total_amount), // payable (incl. GST + shipping)
+            'items_subtotal'    => $money($itemsSubtotal),
+            'total'             => $split['base'],               // merchandise excl. GST
+            'tax'               => $split['tax'],                // GST on merchandise
+            'shipping_charge'   => $money($shippingCharge),
+            'discount_amount'   => $money($discountAmount),
+            'coupon_code'       => $order->coupon_code,
             'status'            => $order->status,
             'payment_status'    => $order->payment_status,
             'shipping_address'  => $order->shipping_address,
@@ -1590,26 +1633,7 @@ class OrderController extends Controller
                 'selected_type' => $order->user->selected_type,
                 'gstin'         => $order->user->gstin,
             ] : null,
-            'items'             => $order->items->map(function ($it) use ($money, $mulMoney) {
-                return [
-                    'id'         => $it->id,
-                    'product_id' => $it->product_id,
-                    'variant_id' => $it->variant_id,
-                    'quantity'   => (int) $it->quantity,
-                    'price'      => $money($it->price),
-                    'subtotal'   => $mulMoney($it->price, $it->quantity),
-                    'product'    => $it->product ? [
-                        'id'   => $it->product->id,
-                        'name' => $it->product->name,
-                        'slug' => $it->product->slug,
-                    ] : null,
-                    'variant'    => $it->variant ? [
-                        'id'            => $it->variant->id,
-                        'variant_value' => $it->variant->variant_value,
-                        'regular_price' => $money($it->variant->regular_price),
-                    ] : null,
-                ];
-            })->values()->all(),
+            'items'             => $items,
             'payments'          => $order->payments->map(function ($p) use ($money) {
                 return [
                     'id'         => $p->id,

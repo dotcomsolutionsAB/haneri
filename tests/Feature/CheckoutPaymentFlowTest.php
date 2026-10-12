@@ -213,6 +213,22 @@ class CheckoutPaymentFlowTest extends TestCase
         $this->assertSame($existing->id, $res->json('user.id'));
     }
 
+    public function test_admins_cannot_add_products_to_the_cart(): void
+    {
+        $admin = $this->makeUser(['role' => 'admin']);
+        $product = $this->makeProduct();
+        $variant = $this->makeVariant($product, 1000);
+        Sanctum::actingAs($admin);
+
+        $this->postJson('/api/cart/add', [
+            'product_id' => $product->id,
+            'variant_id' => $variant->id,
+            'quantity' => 1,
+        ])->assertStatus(403);
+
+        $this->assertSame(0, CartModel::where('user_id', (string) $admin->id)->count());
+    }
+
     public function test_numeric_guest_cart_ids_are_rejected_everywhere(): void
     {
         $owner = $this->makeUser();
@@ -382,6 +398,9 @@ class CheckoutPaymentFlowTest extends TestCase
         $res->assertStatus(201);
         $this->assertSame(900000, $this->orderPayload($res)['razorpay_amount']);
         $this->assertSame(0, (int) CouponModel::where('coupon_code', 'SAVE10')->value('count'));
+        $order = OrderModel::find($this->orderPayload($res)['order_id']);
+        $this->assertSame('SAVE10', $order->coupon_code);
+        $this->assertEquals(1000.0, (float) $order->discount_amount);
 
         // retrying the same checkout (payment window closed) re-opens that order: no error, no second use
         $retry = $this->postJson('/api/orders', $this->orderRequest(['coupon_code' => 'SAVE10']));
