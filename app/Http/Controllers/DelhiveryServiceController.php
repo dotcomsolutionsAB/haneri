@@ -178,6 +178,11 @@ class DelhiveryServiceController extends Controller
             'origin_pin'      => 'required_if:through,simple|digits:6',
             'destination_pin' => 'required_if:through,simple|digits:6',
             'weight'          => 'required_if:through,simple|numeric|min:0.01',
+
+            // Optional box size. Charged weight uses the higher of actual and volumetric.
+            'length'  => 'nullable|numeric|min:1',
+            'breadth' => 'nullable|numeric|min:1',
+            'height'  => 'nullable|numeric|min:1',
         ]);
 
         if ($validator->fails()) {
@@ -194,28 +199,38 @@ class DelhiveryServiceController extends Controller
         // =========================
         // Resolve pins + weight
         // =========================
+        $lengthCm = 10.0;
+        $breadthCm = 10.0;
+        $heightCm = 10.0;
+
         if ($through === 'order') {
             $orderId = (int) $request->input('order_id');
 
-            $shipment = OrderShipment::where('order_id', $orderId)->orderByDesc('id')->first();
-            if (!$shipment) {
+            try {
+                $orderData = $this->buildShipmentData($orderId)['orderData'];
+            } catch (\Exception $e) {
                 return response()->json([
-                    'code'    => 404,
+                    'code'    => 422,
                     'success' => false,
-                    'message' => 'No shipment record found for this order.',
+                    'message' => $e->getMessage(),
                     'data'    => [],
-                ], 404);
+                ], 422);
             }
 
-            $originPin      = $shipment->pickup_pin;
-            $destinationPin = $shipment->shipping_pin;
-            $weightInput    = $shipment->weight ?? 1; // assume kg in DB; adjust if you store grams
+            $originPin      = $orderData['pickup_pin'] ?? null;
+            $destinationPin = $orderData['pin'] ?? null;
+            $weightInput    = $request->filled('weight')
+                ? $request->input('weight')
+                : ($orderData['weight'] ?? 1);
+            $lengthCm = (float) ($request->filled('length') ? $request->input('length') : ($orderData['shipment_length'] ?? 10));
+            $breadthCm = (float) ($request->filled('breadth') ? $request->input('breadth') : ($orderData['shipment_width'] ?? 10));
+            $heightCm = (float) ($request->filled('height') ? $request->input('height') : ($orderData['shipment_height'] ?? 10));
 
             if (!$originPin || !$destinationPin) {
                 return response()->json([
                     'code'    => 422,
                     'success' => false,
-                    'message' => 'Pickup pin / Shipping pin missing in shipment record.',
+                    'message' => 'Pickup pin / shipping pin missing for this order.',
                     'data'    => [],
                 ], 422);
             }
@@ -223,10 +238,30 @@ class DelhiveryServiceController extends Controller
             $originPin      = $request->input('origin_pin');
             $destinationPin = $request->input('destination_pin');
             $weightInput    = $request->input('weight'); // in KG as per your payload
+            $lengthCm = (float) $request->input('length', 10);
+            $breadthCm = (float) $request->input('breadth', 10);
+            $heightCm = (float) $request->input('height', 10);
         }
 
-        // Delhivery expects cgm in GRAMS (doc: "Only in Grams Unit") :contentReference[oaicite:2]{index=2}
-        $cgm = $this->toDelhiveryGrams($weightInput);
+        $lengthCm = max(1, $lengthCm);
+        $breadthCm = max(1, $breadthCm);
+        $heightCm = max(1, $heightCm);
+        $actualKg = max(0.01, (float) $weightInput);
+        // Courier volumetric weight in kg. Charge whichever is higher.
+        $volumetricKg = ($lengthCm * $breadthCm * $heightCm) / 5000;
+        $chargedKg = max($actualKg, $volumetricKg);
+        $package = [
+            'length_cm' => round($lengthCm, 2),
+            'breadth_cm' => round($breadthCm, 2),
+            'height_cm' => round($heightCm, 2),
+            'actual_weight_kg' => round($actualKg, 3),
+            'volumetric_weight_kg' => round($volumetricKg, 3),
+            'charged_weight_kg' => round($chargedKg, 3),
+            'charged_on' => $volumetricKg > $actualKg ? 'volumetric' : 'actual',
+        ];
+
+        // Delhivery expects cgm in grams. Weight here is already kilograms.
+        $cgm = (int) round($chargedKg * 1000);
 
         $baseQuery = [
             'ss'    => 'Delivered',     // ✅ delivery only (no RTO)
@@ -270,7 +305,7 @@ class DelhiveryServiceController extends Controller
                 'success' => false,
                 'message' => 'Delhivery shipping cost fetch failed for all modes.',
                 'through' => $through,
-                'data'    => ['shippings' => $shippings],
+                'data'    => ['shippings' => $shippings, 'package' => $package],
             ], 400);
         }
 
@@ -281,6 +316,7 @@ class DelhiveryServiceController extends Controller
             'through' => $through,
             'data'    => [
                 'shippings' => $shippings,
+                'package' => $package,
             ],
         ]);
     }
@@ -783,6 +819,10 @@ class DelhiveryServiceController extends Controller
             'payload.shipping_mode'  => 'nullable|in:air,surface',
             'payload.service_level'  => 'nullable|in:normal,express',
             'payload.address_type'   => 'nullable|in:home,work',
+            'payload.shipment_length' => 'nullable|numeric|min:1',
+            'payload.shipment_width'  => 'nullable|numeric|min:1',
+            'payload.shipment_height' => 'nullable|numeric|min:1',
+            'payload.weight'          => 'nullable|numeric|min:0.01',
         ]);
 
         if ($validator->fails()) {

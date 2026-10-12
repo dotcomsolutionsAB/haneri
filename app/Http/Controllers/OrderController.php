@@ -1576,7 +1576,7 @@ class OrderController extends Controller
             'payments' => function ($pq) {
                 $pq->select('id','order_id','amount','status','created_at');
             },
-            
+            'latestShipment',
         ])->find($id);
 
         if (!$order) {
@@ -1626,6 +1626,7 @@ class OrderController extends Controller
         $merchandiseIncl = max(0, round($itemsSubtotal - $discountAmount, 2));
         $split = $splitInclusive($merchandiseIncl, 18);
 
+        $shipment = $order->latestShipment;
         // Shape data
         $data = [
             'id'                => $order->id,
@@ -1659,6 +1660,22 @@ class OrderController extends Controller
                     'created_at' => optional($p->created_at)->toIso8601String(),
                 ];
             })->values()->all(),
+            'shipment'          => $shipment ? [
+                'id'                 => $shipment->id,
+                'status'             => $shipment->status,
+                'courier'            => $shipment->courier,
+                'awb_no'             => $shipment->awb_no,
+                'courier_reference'  => $shipment->courier_reference,
+                'booked_at'          => optional($shipment->booked_at)->toIso8601String(),
+                'weight'             => $shipment->weight,
+                'shipment_length'    => $shipment->shipment_length,
+                'shipment_width'     => $shipment->shipment_width,
+                'shipment_height'    => $shipment->shipment_height,
+                'shipping_mode'      => $shipment->shipping_mode,
+                'error_message'      => $shipment->error_message,
+                'pickup_pin'         => $shipment->pickup_pin,
+                'shipping_pin'       => $shipment->shipping_pin,
+            ] : null,
         ];
 
         return response()->json([
