@@ -425,7 +425,10 @@ class RazorpayController extends Controller
 
             if (! $alreadyPaid) {
                 $order->payment_status = 'paid';
-                // Keep order status as-is: DB enum is pending|completed|cancelled|refunded
+                // Paid checkout orders move into processing until admin dispatches/completes them.
+                if (strtolower((string) $order->status) === 'pending') {
+                    $order->status = 'processing';
+                }
                 $order->save();
 
                 // Checkout leaves the cart untouched until the payment is confirmed

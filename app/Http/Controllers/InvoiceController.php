@@ -153,7 +153,7 @@ class InvoiceController extends Controller
     public function updateOrderStatus(Request $request, int $id)
     {
         $validated = $request->validate([
-            'status'           => 'nullable|in:pending,completed,cancelled,refunded',
+            'status'           => 'nullable|in:pending,processing,dispatched,completed,cancelled,refunded',
             'payment_status'   => 'nullable|in:pending,paid,failed',
             'delivery_status'  => 'nullable|in:pending,accepted,arrived,completed,cancelled',
         ]);
@@ -172,10 +172,22 @@ class InvoiceController extends Controller
         $oldStatus        = $order->status;
         $oldPaymentStatus = $order->payment_status;
 
+        $nextStatus = $validated['status'] ?? $order->status;
+        $nextPayment = $validated['payment_status'] ?? $order->payment_status;
+
+        // Paid orders move from pending → processing unless admin chose another status.
+        if (
+            $nextPayment === 'paid'
+            && !array_key_exists('status', $validated)
+            && strtolower((string) $order->status) === 'pending'
+        ) {
+            $nextStatus = 'processing';
+        }
+
         // Update fields
         $order->update(array_filter([
-            'status'          => $validated['status'] ?? $order->status,
-            'payment_status'  => $validated['payment_status'] ?? $order->payment_status,
+            'status'          => $nextStatus,
+            'payment_status'  => $nextPayment,
             'delivery_status' => $validated['delivery_status'] ?? $order->delivery_status,
         ]));
 

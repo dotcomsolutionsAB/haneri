@@ -27,7 +27,7 @@ class OrderController extends Controller
     {
         // Validate request data
         $request->validate([
-            'status' => 'required|in:pending,completed,cancelled,refunded',
+            'status' => 'required|in:pending,processing,dispatched,completed,cancelled,refunded',
             'payment_status' => 'required|in:pending,paid,failed',
             // 'payment_status' => 'pending',
             'shipping_address' => 'required|string',
@@ -65,6 +65,15 @@ class OrderController extends Controller
         $orderStatus   = $isAdmin ? $request->input('status', 'pending') : 'pending';
         $paymentStatus = $isAdmin ? $request->input('payment_status', 'pending') : 'pending';
         $paymentMode   = $request->input('payment_mode', 'Prepaid');
+
+        // Paid orders start in processing unless an admin explicitly chose another status.
+        if (
+            $paymentStatus === 'paid'
+            && strtolower((string) $orderStatus) === 'pending'
+            && (!$isAdmin || !$request->filled('status'))
+        ) {
+            $orderStatus = 'processing';
+        }
 
         // Start a transaction to ensure all operations are atomic
         DB::beginTransaction();
@@ -1022,7 +1031,7 @@ class OrderController extends Controller
     public function statusUpdate(Request $request, $orderId)
     {
         $validated = $request->validate([
-            'status'          => 'nullable|string|in:pending,completed,cancelled,refunded',
+            'status'          => 'nullable|string|in:pending,processing,dispatched,completed,cancelled,refunded',
             'payment_status'  => 'nullable|string|in:pending,paid,failed,refunded',
             'delivery_status' => 'nullable|string|in:pending,accepted,arrived,completed,cancelled',
         ]);
@@ -1097,6 +1106,14 @@ class OrderController extends Controller
 
             if (array_key_exists('payment_status', $validated)) {
                 $order->payment_status = $validated['payment_status'];
+                // Paid orders move from pending → processing unless status was also set.
+                if (
+                    $validated['payment_status'] === 'paid'
+                    && !array_key_exists('status', $validated)
+                    && strtolower((string) $order->getOriginal('status')) === 'pending'
+                ) {
+                    $order->status = 'processing';
+                }
             }
 
             if (array_key_exists('delivery_status', $validated)) {
@@ -1303,7 +1320,7 @@ class OrderController extends Controller
 
             $orderId     = $request->input('order_id');
             $userName    = $request->input('user_name');
-            $status      = $request->input('status');              // pending|completed|cancelled|refunded
+            $status      = $request->input('status');              // pending|processing|dispatched|completed|cancelled|refunded
             $payStatus   = $request->input('payment_status');      // pending|paid|failed
             $userType    = strtolower(trim((string) $request->input('user_type', '')));
 
