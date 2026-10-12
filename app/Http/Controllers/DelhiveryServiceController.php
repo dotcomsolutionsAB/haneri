@@ -1152,14 +1152,15 @@ class DelhiveryServiceController extends Controller
 
     public function listWarehouses()
     {
+        $service = new DelhiveryService();
         $warehouses = DelhiveryService::normalizeClientWarehouses(
-            (new DelhiveryService())->listClientWarehouses()
+            $service->listClientWarehouses()
         );
 
         return response()->json([
-            'success' => true,
+            'success' => $warehouses !== [],
             'message' => $warehouses === []
-                ? 'No Delhivery warehouses found.'
+                ? ($service->lastWarehouseError() ?: 'No Delhivery warehouses found.')
                 : 'Warehouses fetched.',
             'data' => $warehouses,
         ]);

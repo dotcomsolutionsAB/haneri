@@ -29,6 +29,25 @@ class DelhiveryWarehouseMatchTest extends TestCase
         $this->assertSame('713146', $resolved['match']['pin']);
     }
 
+    public function test_nested_pickup_location_name_is_found(): void
+    {
+        $resolved = DelhiveryService::matchClientWarehouse([
+            'result' => [
+                'pickup_locations' => [
+                    [
+                        'pickup_location_name' => 'HANERI HO',
+                        'city' => 'Noida',
+                        'state' => 'Uttar Pradesh',
+                        'pincode' => '201301',
+                    ],
+                ],
+            ],
+        ], 'Kolkata', '700001');
+
+        $this->assertSame('HANERI HO', $resolved['match']['name']);
+        $this->assertSame('201301', $resolved['match']['pin']);
+    }
+
     public function test_unknown_pickup_among_several_warehouses_is_not_guessed(): void
     {
         $resolved = DelhiveryService::matchClientWarehouse([

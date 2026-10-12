@@ -5,6 +5,7 @@ namespace App\Services;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class DelhiveryService
@@ -13,19 +14,35 @@ class DelhiveryService
     protected $apiKey;
     protected $apiUrl;
     protected $isTestEnvironment;
+    protected $lastWarehouseError = '';
 
     public function __construct()
     {
         $this->client = new Client();
         $this->apiKey = env('DELHIVERY_API_KEY');
-        $this->isTestEnvironment = env('DELHIVERY_TEST_MODE', true);
+        // Live Delhivery unless the flag is explicitly turned on.
+        $this->isTestEnvironment = filter_var(env('DELHIVERY_TEST_MODE', false), FILTER_VALIDATE_BOOLEAN);
     }
 
     private function getBaseUrl()
     {
+        try {
+            $cached = Cache::get('delhivery.api_host');
+            if (is_string($cached) && str_starts_with($cached, 'https://')) {
+                return rtrim($cached, '/');
+            }
+        } catch (\Throwable $e) {
+            // Cache is unavailable outside the application.
+        }
+
         return $this->isTestEnvironment 
             ? 'https://staging-express.delhivery.com' 
             : 'https://track.delhivery.com';
+    }
+
+    public function lastWarehouseError(): string
+    {
+        return $this->lastWarehouseError;
     }
 
     public function checkPincodeServiceability(string $pincode): array
@@ -408,7 +425,40 @@ class DelhiveryService
      */
     public function listClientWarehouses(): array
     {
-        $endpoint = $this->getBaseUrl() . '/api/backend/clientwarehouse/all/';
+        $hosts = array_values(array_unique([
+            $this->getBaseUrl(),
+            'https://track.delhivery.com',
+        ]));
+
+        $lastError = 'No Delhivery warehouses found.';
+        foreach ($hosts as $host) {
+            $fetched = $this->fetchWarehouseBody($host);
+            if (self::normalizeClientWarehouses($fetched['body']) !== []) {
+                $this->lastWarehouseError = '';
+                try {
+                    Cache::put('delhivery.api_host', $host, 3600);
+                } catch (\Throwable $e) {
+                    // Ignore when the cache store is not booted.
+                }
+                return $fetched['body'];
+            }
+            if ($fetched['error'] !== '') {
+                $lastError = $fetched['error'];
+            }
+        }
+
+        $this->lastWarehouseError = $lastError;
+        Log::warning('Delhivery warehouse list empty: ' . $lastError);
+
+        return [];
+    }
+
+    /**
+     * @return array{body: array, error: string}
+     */
+    private function fetchWarehouseBody(string $host): array
+    {
+        $endpoint = rtrim($host, '/') . '/api/backend/clientwarehouse/all/';
 
         try {
             $response = $this->client->get($endpoint, [
@@ -421,11 +471,23 @@ class DelhiveryService
 
             $raw = json_decode($response->getBody()->getContents(), true);
 
-            return is_array($raw) ? $raw : [];
+            return [
+                'body' => is_array($raw) ? $raw : [],
+                'error' => is_array($raw) ? '' : 'Delhivery returned an unreadable warehouse list.',
+            ];
         } catch (\Throwable $e) {
-            Log::error('Delhivery warehouse list failed: ' . $e->getMessage());
+            $message = $e->getMessage();
+            if ($e instanceof ClientException && $e->getResponse()) {
+                $decoded = json_decode((string) $e->getResponse()->getBody(), true);
+                if (is_array($decoded)) {
+                    $message = (string) ($decoded['detail'] ?? $decoded['error'] ?? $decoded['rmk'] ?? $decoded['message'] ?? $message);
+                }
+            }
 
-            return [];
+            return [
+                'body' => [],
+                'error' => $message,
+            ];
         }
     }
 
@@ -434,42 +496,62 @@ class DelhiveryService
      */
     public static function normalizeClientWarehouses(array $raw): array
     {
-        $rows = $raw['data'] ?? $raw['warehouses'] ?? $raw;
-        if (is_array($rows) && isset($rows['name'])) {
-            $rows = [$rows];
-        }
-        if (!is_array($rows)) {
-            return [];
+        $found = [];
+        self::collectWarehouses($raw, $found, 0);
+
+        return array_values($found);
+    }
+
+    private static function collectWarehouses(array $node, array &$found, int $depth): void
+    {
+        if ($depth > 6) {
+            return;
         }
 
-        $warehouses = [];
-        foreach ($rows as $row) {
-            if (!is_array($row)) {
-                continue;
+        $name = '';
+        foreach (['name', 'warehouse_name', 'pickup_location_name', 'registered_name'] as $key) {
+            if (isset($node[$key]) && is_scalar($node[$key]) && trim((string) $node[$key]) !== '') {
+                $name = trim((string) $node[$key]);
+                break;
             }
-            $name = trim((string) ($row['name'] ?? $row['warehouse_name'] ?? ''));
-            if ($name === '') {
-                continue;
+        }
+        $pin = '';
+        foreach (['pin', 'pincode', 'pin_code'] as $key) {
+            if (isset($node[$key]) && is_scalar($node[$key])) {
+                $pin = preg_replace('/\D/', '', (string) $node[$key]) ?? '';
+                break;
             }
-            if (array_key_exists('active', $row) && !$row['active']) {
-                continue;
+        }
+        $city = isset($node['city']) && is_scalar($node['city']) ? trim((string) $node['city']) : '';
+        $address = '';
+        foreach (['address', 'add'] as $key) {
+            if (isset($node[$key]) && is_scalar($node[$key])) {
+                $address = trim((string) $node[$key]);
+                break;
             }
-            $warehouses[] = [
+        }
+
+        if ($name !== '' && ($pin !== '' || $city !== '' || $address !== '')) {
+            $found[$name] = [
                 'name' => $name,
-                'pin' => preg_replace('/\D/', '', (string) ($row['pin'] ?? $row['pincode'] ?? $row['pin_code'] ?? '')),
-                'address' => trim((string) ($row['address'] ?? $row['add'] ?? '')),
-                'city' => trim((string) ($row['city'] ?? '')),
-                'state' => trim((string) ($row['state'] ?? '')),
-                'phone' => trim((string) ($row['phone'] ?? $row['phone_number'] ?? '')),
-                'return_address' => trim((string) ($row['return_address'] ?? $row['return_add'] ?? '')),
-                'return_pin' => preg_replace('/\D/', '', (string) ($row['return_pin'] ?? '')),
-                'return_city' => trim((string) ($row['return_city'] ?? '')),
-                'return_state' => trim((string) ($row['return_state'] ?? '')),
-                'return_phone' => trim((string) ($row['return_phone'] ?? '')),
+                'pin' => $pin,
+                'address' => $address,
+                'city' => $city,
+                'state' => trim((string) ($node['state'] ?? '')),
+                'phone' => trim((string) ($node['phone'] ?? $node['phone_number'] ?? '')),
+                'return_address' => trim((string) ($node['return_address'] ?? $node['return_add'] ?? '')),
+                'return_pin' => preg_replace('/\D/', '', (string) ($node['return_pin'] ?? '')),
+                'return_city' => trim((string) ($node['return_city'] ?? '')),
+                'return_state' => trim((string) ($node['return_state'] ?? '')),
+                'return_phone' => trim((string) ($node['return_phone'] ?? '')),
             ];
         }
 
-        return $warehouses;
+        foreach ($node as $value) {
+            if (is_array($value)) {
+                self::collectWarehouses($value, $found, $depth + 1);
+            }
+        }
     }
 
     /**
