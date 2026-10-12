@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\ContactFormSubmittedMail;
 use App\Models\ContactFormModel;
 use App\Models\EmailLog;
+use App\services\RecaptchaService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -13,15 +14,20 @@ use Illuminate\Support\Facades\Validator;
 
 class ContactFormController extends Controller
 {
-    public function create(Request $request)
+    public function create(Request $request, RecaptchaService $recaptcha)
     {
         try {
-            $validator = Validator::make($request->all(), [
+            $rules = [
                 'name'     => 'required|string|max:255',
                 'email'    => 'required|email|max:255',
                 'mobile'   => 'nullable|string|max:20',
                 'comments' => 'nullable|string',
-            ]);
+                'recaptcha_token' => $recaptcha->isConfigured()
+                    ? 'required|string'
+                    : 'nullable|string',
+            ];
+
+            $validator = Validator::make($request->all(), $rules);
 
             if ($validator->fails()) {
                 return response()->json([
@@ -29,6 +35,17 @@ class ContactFormController extends Controller
                     'success' => false,
                     'message' => 'Validation failed.',
                     'data'    => $validator->errors(),
+                ], 422);
+            }
+
+            if (!$recaptcha->verify($request->input('recaptcha_token'), $request->ip())) {
+                return response()->json([
+                    'code'    => 422,
+                    'success' => false,
+                    'message' => 'Captcha verification failed. Please try again.',
+                    'data'    => [
+                        'recaptcha_token' => ['Captcha verification failed. Please try again.'],
+                    ],
                 ], 422);
             }
 

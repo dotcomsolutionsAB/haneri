@@ -44,6 +44,12 @@ return [
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
     ],
+
+    'recaptcha' => [
+        // Google reCAPTCHA v2 ("I'm not a robot") — pair with NEXT_PUBLIC_RECAPTCHA_SITE_KEY on the frontend
+        'site_key' => env('RECAPTCHA_SITE_KEY'),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY'),
+    ],
     
     'firebase' => [
         'api_key' => env('FIREBASE_API_KEY'),
