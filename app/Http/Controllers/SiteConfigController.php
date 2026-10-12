@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\JsonResponse;
 use App\Models\ProductModel;
+use App\services\RecaptchaService;
 
 class SiteConfigController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(RecaptchaService $recaptcha): JsonResponse
     {
         $mode = config('site.mode', 'shopping');
         $enquiryUrl = config('site.google_sheets_enquiry_url', '');
@@ -25,6 +26,11 @@ class SiteConfigController extends Controller
 
         if ($enquiryUrl !== '') {
             $data['google_sheets_enquiry_url'] = $enquiryUrl;
+        }
+
+        // Public site key only — never expose the secret. Required for the Contact Us widget.
+        if ($recaptcha->isConfigured()) {
+            $data['recaptcha_site_key'] = $recaptcha->siteKey();
         }
 
         return response()->json([

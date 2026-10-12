@@ -9,15 +9,26 @@ class RecaptchaService
 {
     public function isConfigured(): bool
     {
-        return trim((string) config('services.recaptcha.secret_key', '')) !== '';
+        return $this->siteKey() !== '' && $this->secretKey() !== '';
+    }
+
+    public function siteKey(): string
+    {
+        return trim((string) config('services.recaptcha.site_key', ''));
+    }
+
+    public function secretKey(): string
+    {
+        return trim((string) config('services.recaptcha.secret_key', ''));
     }
 
     public function verify(?string $token, ?string $remoteIp = null): bool
     {
-        $secret = trim((string) config('services.recaptcha.secret_key', ''));
-        if ($secret === '') {
+        if (!$this->isConfigured()) {
             return true;
         }
+
+        $secret = $this->secretKey();
 
         $token = trim((string) $token);
         if ($token === '') {
