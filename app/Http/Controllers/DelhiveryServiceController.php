@@ -735,8 +735,8 @@ class DelhiveryServiceController extends Controller
                     || (!empty($apiResponse['error']));
 
             if ($isError) {
-                $msg = $apiResponse['rmk']
-                    ?? (is_string($apiResponse['error']) ? $apiResponse['error'] : 'Delhivery returned an error.');
+                $msg = $this->delhiveryBookingFailure(is_array($apiResponse) ? $apiResponse : null)
+                    ?? 'Delhivery returned an error.';
 
                 $shipment->status        = 'failed';
                 $shipment->error_message = $msg;
@@ -939,12 +939,17 @@ class DelhiveryServiceController extends Controller
             $delhiveryService = new DelhiveryService();
             $apiResponse = $delhiveryService->placeOrder($payload); // Send the payload to Delhivery
 
-            // If Delhivery returned an error, log it and return failure
-            $isError = isset($apiResponse['error']) || isset($apiResponse['rmk']);
-            if ($isError) {
+            // Package remarks carry the real reason. rmk is often a generic internal-error line.
+            $failure = $this->delhiveryBookingFailure(is_array($apiResponse) ? $apiResponse : null);
+            if ($failure !== null) {
+                $shipment->status = 'failed';
+                $shipment->error_message = $failure;
+                $shipment->response_payload = $apiResponse;
+                $shipment->save();
+
                 return response()->json([
                     'success' => false,
-                    'message' => $apiResponse['rmk'] ?? 'Error from Delhivery',
+                    'message' => $failure,
                     'data'    => $apiResponse,
                 ], 400);
             }
@@ -979,6 +984,56 @@ class DelhiveryServiceController extends Controller
             ], 500);
         }
     }
+    /**
+     * Prefer the package remark (for example an insufficient wallet balance)
+     * over Delhivery's generic rmk line.
+     */
+    private function delhiveryBookingFailure(?array $apiResponse): ?string
+    {
+        if (!is_array($apiResponse)) {
+            return 'Delhivery did not book the shipment.';
+        }
+
+        $waybill = trim((string) data_get($apiResponse, 'packages.0.waybill', ''));
+        if ($waybill !== '') {
+            return null;
+        }
+
+        $packageStatus = strtolower((string) data_get($apiResponse, 'packages.0.status', ''));
+        $failed = ($apiResponse['success'] ?? null) === false
+            || $packageStatus === 'fail'
+            || isset($apiResponse['error'])
+            || isset($apiResponse['rmk']);
+        if (!$failed) {
+            return null;
+        }
+
+        $remarks = data_get($apiResponse, 'packages.0.remarks', data_get($apiResponse, 'packages.0.remark'));
+        if (is_string($remarks)) {
+            $remarks = [$remarks];
+        }
+        $lines = [];
+        foreach (is_array($remarks) ? $remarks : [] as $line) {
+            $line = trim((string) $line);
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+        if ($lines !== []) {
+            return implode(' ', $lines);
+        }
+
+        $rmk = trim((string) ($apiResponse['rmk'] ?? ''));
+        if ($rmk !== '') {
+            return $rmk;
+        }
+        if (is_string($apiResponse['error'] ?? null) && trim($apiResponse['error']) !== '') {
+            return trim($apiResponse['error']);
+        }
+
+        return 'Delhivery did not book the shipment.';
+    }
+
     // Build the shipment data for both checking and punching
     private function buildShipmentData(int $orderId, ?int $pickupLocationId = null, array $overrides = []): array
     {
