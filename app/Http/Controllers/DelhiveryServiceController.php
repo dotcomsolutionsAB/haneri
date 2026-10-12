@@ -686,6 +686,15 @@ class DelhiveryServiceController extends Controller
             ];
 
             // 9) Call DelhiveryService
+            try {
+                $orderData = $this->alignPickupWithDelhivery($orderData);
+            } catch (\RuntimeException $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'data'    => [],
+                ], 422);
+            }
             $delhiveryService = new DelhiveryService();
             $apiResponse      = $delhiveryService->placeOrder($orderData);
 
@@ -836,6 +845,15 @@ class DelhiveryServiceController extends Controller
         $orderId = (int)$request->order_id;
         $payload = $request->input('payload');  // Get the payload from frontend (updated or not)
         $payload['order_no'] = (string) $orderId;
+        try {
+            $payload = $this->alignPickupWithDelhivery($payload);
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'data'    => [],
+            ], 422);
+        }
         // ✅ Normalize incoming values (user-friendly -> Delhivery expected)
         $shippingMode = strtolower(trim($payload['shipping_mode'] ?? 'surface')); // air/surface
         $serviceLevel = strtolower(trim($payload['service_level'] ?? 'normal'));  // normal/express
@@ -1110,6 +1128,12 @@ class DelhiveryServiceController extends Controller
             }
         }
 
+        try {
+            $orderData = $this->alignPickupWithDelhivery($orderData);
+        } catch (\RuntimeException $e) {
+            throw new \Exception($e->getMessage());
+        }
+
         // Return full preview pack
         return [
             'order'      => $order,
@@ -1118,6 +1142,59 @@ class DelhiveryServiceController extends Controller
             'items'      => $items,
             'orderData'  => $orderData,
         ];
+    }
+
+    /**
+     * Delhivery only accepts a pickup name that exists as a client warehouse.
+     * A local label such as "Kolkata" is replaced with the registered warehouse.
+     */
+    private function alignPickupWithDelhivery(array $orderData): array
+    {
+        $service = new DelhiveryService();
+        $resolved = DelhiveryService::matchClientWarehouse(
+            $service->listClientWarehouses(),
+            (string) ($orderData['pickup_name'] ?? ''),
+            isset($orderData['pickup_pin']) ? (string) $orderData['pickup_pin'] : null
+        );
+
+        $match = $resolved['match'];
+        if (!$match) {
+            $configured = trim((string) config('shipping.pickup.name', ''));
+            if ($resolved['names'] === [] && $configured !== '') {
+                $orderData['pickup_name'] = $configured;
+                return $orderData;
+            }
+            if ($resolved['names'] !== []) {
+                throw new \RuntimeException(
+                    'Pickup "'.($orderData['pickup_name'] ?? '').'" is not registered with Delhivery. Use one of: '.implode(', ', $resolved['names']).'.'
+                );
+            }
+            return $orderData;
+        }
+
+        $orderData['pickup_name'] = $match['name'];
+        if ($match['pin'] !== '') {
+            $orderData['pickup_pin'] = $match['pin'];
+            $orderData['return_pin'] = $match['return_pin'] !== '' ? $match['return_pin'] : $match['pin'];
+        }
+        if ($match['address'] !== '') {
+            $orderData['pickup_address'] = $match['address'];
+            $orderData['return_address'] = $match['return_address'] !== '' ? $match['return_address'] : $match['address'];
+        }
+        if ($match['city'] !== '') {
+            $orderData['pickup_city'] = $match['city'];
+            $orderData['return_city'] = $match['return_city'] !== '' ? $match['return_city'] : $match['city'];
+        }
+        if ($match['state'] !== '') {
+            $orderData['pickup_state'] = $match['state'];
+            $orderData['return_state'] = $match['return_state'] !== '' ? $match['return_state'] : $match['state'];
+        }
+        if ($match['phone'] !== '') {
+            $orderData['pickup_phone'] = $match['phone'];
+            $orderData['return_phone'] = $match['return_phone'] !== '' ? $match['return_phone'] : $match['phone'];
+        }
+
+        return $orderData;
     }
 
     // fetch delivery details from db

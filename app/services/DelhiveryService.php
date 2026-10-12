@@ -402,4 +402,104 @@ class DelhiveryService
         }
     }
 
+    /**
+     * Warehouses registered on this Delhivery client. The create-shipment
+     * API rejects any pickup name that is not an exact match.
+     */
+    public function listClientWarehouses(): array
+    {
+        $endpoint = $this->getBaseUrl() . '/api/backend/clientwarehouse/all/';
+
+        try {
+            $response = $this->client->get($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                ],
+                'timeout' => 20,
+            ]);
+
+            $raw = json_decode($response->getBody()->getContents(), true);
+
+            return is_array($raw) ? $raw : [];
+        } catch (\Throwable $e) {
+            Log::error('Delhivery warehouse list failed: ' . $e->getMessage());
+
+            return [];
+        }
+    }
+
+    /**
+     * Pick the registered warehouse for a shipment.
+     * Name match wins, then a unique pincode match, then the only warehouse.
+     *
+     * @return array{match: ?array, names: array<int, string>}
+     */
+    public static function matchClientWarehouse(array $raw, string $requestedName, ?string $requestedPin): array
+    {
+        $rows = $raw['data'] ?? $raw['warehouses'] ?? $raw;
+        if (is_array($rows) && isset($rows['name'])) {
+            $rows = [$rows];
+        }
+        if (!is_array($rows)) {
+            return ['match' => null, 'names' => []];
+        }
+
+        $warehouses = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+            $name = trim((string) ($row['name'] ?? $row['warehouse_name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            if (array_key_exists('active', $row) && !$row['active']) {
+                continue;
+            }
+            $warehouses[] = [
+                'name' => $name,
+                'pin' => preg_replace('/\D/', '', (string) ($row['pin'] ?? $row['pincode'] ?? $row['pin_code'] ?? '')),
+                'address' => trim((string) ($row['address'] ?? $row['add'] ?? '')),
+                'city' => trim((string) ($row['city'] ?? '')),
+                'state' => trim((string) ($row['state'] ?? '')),
+                'phone' => trim((string) ($row['phone'] ?? $row['phone_number'] ?? '')),
+                'return_address' => trim((string) ($row['return_address'] ?? $row['return_add'] ?? '')),
+                'return_pin' => preg_replace('/\D/', '', (string) ($row['return_pin'] ?? '')),
+                'return_city' => trim((string) ($row['return_city'] ?? '')),
+                'return_state' => trim((string) ($row['return_state'] ?? '')),
+                'return_phone' => trim((string) ($row['return_phone'] ?? '')),
+            ];
+        }
+
+        $names = array_column($warehouses, 'name');
+        if ($warehouses === []) {
+            return ['match' => null, 'names' => []];
+        }
+
+        $wanted = trim($requestedName);
+        foreach ($warehouses as $warehouse) {
+            if ($wanted !== '' && strcasecmp($warehouse['name'], $wanted) === 0) {
+                return ['match' => $warehouse, 'names' => $names];
+            }
+        }
+
+        $pin = preg_replace('/\D/', '', (string) $requestedPin);
+        if ($pin !== '') {
+            $byPin = array_values(array_filter(
+                $warehouses,
+                fn (array $warehouse) => $warehouse['pin'] !== '' && $warehouse['pin'] === $pin
+            ));
+            if (count($byPin) === 1) {
+                return ['match' => $byPin[0], 'names' => $names];
+            }
+        }
+
+        if (count($warehouses) === 1) {
+            return ['match' => $warehouses[0], 'names' => $names];
+        }
+
+        return ['match' => null, 'names' => $names];
+    }
+
 }
