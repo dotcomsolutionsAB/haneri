@@ -422,6 +422,9 @@ class DelhiveryService
     /**
      * Warehouses registered on this Delhivery client. The create-shipment
      * API rejects any pickup name that is not an exact match.
+     *
+     * Delhivery does not publish /clientwarehouse/all/ (it returns the login
+     * page). The live routes are fetch, search, and status-by-name.
      */
     public function listClientWarehouses(): array
     {
@@ -430,20 +433,30 @@ class DelhiveryService
             'https://track.delhivery.com',
         ]));
 
+        $reads = [
+            ['GET', '/api/backend/clientwarehouse/search/', null],
+            ['GET', '/api/backend/clientwarehouse/search/?page_size=100', null],
+            ['GET', '/api/backend/clientwarehouse/fetch/', null],
+            ['GET', '/api/backend/clientwarehouse/fetch/?page_size=100', null],
+        ];
+
         $lastError = 'No Delhivery warehouses found.';
         foreach ($hosts as $host) {
-            $fetched = $this->fetchWarehouseBody($host);
-            if (self::normalizeClientWarehouses($fetched['body']) !== []) {
-                $this->lastWarehouseError = '';
-                try {
-                    Cache::put('delhivery.api_host', $host, 3600);
-                } catch (\Throwable $e) {
-                    // Ignore when the cache store is not booted.
+            foreach ($reads as [$method, $path, $json]) {
+                $fetched = $this->requestWarehouse($method, rtrim($host, '/') . $path, $json);
+                if (self::normalizeClientWarehouses($fetched['body']) !== []) {
+                    $this->rememberWarehouseHost($host);
+                    return $fetched['body'];
                 }
-                return $fetched['body'];
+                if ($fetched['error'] !== '') {
+                    $lastError = $fetched['error'];
+                }
             }
-            if ($fetched['error'] !== '') {
-                $lastError = $fetched['error'];
+
+            $confirmed = $this->confirmKnownWarehouses($host);
+            if ($confirmed !== []) {
+                $this->rememberWarehouseHost($host);
+                return ['data' => $confirmed];
             }
         }
 
@@ -454,21 +467,91 @@ class DelhiveryService
     }
 
     /**
+     * @return array<int, array<string, string>>
+     */
+    private function confirmKnownWarehouses(string $host): array
+    {
+        $names = array_values(array_unique(array_filter(array_map(
+            static fn ($name) => trim((string) $name),
+            [
+                config('shipping.pickup.name'),
+                'HANERI HO',
+            ]
+        ))));
+
+        $found = [];
+        foreach ($names as $name) {
+            $fetched = $this->requestWarehouse(
+                'POST',
+                rtrim($host, '/') . '/api/backend/clientwarehouse/status/',
+                ['name' => $name]
+            );
+            $blob = strtolower(json_encode($fetched['body']) ?: '');
+            $missing = $fetched['error'] !== ''
+                || $fetched['body'] === []
+                || str_contains($blob, 'does not exist')
+                || str_contains($blob, 'not found')
+                || (isset($fetched['body']['success']) && $fetched['body']['success'] === false);
+            if ($missing) {
+                continue;
+            }
+
+            $rows = self::normalizeClientWarehouses($fetched['body']);
+            if ($rows === []) {
+                $rows = [[
+                    'name' => $name,
+                    'pin' => '',
+                    'address' => '',
+                    'city' => '',
+                    'state' => '',
+                    'phone' => '',
+                    'return_address' => '',
+                    'return_pin' => '',
+                    'return_city' => '',
+                    'return_state' => '',
+                    'return_phone' => '',
+                ]];
+            }
+            foreach ($rows as $warehouse) {
+                if (($warehouse['name'] ?? '') === '') {
+                    $warehouse['name'] = $name;
+                }
+                $found[$warehouse['name']] = $warehouse;
+            }
+        }
+
+        return array_values($found);
+    }
+
+    private function rememberWarehouseHost(string $host): void
+    {
+        $this->lastWarehouseError = '';
+        try {
+            Cache::put('delhivery.api_host', $host, 3600);
+        } catch (\Throwable $e) {
+            // Ignore when the cache store is not booted.
+        }
+    }
+
+    /**
      * @return array{body: array, error: string}
      */
-    private function fetchWarehouseBody(string $host): array
+    private function requestWarehouse(string $method, string $url, ?array $json = null): array
     {
-        $endpoint = rtrim($host, '/') . '/api/backend/clientwarehouse/all/';
-
         try {
-            $response = $this->client->get($endpoint, [
+            $options = [
                 'headers' => [
                     'Authorization' => 'Token ' . $this->apiKey,
                     'Accept'        => 'application/json',
                 ],
                 'timeout' => 20,
-            ]);
+            ];
+            if ($json !== null) {
+                $options['headers']['Content-Type'] = 'application/json';
+                $options['json'] = $json;
+            }
 
+            $response = $this->client->request($method, $url, $options);
             $raw = json_decode($response->getBody()->getContents(), true);
 
             return [
@@ -476,19 +559,34 @@ class DelhiveryService
                 'error' => is_array($raw) ? '' : 'Delhivery returned an unreadable warehouse list.',
             ];
         } catch (\Throwable $e) {
-            $message = $e->getMessage();
-            if ($e instanceof ClientException && $e->getResponse()) {
-                $decoded = json_decode((string) $e->getResponse()->getBody(), true);
-                if (is_array($decoded)) {
-                    $message = (string) ($decoded['detail'] ?? $decoded['error'] ?? $decoded['rmk'] ?? $decoded['message'] ?? $message);
-                }
-            }
-
             return [
                 'body' => [],
-                'error' => $message,
+                'error' => $this->shortWarehouseError($e),
             ];
         }
+    }
+
+    private function shortWarehouseError(\Throwable $e): string
+    {
+        $message = $e->getMessage();
+        if ($e instanceof ClientException && $e->getResponse()) {
+            $decoded = json_decode((string) $e->getResponse()->getBody(), true);
+            if (is_array($decoded)) {
+                $message = (string) ($decoded['detail'] ?? $decoded['error'] ?? $decoded['rmk'] ?? $decoded['message'] ?? $message);
+            }
+        }
+
+        if (stripos($message, '<script') !== false || stripos($message, '<!---->') !== false || strlen($message) > 240) {
+            $status = $e instanceof ClientException && $e->getResponse()
+                ? $e->getResponse()->getStatusCode()
+                : 0;
+
+            return $status > 0
+                ? "Delhivery warehouse lookup failed ({$status})."
+                : 'Delhivery warehouse lookup failed.';
+        }
+
+        return $message;
     }
 
     /**
@@ -531,7 +629,8 @@ class DelhiveryService
             }
         }
 
-        if ($name !== '' && ($pin !== '' || $city !== '' || $address !== '')) {
+        $marked = array_key_exists('active', $node) || array_key_exists('status', $node);
+        if ($name !== '' && ($pin !== '' || $city !== '' || $address !== '' || $marked)) {
             $found[$name] = [
                 'name' => $name,
                 'pin' => $pin,
