@@ -183,6 +183,7 @@ class DelhiveryServiceController extends Controller
             'length'  => 'nullable|numeric|min:1',
             'breadth' => 'nullable|numeric|min:1',
             'height'  => 'nullable|numeric|min:1',
+            'pickup_name' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -207,7 +208,11 @@ class DelhiveryServiceController extends Controller
             $orderId = (int) $request->input('order_id');
 
             try {
-                $orderData = $this->buildShipmentData($orderId)['orderData'];
+                $overrides = [];
+                if ($request->filled('pickup_name')) {
+                    $overrides['pickup_name'] = $request->input('pickup_name');
+                }
+                $orderData = $this->buildShipmentData($orderId, null, $overrides)['orderData'];
             } catch (\Exception $e) {
                 return response()->json([
                     'code'    => 422,
@@ -1120,6 +1125,7 @@ class DelhiveryServiceController extends Controller
             'customer_name','customer_address','phone',
             'shipping_mode','service_level','address_type',
             'shipment_length','shipment_width','shipment_height',
+            'pickup_name',
         ];
 
         foreach ($allowed as $k) {
@@ -1142,6 +1148,21 @@ class DelhiveryServiceController extends Controller
             'items'      => $items,
             'orderData'  => $orderData,
         ];
+    }
+
+    public function listWarehouses()
+    {
+        $warehouses = DelhiveryService::normalizeClientWarehouses(
+            (new DelhiveryService())->listClientWarehouses()
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => $warehouses === []
+                ? 'No Delhivery warehouses found.'
+                : 'Warehouses fetched.',
+            'data' => $warehouses,
+        ]);
     }
 
     /**

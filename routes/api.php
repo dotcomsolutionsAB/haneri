@@ -162,6 +162,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/deliveryone/test', [DelhiveryServiceController::class, 'test']);
             Route::post('/make_order', [DelhiveryServiceController::class, 'createOrder']); // Raw data passing
             // manual creation through checking shipment detail before create(admin)
+            Route::get('/warehouses', [DelhiveryServiceController::class, 'listWarehouses']);
             Route::post('/check_shipment', [DelhiveryServiceController::class, 'checkShipment']); // check shipment all datas
             Route::post('/punch_shipment', [DelhiveryServiceController::class, 'punchShipment']); // after check punch
             Route::post('/create_ship_by_order', [DelhiveryServiceController::class, 'createShipByOrder']); // create shipment and save in db

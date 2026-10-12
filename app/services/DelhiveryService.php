@@ -430,19 +430,16 @@ class DelhiveryService
     }
 
     /**
-     * Pick the registered warehouse for a shipment.
-     * Name match wins, then a unique pincode match, then the only warehouse.
-     *
-     * @return array{match: ?array, names: array<int, string>}
+     * @return array<int, array<string, string>>
      */
-    public static function matchClientWarehouse(array $raw, string $requestedName, ?string $requestedPin): array
+    public static function normalizeClientWarehouses(array $raw): array
     {
         $rows = $raw['data'] ?? $raw['warehouses'] ?? $raw;
         if (is_array($rows) && isset($rows['name'])) {
             $rows = [$rows];
         }
         if (!is_array($rows)) {
-            return ['match' => null, 'names' => []];
+            return [];
         }
 
         $warehouses = [];
@@ -472,6 +469,18 @@ class DelhiveryService
             ];
         }
 
+        return $warehouses;
+    }
+
+    /**
+     * Pick the registered warehouse for a shipment.
+     * Name match wins, then a unique pincode match, then the only warehouse.
+     *
+     * @return array{match: ?array, names: array<int, string>}
+     */
+    public static function matchClientWarehouse(array $raw, string $requestedName, ?string $requestedPin): array
+    {
+        $warehouses = self::normalizeClientWarehouses($raw);
         $names = array_column($warehouses, 'name');
         if ($warehouses === []) {
             return ['match' => null, 'names' => []];
