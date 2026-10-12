@@ -117,6 +117,7 @@ class ContactFormController extends Controller
 
             $email  = trim((string) $request->input('email', ''));
             $mobile = trim((string) $request->input('mobile', ''));
+            $search = trim((string) $request->input('search', ''));
 
             $query = ContactFormModel::query();
 
@@ -126,6 +127,17 @@ class ContactFormController extends Controller
 
             if ($mobile !== '') {
                 $query->where('mobile', 'like', '%' . $mobile . '%');
+            }
+
+            if ($search !== '') {
+                $like = '%' . $search . '%';
+                $query->where(function ($builder) use ($like) {
+                    $builder
+                        ->where('name', 'like', $like)
+                        ->orWhere('email', 'like', $like)
+                        ->orWhere('mobile', 'like', $like)
+                        ->orWhere('comments', 'like', $like);
+                });
             }
 
             $total = $query->count();
