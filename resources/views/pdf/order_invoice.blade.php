@@ -361,7 +361,7 @@
                     </tr>
                     <tr>
                         <td class="summary-label">
-                            Discount@if(!empty($couponCode)) ({{ $couponCode }})@endif:
+                            Discount{{ !empty($couponCode) ? ' ('.$couponCode.')' : '' }}:
                         </td>
                         <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
                     </tr>
