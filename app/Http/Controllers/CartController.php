@@ -39,14 +39,15 @@ class CartController extends Controller
             ], 422);
         }
 
-        $token = $request->bearerToken();
-        $user = null;
-
-        if ($token) {
-            $user = Auth::guard('sanctum')->user();
-        }
+        $user = Auth::guard('sanctum')->user();
 
         if ($user) {
+            if ($user->role === 'admin') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Admin accounts cannot add products to the cart.',
+                ], 403);
+            }
             $userId = $user->id;
         } else {
             $cartId = $request->input('cart_id');
