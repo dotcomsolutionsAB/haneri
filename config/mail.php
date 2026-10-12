@@ -149,4 +149,22 @@ return [
 
     'contact_form_recipient' => env('CONTACT_FROM_RECIPIENT', 'info@haneri.com'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | New website order notification recipients
+    |--------------------------------------------------------------------------
+    |
+    | These addresses are emailed once when a website order is paid.
+    | Comma-separated. Defaults to the Haneri order inbox.
+    |
+    */
+
+    'order_notification_recipients' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env(
+            'ORDER_NOTIFICATION_EMAILS',
+            'manan@cognitivebranding.com,dotcomsolutiononline@gmail.com'
+        ))
+    ))),
+
 ];

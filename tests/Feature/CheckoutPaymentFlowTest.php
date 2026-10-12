@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Http\Controllers\RazorpayController;
+use App\Mail\NewWebsiteOrderMail;
 use App\Models\CartModel;
 use App\Models\CouponModel;
 use App\Models\OrderModel;
@@ -473,6 +474,12 @@ class CheckoutPaymentFlowTest extends TestCase
         $this->assertSame('pay_ABC123', $payment->razorpay_payment_id);
         $this->assertSame(0, CartModel::where('user_id', (string) $user->id)->count());
         $this->assertNotNull($order->mail_sent_at, 'confirmation email is sent once payment is confirmed');
+        Mail::assertSent(NewWebsiteOrderMail::class, function (NewWebsiteOrderMail $mail) {
+            return $mail->hasTo('manan@cognitivebranding.com');
+        });
+        Mail::assertSent(NewWebsiteOrderMail::class, function (NewWebsiteOrderMail $mail) {
+            return $mail->hasTo('dotcomsolutiononline@gmail.com');
+        });
 
         // replaying the confirmation is harmless
         $this->postJson("/api/orders/{$o['order_id']}/verify-payment", [
@@ -481,6 +488,7 @@ class CheckoutPaymentFlowTest extends TestCase
             'razorpay_signature' => $this->sign($o['razorpay_order_id'], 'pay_ABC123'),
         ])->assertStatus(200);
         $this->assertSame(1, PaymentModel::where('order_id', $order->id)->count());
+        Mail::assertSent(NewWebsiteOrderMail::class, 2);
     }
 
     public function test_payment_with_a_bad_signature_is_rejected_and_order_stays_unpaid(): void
@@ -501,6 +509,7 @@ class CheckoutPaymentFlowTest extends TestCase
 
         $this->assertSame('pending', OrderModel::find($o['order_id'])->payment_status);
         $this->assertSame(1, CartModel::where('user_id', (string) $user->id)->count());
+        Mail::assertNotSent(NewWebsiteOrderMail::class);
     }
 
     public function test_signature_for_a_different_razorpay_order_is_rejected(): void

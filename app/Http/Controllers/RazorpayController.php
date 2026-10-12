@@ -9,6 +9,7 @@ use App\Models\PaymentModel;
 use App\Models\User;
 use App\Models\OrderItemModel;
 use App\Models\CartModel;
+use App\Mail\NewWebsiteOrderMail;
 use App\Mail\OrderPlacedMail;
 use Illuminate\Support\Facades\Mail;
 use Exception;
@@ -485,10 +486,12 @@ class RazorpayController extends Controller
                 })
                 ->toArray();
 
+            $customerNotified = false;
             try {
                 Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
                 $order->mail_sent_at = now();
                 $order->save();
+                $customerNotified = true;
                 EmailLog::record($orderUser->email, OrderPlacedMail::class, 'sent', [
                     'recipient_user_id' => $orderUser->id,
                     'subject' => 'Order Confirmed • #'.$order->id.' • '.config('app.name'),
@@ -500,7 +503,50 @@ class RazorpayController extends Controller
                     'error_message' => $e->getMessage(),
                 ]);
             }
+
+            if ($customerNotified) {
+                $this->notifyOrderRecipients($orderUser, $order, $items);
+            }
         });
+    }
+
+    /**
+     * Tell the order inbox once, after the customer confirmation has been sent.
+     *
+     * @param  array<int, array{name:string,variant:?string,qty:int,price:float,total:float}>  $items
+     */
+    private function notifyOrderRecipients(User $orderUser, OrderModel $order, array $items): void
+    {
+        $recipients = config('mail.order_notification_recipients', []);
+        if (! is_array($recipients)) {
+            return;
+        }
+
+        $subject = NewWebsiteOrderMail::subjectFor($order);
+        $seen = [];
+
+        foreach ($recipients as $recipient) {
+            $recipient = strtolower(trim((string) $recipient));
+            if ($recipient === '' || isset($seen[$recipient]) || ! filter_var($recipient, FILTER_VALIDATE_EMAIL)) {
+                continue;
+            }
+            $seen[$recipient] = true;
+
+            try {
+                Mail::to($recipient)->send(new NewWebsiteOrderMail($orderUser, $order, $items));
+                EmailLog::record($recipient, NewWebsiteOrderMail::class, 'sent', [
+                    'subject' => $subject,
+                    'metadata' => ['order_id' => $order->id],
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('NewWebsiteOrderMail failed for order '.$order->id.': '.$e->getMessage());
+                EmailLog::record($recipient, NewWebsiteOrderMail::class, 'failed', [
+                    'subject' => $subject,
+                    'error_message' => $e->getMessage(),
+                    'metadata' => ['order_id' => $order->id],
+                ]);
+            }
+        }
     }
 
     /**
