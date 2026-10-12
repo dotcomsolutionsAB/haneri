@@ -348,6 +348,12 @@
             <div class="summary-inner">
                 <table class="summary-table">
                     <tr>
+                        <td class="summary-label">
+                            Discount{{ !empty($couponCode) ? ' ('.$couponCode.')' : '' }}:
+                        </td>
+                        <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
+                    </tr>
+                    <tr>
                         <td class="summary-label">SUBTOTAL (Excl. GST):</td>
                         <td class="summary-value">₹{{ number_format($subTotal, 2) }}</td>
                     </tr>
@@ -358,12 +364,6 @@
                     <tr>
                         <td class="summary-label">Shipping Charges:</td>
                         <td class="summary-value">₹{{ number_format($shippingCharge, 2) }}</td>
-                    </tr>
-                    <tr>
-                        <td class="summary-label">
-                            Discount{{ !empty($couponCode) ? ' ('.$couponCode.')' : '' }}:
-                        </td>
-                        <td class="summary-value">₹{{ number_format($discount, 2) }}</td>
                     </tr>
                 </table>
             </div>
