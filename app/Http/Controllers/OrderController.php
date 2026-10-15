@@ -14,6 +14,7 @@ use App\Http\Controllers\RazorpayController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Mail\OrderPlacedMail;
 use App\Mail\OrderStatusUpdate;
 use App\Models\PaymentModel;
@@ -369,6 +370,245 @@ class OrderController extends Controller
             DB::rollBack();
 
             // Return error response
+            return response()->json([
+                'message' => 'Failed to create order. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * Admin-only prepaid order create for testing (e.g. Delhivery booking).
+     * Skips Razorpay and accepts line items directly — no customer cart required.
+     */
+    public function adminStore(Request $request)
+    {
+        $user = Auth::user();
+        if (!$user || $user->role !== 'admin') {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $validated = $request->validate([
+            'user_id'            => 'required|integer|exists:users,id',
+            'shipping_address'   => 'required|string|min:10',
+            'shipping_charge'    => 'nullable|numeric|min:0',
+            'coupon_code'        => 'nullable|string|max:100',
+            'items'              => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer|exists:t_products,id',
+            'items.*.variant_id' => 'required|integer|exists:t_product_variants,id',
+            'items.*.quantity'   => 'required|integer|min:1|max:100',
+        ]);
+
+        $orderUser = User::find($validated['user_id']);
+        if (!$orderUser) {
+            return response()->json(['message' => 'User not found.'], 404);
+        }
+
+        $paymentMode   = 'Prepaid';
+        $paymentStatus = 'paid';
+        $orderStatus   = 'processing';
+        $shippingCharge = (float) ($validated['shipping_charge'] ?? 0);
+
+        DB::beginTransaction();
+
+        try {
+            $productIds = collect($validated['items'])->pluck('product_id')->unique()->values();
+            $purchasable = \App\Models\ProductModel::whereIn('id', $productIds)
+                ->where('is_ecommerce', true)
+                ->count();
+            if ($purchasable !== $productIds->count()) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'One or more products are not available for purchase.',
+                ], 422);
+            }
+
+            $lines = [];
+            $totalAmount = 0.0;
+            $totalQty = 0;
+
+            foreach ($validated['items'] as $item) {
+                $productId = (int) $item['product_id'];
+                $variantId = (int) $item['variant_id'];
+                $quantity  = (int) $item['quantity'];
+
+                $variant = \App\Models\ProductVariantModel::where('id', $variantId)
+                    ->where('product_id', $productId)
+                    ->first();
+                if (!$variant) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => "Variant {$variantId} does not belong to product {$productId}.",
+                    ], 422);
+                }
+
+                $linePrice = $this->getFinalPrice($orderUser, $productId, $variantId);
+                if ($linePrice <= 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'One or more items could not be priced for this customer.',
+                    ], 422);
+                }
+
+                $lines[] = [
+                    'product_id' => $productId,
+                    'variant_id' => $variantId,
+                    'quantity'   => $quantity,
+                    'price'      => $linePrice,
+                ];
+                $totalAmount += $linePrice * $quantity;
+                $totalQty += $quantity;
+            }
+
+            $couponCode = trim((string) ($validated['coupon_code'] ?? ''));
+            $discountAmount = 0.0;
+            $coupon = null;
+
+            if ($couponCode !== '') {
+                $coupon = CouponModel::query()
+                    ->where('coupon_code', $couponCode)
+                    ->where('status', 'active')
+                    ->whereDate('validity', '>=', now()->toDateString())
+                    ->where(function ($qq) use ($orderUser) {
+                        $qq->whereNull('user_id')
+                            ->orWhere('user_id', $orderUser->id);
+                    })
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$coupon) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Invalid coupon or coupon expired / inactive.',
+                    ], 422);
+                }
+
+                if ((int) $coupon->count <= 0) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Coupon usage limit exceeded.',
+                    ], 422);
+                }
+
+                if ($coupon->discount_type === 'percentage') {
+                    $discountAmount = round($totalAmount * ((float) $coupon->discount_value / 100), 2);
+                } else {
+                    $discountAmount = (float) $coupon->discount_value;
+                }
+
+                $discountAmount = min($discountAmount, $totalAmount);
+                $totalAmount = max(0, $totalAmount - $discountAmount);
+            }
+
+            $finalAmount = round((float) $totalAmount + (float) $shippingCharge, 2);
+            if ($finalAmount < 1) {
+                DB::rollBack();
+                return response()->json(['message' => 'Order total must be at least ₹1.'], 422);
+            }
+
+            $manualRazorpayId = 'admin-manual-' . Str::uuid()->toString();
+
+            $order = OrderModel::create([
+                'user_id'           => $orderUser->id,
+                'total_amount'      => $finalAmount,
+                'shipping_charge'   => $shippingCharge,
+                'coupon_code'       => $coupon?->coupon_code,
+                'discount_amount'   => round((float) $discountAmount, 2),
+                'status'            => $orderStatus,
+                'payment_status'    => $paymentStatus,
+                'shipping_address'  => $validated['shipping_address'],
+                'razorpay_order_id' => $manualRazorpayId,
+            ]);
+
+            $ship = $this->parseShippingAddress((string) $order->shipping_address);
+            $shippingPin   = $ship['pin'] ?? null;
+            $shippingCity  = $ship['city'] ?? null;
+            $shippingState = $ship['state'] ?? null;
+            $shipCustomerName  = $ship['name']  ?: $orderUser->name;
+            $shipCustomerPhone = $ship['phone'] ?: $orderUser->mobile;
+
+            if (!$shippingPin || !preg_match('/^\d{6}$/', (string) $shippingPin)) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Shipping address must include a valid 6-digit pincode for Delhivery.',
+                ], 422);
+            }
+
+            OrderShipment::create([
+                'order_id'         => $order->id,
+                'user_id'          => $orderUser->id,
+                'courier'          => 'delhivery',
+                'status'           => 'setup',
+                'customer_name'    => $shipCustomerName,
+                'customer_phone'   => $shipCustomerPhone,
+                'customer_email'   => $orderUser->email,
+                'shipping_address' => $order->shipping_address,
+                'shipping_pin'     => $shippingPin,
+                'shipping_city'    => $shippingCity,
+                'shipping_state'   => $shippingState,
+                'payment_mode'     => $paymentMode,
+                'total_amount'     => $order->total_amount,
+                'cod_amount'       => 0,
+                'quantity'         => $totalQty,
+                'weight'           => null,
+                'products_description' => 'Order #'.$order->id.' items',
+                'pickup_location_id' => config('shipping.pickup.location_id', 1),
+                'pickup_name'      => config('shipping.pickup.name', 'Default Pickup'),
+                'pickup_address'   => config('shipping.pickup.address', ''),
+                'pickup_pin'       => config('shipping.pickup.pin', ''),
+                'pickup_city'      => config('shipping.pickup.city', ''),
+                'pickup_state'     => config('shipping.pickup.state', ''),
+                'pickup_phone'     => config('shipping.pickup.phone', ''),
+            ]);
+
+            foreach ($lines as $line) {
+                OrderItemModel::create([
+                    'order_id'   => $order->id,
+                    'product_id' => $line['product_id'],
+                    'variant_id' => $line['variant_id'],
+                    'quantity'   => $line['quantity'],
+                    'price'      => $line['price'],
+                ]);
+            }
+
+            PaymentModel::create([
+                'method'              => $paymentMode,
+                'razorpay_payment_id' => null,
+                'amount'              => $finalAmount,
+                'status'              => $paymentStatus,
+                'order_id'            => $order->id,
+                'razorpay_order_id'   => $manualRazorpayId,
+                'user'                => $orderUser->id,
+            ]);
+
+            if ($coupon) {
+                $coupon->decrement('count');
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Prepaid order created successfully.',
+                'data' => [
+                    'order_id'        => $order->id,
+                    'total_amount'    => $order->total_amount,
+                    'status'          => $order->status,
+                    'payment_status'  => $order->payment_status,
+                    'payment_mode'    => $paymentMode,
+                    'shipping_address'=> $order->shipping_address,
+                    'user' => [
+                        'id'     => $orderUser->id,
+                        'name'   => $orderUser->name,
+                        'email'  => $orderUser->email,
+                        'mobile' => $orderUser->mobile,
+                    ],
+                ],
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Admin prepaid order create failed: ' . $e->getMessage());
+
             return response()->json([
                 'message' => 'Failed to create order. Please try again.',
                 'error' => config('app.debug') ? $e->getMessage() : null,

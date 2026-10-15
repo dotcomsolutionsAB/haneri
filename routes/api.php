@@ -141,6 +141,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // for all orders
         Route::post('/fetch_all', [OrderController::class, 'fetchOrders']); // List all orders for admin
         Route::get('/fetch_order_detail/{id}', [OrderController::class, 'fetchOrderDetails']); //Fetch order detail for admin
+        Route::post('/orders/admin-create', [OrderController::class, 'adminStore']); // Prepaid order without Razorpay
         Route::post('/status/{id}/update', [InvoiceController::class, 'updateOrderStatus']); // updated order status
         Route::post('/orders/{id}/regenerate-invoice', [InvoiceController::class, 'regenerateOrderInvoice']);
 

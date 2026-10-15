@@ -267,9 +267,14 @@ class UserController extends Controller
             // Query Users
             $query = User::query();
 
-            // Search by name
+            // Search by name, email, or mobile
             if ($request->filled('user_name')) {
-                $query->where('name', 'like', '%' . $request->user_name . '%');
+                $needle = trim((string) $request->user_name);
+                $query->where(function ($q) use ($needle) {
+                    $q->where('name', 'like', '%' . $needle . '%')
+                        ->orWhere('email', 'like', '%' . $needle . '%')
+                        ->orWhere('mobile', 'like', '%' . $needle . '%');
+                });
             }
 
             // Filter by role
