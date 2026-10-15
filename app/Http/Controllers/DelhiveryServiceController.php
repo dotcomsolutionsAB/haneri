@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\OrderModel;
 use App\Models\OrderItemModel;
 use App\Models\OrderShipment;
-use App\Models\PickupLocationModel;
 use App\services\DelhiveryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -218,7 +217,7 @@ class DelhiveryServiceController extends Controller
                 if ($request->filled('pickup_name')) {
                     $overrides['pickup_name'] = $request->input('pickup_name');
                 }
-                $orderData = $this->buildShipmentData($orderId, null, $overrides)['orderData'];
+                $orderData = $this->buildShipmentData($orderId, $overrides)['orderData'];
             } catch (\Exception $e) {
                 return response()->json([
                     'code'    => 422,
@@ -498,7 +497,7 @@ class DelhiveryServiceController extends Controller
         // 1) Validate only order_id – everything else is auto-fetched
         $validator = Validator::make($request->all(), [
             'order_id' => 'required|integer|exists:t_orders,id',
-            'pickup_location_id' => 'nullable|integer|exists:t_pickup_location,id',
+            'pickup_name' => 'nullable|string|max:255',
         ]);
 
         if ($validator->fails()) {
@@ -570,49 +569,13 @@ class DelhiveryServiceController extends Controller
 
             $productsDescription = implode(', ', $descParts);
 
-            // Resolve pickup location:
-            $pickupLocationId = $request->input('pickup_location_id');
-            $pickup = null;
-
-            // If pickup_location_id explicitly provided, try loading it
-            if (!empty($pickupLocationId)) {
-                $pickup = PickupLocationModel::find($pickupLocationId);
-            }
-
-            // If not provided OR not found, find default pickup
-            if (!$pickup) {
-                $pickup = PickupLocationModel::where('is_default', 1)
-                    ->where('is_active', 1)
-                    ->first();
-            }
-
-            // If still not found, pick first active pickup
-            if (!$pickup) {
-                $pickup = PickupLocationModel::where('is_active', 1)
-                    ->orderBy('id')
-                    ->first();
-            }
-
-            // If STILL no pickup → throw error
-            if (!$pickup) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No valid pickup location found. Please configure t_pickup_location.',
-                    'data'    => [],
-                ], 500);
-            }
-
-            // Use courier_pickup_name if set, else internal name
-            $pickupName    = $pickup->courier_pickup_name ?: $pickup->name;
-            $pickupAddress = trim(
-                $pickup->address_line1
-                . ($pickup->address_line2 ? ', '.$pickup->address_line2 : '')
-                . ($pickup->landmark ? ', '.$pickup->landmark : '')
-            );
-            $pickupPin     = $pickup->pin;
-            $pickupCity    = $pickup->city;
-            $pickupState   = $pickup->state;
-            $pickupPhone   = $pickup->phone ?: $pickup->alternate_phone;
+            // Pickup resolved against Delhivery warehouses in alignPickupWithDelhivery().
+            $pickupName    = (string) ($request->input('pickup_name') ?: config('shipping.pickup.name', ''));
+            $pickupAddress = (string) config('shipping.pickup.address', '');
+            $pickupPin     = (string) config('shipping.pickup.pin', '');
+            $pickupCity    = (string) config('shipping.pickup.city', '');
+            $pickupState   = (string) config('shipping.pickup.state', '');
+            $pickupPhone   = (string) config('shipping.pickup.phone', '');
 
             // 5) Map shipping details from single shipping_address string
             // New format: name, mobile, city, state, country, pin, add1, add2
@@ -772,7 +735,6 @@ class DelhiveryServiceController extends Controller
             $shipment = OrderShipment::firstOrNew(['order_id' => $order->id]);
             $shipment->user_id              = $order->user_id;
             $shipment->courier              = 'delhivery';
-            $shipment->pickup_location_id   = $pickup->id;   // store pickup id here
             $shipment->customer_name        = $orderData['customer_name'];
             $shipment->customer_phone       = $finalPhone;
             $shipment->customer_email       = $user->email;
@@ -1399,7 +1361,7 @@ class DelhiveryServiceController extends Controller
     }
 
     // Build the shipment data for both checking and punching
-    private function buildShipmentData(int $orderId, ?int $pickupLocationId = null, array $overrides = []): array
+    private function buildShipmentData(int $orderId, array $overrides = []): array
     {
         $order = OrderModel::with('user')->findOrFail($orderId);
         $user = $order->user;
@@ -1458,25 +1420,13 @@ class DelhiveryServiceController extends Controller
         $productsDescription = implode(', ', $descParts);
         $firstPackage = $packages[0] ?? null;
 
-        // Pickup resolve
-        $pickup = null;
-        if (!empty($pickupLocationId)) {
-            $pickup = PickupLocationModel::find($pickupLocationId);
-        }
-        if (!$pickup) {
-            $pickup = PickupLocationModel::where('is_default', 1)->where('is_active', 1)->first();
-        }
-        if (!$pickup) {
-            $pickup = PickupLocationModel::where('is_active', 1)->orderBy('id')->first();
-        }
-        if (!$pickup) throw new \Exception("No valid pickup location found.");
-
-        $pickupName = $pickup->courier_pickup_name ?: $pickup->name;
-        $pickupAddress = trim(
-            $pickup->address_line1
-            . ($pickup->address_line2 ? ', '.$pickup->address_line2 : '')
-            . ($pickup->landmark ? ', '.$pickup->landmark : '')
-        );
+        // Pickup comes from Delhivery client warehouses (aligned below).
+        $pickupName = (string) ($overrides['pickup_name'] ?? config('shipping.pickup.name', ''));
+        $pickupAddress = (string) config('shipping.pickup.address', '');
+        $pickupPin = (string) ($overrides['pickup_pin'] ?? config('shipping.pickup.pin', ''));
+        $pickupCity = (string) config('shipping.pickup.city', '');
+        $pickupState = (string) config('shipping.pickup.state', '');
+        $pickupPhone = (string) config('shipping.pickup.phone', '');
 
         // Shipping address parse (your new format)
         $shippingAddressRaw = $order->shipping_address;
@@ -1544,10 +1494,10 @@ class DelhiveryServiceController extends Controller
 
             'pickup_name'          => $pickupName,
             'pickup_address'       => $pickupAddress,
-            'pickup_pin'           => $pickup->pin,
-            'pickup_city'          => $pickup->city,
-            'pickup_state'         => $pickup->state,
-            'pickup_phone'         => $pickup->phone ?: $pickup->alternate_phone,
+            'pickup_pin'           => $pickupPin,
+            'pickup_city'          => $pickupCity,
+            'pickup_state'         => $pickupState,
+            'pickup_phone'         => $pickupPhone,
 
             'shipment_length'      => $firstPackage['shipment_length'] ?? 10,
             'shipment_width'       => $firstPackage['shipment_width'] ?? 10,
@@ -1558,11 +1508,11 @@ class DelhiveryServiceController extends Controller
             'service_level'        => 'normal',
             'address_type'         => 'home',
 
-            'return_pin'           => $pickup->pin,
-            'return_city'          => $pickup->city,
-            'return_phone'         => $pickup->phone ?: $pickup->alternate_phone,
+            'return_pin'           => $pickupPin,
+            'return_city'          => $pickupCity,
+            'return_phone'         => $pickupPhone,
             'return_address'       => $pickupAddress,
-            'return_state'         => $pickup->state,
+            'return_state'         => $pickupState,
             'return_country'       => 'India',
         ];
 
@@ -1571,7 +1521,8 @@ class DelhiveryServiceController extends Controller
             'customer_name','customer_address','phone',
             'shipping_mode','service_level','address_type',
             'shipment_length','shipment_width','shipment_height',
-            'pickup_name',
+            'pickup_name','pickup_pin','pickup_city','pickup_state',
+            'pickup_address','pickup_phone',
             'packages',
         ];
 
@@ -1591,7 +1542,14 @@ class DelhiveryServiceController extends Controller
         return [
             'order'      => $order,
             'user'       => $user,
-            'pickup'     => $pickup,
+            'pickup'     => [
+                'name'    => $orderData['pickup_name'] ?? null,
+                'address' => $orderData['pickup_address'] ?? null,
+                'pin'     => $orderData['pickup_pin'] ?? null,
+                'city'    => $orderData['pickup_city'] ?? null,
+                'state'   => $orderData['pickup_state'] ?? null,
+                'phone'   => $orderData['pickup_phone'] ?? null,
+            ],
             'items'      => $items,
             'packages'   => $orderData['packages'] ?? $packages,
             'orderData'  => $orderData,
@@ -1629,17 +1587,17 @@ class DelhiveryServiceController extends Controller
 
         $match = $resolved['match'];
         if (!$match) {
-            $configured = trim((string) config('shipping.pickup.name', ''));
-            if ($resolved['names'] === [] && $configured !== '') {
-                $orderData['pickup_name'] = $configured;
-                return $orderData;
-            }
             if ($resolved['names'] !== []) {
                 throw new \RuntimeException(
                     'Pickup "'.($orderData['pickup_name'] ?? '').'" is not registered with Delhivery. Use one of: '.implode(', ', $resolved['names']).'.'
                 );
             }
-            return $orderData;
+            $err = trim($service->lastWarehouseError());
+            throw new \RuntimeException(
+                $err !== ''
+                    ? $err
+                    : 'No Delhivery warehouses found. Add a pickup location in Delhivery One.'
+            );
         }
 
         $orderData['pickup_name'] = $match['name'];
@@ -2047,198 +2005,4 @@ class DelhiveryServiceController extends Controller
         ]);
     }
     
-    // pickup details :
-    public function createPickupLocation(Request $request)
-    {
-        // 1) Validate input
-        $validator = Validator::make($request->all(), [
-            'name'                => 'required|string|max:255',   // internal name
-            'code'                => 'nullable|string|max:100',
-            'courier_pickup_name' => 'nullable|string|max:255',   // warehouse name in Delhivery (e.g. "Burhanuddin")
-            'courier_pickup_code' => 'nullable|string|max:100',
-
-            'contact_person'      => 'nullable|string|max:255',
-            'phone'               => 'required|string|max:20',
-            'alternate_phone'     => 'nullable|string|max:20',
-            'email'               => 'nullable|email|max:255',
-
-            'address_line1'       => 'required|string|max:255',
-            'address_line2'       => 'nullable|string|max:255',
-            'landmark'            => 'nullable|string|max:255',
-
-            'city'                => 'required|string|max:100',
-            'district'            => 'nullable|string|max:100',
-            'state'               => 'required|string|max:100',
-            'pin'                 => 'required|string|max:10',    // can be digits:6 if always Indian PIN
-            'country'             => 'nullable|string|max:50',
-
-            'is_default'          => 'nullable|boolean',
-            'is_active'           => 'nullable|boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'data'    => $validator->errors(),
-            ], 422);
-        }
-
-        $data = $validator->validated();
-
-        // Normalize flags
-        $data['is_default'] = isset($data['is_default']) ? (bool)$data['is_default'] : false;
-        $data['is_active']  = isset($data['is_active']) ? (bool)$data['is_active'] : true;
-        $data['country']    = $data['country'] ?? 'India';
-
-        // 2) If this is marked as default, unset default on others
-        if ($data['is_default']) {
-            PickupLocationModel::where('is_default', 1)->update(['is_default' => 0]);
-        }
-
-        // 3) Create pickup location in DB
-        $pickup = PickupLocationModel::create($data);
-        $pickup->makeHidden(['created_at', 'updated_at']);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Pickup location created successfully.',
-            'data'    => $pickup,
-        ], 201);
-    }
-    public function fetchPickupLocations(Request $request, $id = null)
-    {
-        // If ID is passed in the URL => return single record
-        if ($id !== null) {
-            $pickup = PickupLocationModel::find($id);
-
-            if (!$pickup) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Pickup location not found.',
-                    'data'    => [],
-                ], 404);
-            }
-
-            // Hide timestamps
-            $pickup->makeHidden(['created_at', 'updated_at']);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Pickup location fetched successfully.',
-                'data'    => $pickup,
-            ]);
-        }
-
-        // Otherwise => list with filters from body
-
-        $validator = Validator::make($request->all(), [
-            'is_active' => 'nullable|in:0,1',       // filter by active
-            'default'   => 'nullable|in:0,1',       // maps to is_default
-            'name'      => 'nullable|string',       // search in name / courier_pickup_name
-            'pincode'   => 'nullable|string',       // search in pin
-
-            'limit'     => 'nullable|integer|min:1|max:200',
-            'offset'    => 'nullable|integer|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'data'    => $validator->errors(),
-            ], 422);
-        }
-
-        $filters = $validator->validated();
-
-        $limit  = $filters['limit']  ?? 50;
-        $offset = $filters['offset'] ?? 0;
-
-        $query = PickupLocationModel::query();
-
-        // is_active filter
-        if (isset($filters['is_active'])) {
-            $query->where('is_active', (int) $filters['is_active']);
-        }
-
-        // default filter (maps to is_default)
-        if (isset($filters['default'])) {
-            $query->where('is_default', (int) $filters['default']);
-        }
-
-        // name filter (name + courier_pickup_name)
-        if (!empty($filters['name'])) {
-            $name = $filters['name'];
-            $query->where(function ($q) use ($name) {
-                $q->where('name', 'like', "%{$name}%")
-                ->orWhere('courier_pickup_name', 'like', "%{$name}%");
-            });
-        }
-
-        // pincode filter
-        if (!empty($filters['pincode'])) {
-            $query->where('pin', 'like', "%{$filters['pincode']}%");
-        }
-
-        // Order: default first, then by name
-        $query->orderByDesc('is_default')
-            ->orderBy('name');
-
-        // Total BEFORE limit/offset
-        $total = $query->count();
-
-        // Apply limit/offset
-        $items = $query->skip($offset)
-                    ->take($limit)
-                    ->get();
-
-        // Hide timestamps on each item
-        $items->makeHidden(['created_at', 'updated_at']);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Pickup locations fetched successfully.',
-            'data'    => [
-                'items' => $items->values(),   // reset index
-                'meta'  => [
-                    'limit'  => $limit,
-                    'offset' => $offset,
-                    'total'  => $total,
-                ],
-            ],
-        ]);
-    }
-    public function deletePickupLocation($id)
-    {
-        $pickup = PickupLocationModel::find($id);
-
-        if (!$pickup) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pickup location not found.',
-                'data'    => [],
-            ], 404);
-        }
-
-        // Protect default pickup (optional)
-        // If you want to prevent deleting default pickup, uncomment:
-        /*
-        if ($pickup->is_default) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Default pickup location cannot be deleted.',
-                'data'    => [],
-            ], 400);
-        }
-        */
-
-        $pickup->delete();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Pickup location deleted successfully.',
-            'data'    => ['id' => $id],
-        ]);
-    }
 }

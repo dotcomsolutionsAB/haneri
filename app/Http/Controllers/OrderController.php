@@ -296,9 +296,8 @@ class OrderController extends Controller
                 'weight'          => null, // we can set in manual API
                 'products_description' => 'Order #'.$order->id.' items',
 
-                // Pickup info – if you have configured somewhere, you can fill from config
-                'pickup_location_id' => config('shipping.pickup.location_id', 1),
-                'pickup_name'     => config('shipping.pickup.name', 'Default Pickup'),
+                // Pickup resolved from Delhivery warehouses when booking
+                'pickup_name'     => config('shipping.pickup.name', 'HANERI HO'),
                 'pickup_address'  => config('shipping.pickup.address', ''),
                 'pickup_pin'      => config('shipping.pickup.pin', ''),
                 'pickup_city'     => config('shipping.pickup.city', ''),
@@ -552,8 +551,7 @@ class OrderController extends Controller
                 'quantity'         => $totalQty,
                 'weight'           => null,
                 'products_description' => 'Order #'.$order->id.' items',
-                'pickup_location_id' => config('shipping.pickup.location_id', 1),
-                'pickup_name'      => config('shipping.pickup.name', 'Default Pickup'),
+                'pickup_name'      => config('shipping.pickup.name', 'HANERI HO'),
                 'pickup_address'   => config('shipping.pickup.address', ''),
                 'pickup_pin'       => config('shipping.pickup.pin', ''),
                 'pickup_city'      => config('shipping.pickup.city', ''),

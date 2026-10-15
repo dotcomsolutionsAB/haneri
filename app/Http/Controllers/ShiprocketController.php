@@ -417,15 +417,12 @@ class ShiprocketController extends Controller
 
             // 9) Save into t_order_shipments
             $shippedBy = data_get($awbRes, 'response.data.shipped_by', []);
-            $pickupId = 0; // set correctly later
-
             $shipmentRow = OrderShipment::create([
                 'order_id' => $order->id,
                 'user_id'  => $order->user_id,
 
                 'courier' => $courierName ?: 'Shiprocket',
                 'status' => $mappedStatus,
-                'pickup_location_id' => $pickupId,
 
                 'customer_name'  => $custName,
                 'customer_phone' => (string)$phone,
@@ -575,7 +572,6 @@ class ShiprocketController extends Controller
             'payload.seller_invoice' => ['nullable', 'string', 'max:100'],
 
             
-            'payload.pickup_location_id' => ['nullable','integer'], 
             'payload.pickup_name' => ['nullable', 'string', 'max:255'],
             'payload.pickup_address' => ['nullable', 'string', 'max:500'],
             'payload.pickup_pin' => ['nullable'],
@@ -772,7 +768,6 @@ class ShiprocketController extends Controller
                 'seller_address' => $p['seller_address'] ?? null,
                 'seller_invoice' => $p['seller_invoice'] ?? null,
 
-                'pickup_location_id' => isset($p['pickup_location_id']) ? (int)$p['pickup_location_id'] : null,
                 'pickup_name' => $p['pickup_name'] ?? null,
                 'pickup_address' => $p['pickup_address'] ?? null,
                 'pickup_pin' => isset($p['pickup_pin']) ? (string)$p['pickup_pin'] : null,

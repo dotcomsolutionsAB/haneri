@@ -144,7 +144,6 @@ class CheckoutSchema
             $t->integer('quantity')->default(1);
             $t->string('weight')->nullable();
             $t->string('products_description')->nullable();
-            $t->unsignedBigInteger('pickup_location_id')->nullable();
             $t->string('pickup_name')->nullable();
             $t->text('pickup_address')->nullable();
             $t->string('pickup_pin')->nullable();
