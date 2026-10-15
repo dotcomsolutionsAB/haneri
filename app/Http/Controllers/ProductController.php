@@ -234,6 +234,7 @@ class ProductController extends Controller
                     'file_path' => $fullUrl,
                     'type'      => $upload->type,
                     'size'      => $upload->size,
+                    'alt_text'  => $upload->alt_text,
                 ];
             });
 
@@ -546,26 +547,30 @@ class ProductController extends Controller
 
                     /* 3. images */
                     $fileUrls = [];
+                    $fileAlts = [];
                     if (!empty($data['photo_id'])) {
                         $ids  = array_values(array_filter(array_map('intval', explode(',', $data['photo_id']))));
                         $rows = UploadModel::whereIn('id', $ids)
-                            ->get(['id','file_path'])
+                            ->get(['id','file_path','alt_text'])
                             ->keyBy('id');
 
                         // build URLs in the same order as $ids
                         foreach ($ids as $imgId) {
                             if (isset($rows[$imgId])) {
                                 $fileUrls[] = Storage::disk('public')->url($rows[$imgId]->file_path);
+                                $fileAlts[] = $this->publicImageAlt($rows[$imgId]->alt_text);
                             }
                         }
                     }
                     $data['file_urls'] = $fileUrls;
+                    $data['file_alts'] = $fileAlts;
 
                     $bannerUrls = [];
+                    $bannerAlts = [];
                     if (!empty($data['banner_id'])) {
                         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
                         $brows = UploadModel::whereIn('id', $bids)
-                            ->get(['id','file_path'])
+                            ->get(['id','file_path','alt_text'])
                             ->keyBy('id');
                         
                         // Define the order you want the banners to appear in
@@ -593,9 +598,11 @@ class ProductController extends Controller
                         // Map the sorted file paths to URLs
                         foreach ($browsArray as $banner) {
                             $bannerUrls[] = Storage::disk('public')->url($banner['file_path']);
+                            $bannerAlts[] = $this->publicImageAlt($banner['alt_text'] ?? null);
                         }
                     }
                     $data['banner_urls'] = $bannerUrls;
+                    $data['banner_alts'] = $bannerAlts;
 
                     $this->resolveVariant3dForPublic($data);
 
@@ -769,36 +776,42 @@ class ProductController extends Controller
                     
                     // Process images
                     $fileUrls = [];
+                    $fileAlts = [];
                     if (!empty($data['photo_id'])) {
                         $ids  = array_values(array_filter(array_map('intval', explode(',', $data['photo_id']))));
                         $rows = UploadModel::whereIn('id', $ids)
-                            ->get(['id','file_path'])
+                            ->get(['id','file_path','alt_text'])
                             ->keyBy('id');
 
                         // build URLs in the same order as $ids
                         foreach ($ids as $imgId) {
                             if (isset($rows[$imgId])) {
                                 $fileUrls[] = Storage::disk('public')->url($rows[$imgId]->file_path);
+                                $fileAlts[] = $this->publicImageAlt($rows[$imgId]->alt_text);
                             }
                         }
                     }
                     $data['file_urls'] = $fileUrls;
+                    $data['file_alts'] = $fileAlts;
 
                     /* 4. banners (ordered by banner_id CSV) */
                     $bannerUrls = [];
+                    $bannerAlts = [];
                     if (!empty($data['banner_id'])) {
                         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
                         $brows = UploadModel::whereIn('id', $bids)
-                            ->get(['id','file_path'])
+                            ->get(['id','file_path','alt_text'])
                             ->keyBy('id');
 
                         foreach ($bids as $bid) {
                             if (isset($brows[$bid])) {
                                 $bannerUrls[] = Storage::disk('public')->url($brows[$bid]->file_path);
+                                $bannerAlts[] = $this->publicImageAlt($brows[$bid]->alt_text);
                             }
                         }
                     }
                     $data['banner_urls'] = $bannerUrls;
+                    $data['banner_alts'] = $bannerAlts;
 
                     $this->resolveVariant3dForPublic($data);
 
@@ -936,6 +949,24 @@ class ProductController extends Controller
         }
     }
 
+    /**
+     * Prefer human-written alt text; treat auto-generated filenames as empty
+     * so the storefront can fall back to the product name.
+     */
+    private function publicImageAlt(?string $altText): string
+    {
+        $alt = trim((string) $altText);
+        if ($alt === '') {
+            return '';
+        }
+
+        if (preg_match('/\.(jpe?g|png|gif|webp|pdf|glb|avif|svg)$/i', $alt)) {
+            return '';
+        }
+
+        return $alt;
+    }
+
     /* Helper function to extract product page type (e.g., 'ProductPage_Main') from file path */
     private function getBannerType($filePath)
     {
@@ -1069,32 +1100,33 @@ class ProductController extends Controller
                     $data = $variant->toArray();
                     $data['selling_price'] = round($regularPrice - ($regularPrice * ($discount / 100)), 0);
 
-                    /* 3) images -> [{id, url}] in the SAME order as photo_id CSV */
+                    /* 3) images -> [{id, url, alt_text}] in the SAME order as photo_id CSV */
                     $fileObjs = [];
                     if (!empty($data['photo_id'])) {
                         $ids  = array_values(array_filter(array_map('intval', explode(',', $data['photo_id']))));
                         $rows = UploadModel::whereIn('id', $ids)
-                            ->get(['id','file_path'])
+                            ->get(['id','file_path','alt_text'])
                             ->keyBy('id');
 
                         foreach ($ids as $imgId) {
                             if (isset($rows[$imgId])) {
                                 $fileObjs[] = [
-                                    'id'  => $imgId,
-                                    'url' => Storage::disk('public')->url($rows[$imgId]->file_path),
+                                    'id'       => $imgId,
+                                    'url'      => Storage::disk('public')->url($rows[$imgId]->file_path),
+                                    'alt_text' => $rows[$imgId]->alt_text,
                                 ];
                             }
                         }
                     }
                     $data['file_urls'] = $fileObjs;
 
-                    /* 4) banners -> [{id, url}] in custom order:
+                    /* 4) banners -> [{id, url, alt_text}] in custom order:
                         Main (1st), BLDC (2nd), Scan (3rd), Color (4th), Unknown (last) */
                     $bannerObjs = [];
                     if (!empty($data['banner_id'])) {
                         $bids  = array_values(array_filter(array_map('intval', explode(',', $data['banner_id']))));
                         $brows = UploadModel::whereIn('id', $bids)
-                            ->get(['id','file_path'])
+                            ->get(['id','file_path','alt_text'])
                             ->keyBy('id');
 
                         $bannerOrder = [
@@ -1114,6 +1146,7 @@ class ProductController extends Controller
                                 $browsArray[] = [
                                     'id'       => $bid,
                                     'file_path'=> $filePath,
+                                    'alt_text' => $brows[$bid]->alt_text,
                                     'sort_key' => $bannerOrder[$type] ?? $bannerOrder['Unknown'],
                                 ];
                             }
@@ -1122,11 +1155,12 @@ class ProductController extends Controller
                         // Sort by our defined order, unknowns last
                         usort($browsArray, fn($a, $b) => $a['sort_key'] <=> $b['sort_key']);
 
-                        // Map to [{id,url}]
+                        // Map to [{id,url,alt_text}]
                         foreach ($browsArray as $b) {
                             $bannerObjs[] = [
-                                'id'  => $b['id'],
-                                'url' => Storage::disk('public')->url($b['file_path']),
+                                'id'       => $b['id'],
+                                'url'      => Storage::disk('public')->url($b['file_path']),
+                                'alt_text' => $b['alt_text'],
                             ];
                         }
                     }
@@ -2199,6 +2233,73 @@ class ProductController extends Controller
                 'data' => ['error' => $e->getMessage()]
             ], 500);
         }
+    }
+
+    public function variantDimensions()
+    {
+        $rows = ProductVariantModel::query()
+            ->join('t_products', 't_products.id', '=', 't_product_variants.product_id')
+            ->orderBy('t_products.name')
+            ->orderBy('t_product_variants.variant_value')
+            ->orderBy('t_product_variants.id')
+            ->get([
+                't_product_variants.id',
+                't_product_variants.product_id',
+                't_products.name as product_name',
+                't_product_variants.variant_value',
+                't_product_variants.sku',
+                't_product_variants.length',
+                't_product_variants.width',
+                't_product_variants.height',
+                't_product_variants.weight',
+            ]);
+
+        return response()->json([
+            'success' => true,
+            'data' => $rows->map(function ($row) {
+                return [
+                    'id' => (int) $row->id,
+                    'product_id' => (int) $row->product_id,
+                    'sku' => $row->sku,
+                    'name' => $row->product_name,
+                    'color' => $row->variant_value,
+                    'length' => $row->length !== null ? (float) $row->length : null,
+                    'width' => $row->width !== null ? (float) $row->width : null,
+                    'height' => $row->height !== null ? (float) $row->height : null,
+                    'weight' => $row->weight !== null ? (float) $row->weight : null,
+                ];
+            })->values(),
+        ]);
+    }
+
+    public function updateVariantDimensions(Request $request)
+    {
+        $validated = $request->validate([
+            'variants' => 'required|array|min:1',
+            'variants.*.id' => 'required|integer|exists:t_product_variants,id',
+            'variants.*.sku' => 'nullable|string|max:100',
+            'variants.*.length' => 'nullable|numeric|min:0',
+            'variants.*.width' => 'nullable|numeric|min:0',
+            'variants.*.height' => 'nullable|numeric|min:0',
+            'variants.*.weight' => 'nullable|numeric|min:0',
+        ]);
+
+        \DB::transaction(function () use ($validated) {
+            foreach ($validated['variants'] as $row) {
+                ProductVariantModel::where('id', $row['id'])->update([
+                    'sku' => $this->nullableString($row['sku'] ?? null),
+                    'length' => $row['length'] ?? null,
+                    'width' => $row['width'] ?? null,
+                    'height' => $row['height'] ?? null,
+                    'weight' => $row['weight'] ?? null,
+                ]);
+            }
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Dimensions saved.',
+        ]);
     }
 
     private function nullableString($value): ?string

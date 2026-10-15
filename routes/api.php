@@ -114,6 +114,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
         
         // Product Routes
         Route::prefix('products')->group(function () {
+            Route::get('/variant-dimensions', [ProductController::class, 'variantDimensions']);
+            Route::put('/variant-dimensions', [ProductController::class, 'updateVariantDimensions']);
             Route::post('/register', [ProductController::class, 'store']);         // Add a new product (Admin only)
             Route::post('/upload-description-image', [ProductController::class, 'uploadDescriptionImage']);
             Route::post('/{productId}/variants', [ProductController::class, 'addVariant']); // create variant(s)
@@ -126,6 +128,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::delete('/variants/{variantId}', [ProductController::class, 'deleteVariant']); // Delete variant by id
             Route::delete('/variants/{variant}/photos/{upload}',  [UploadController::class, 'deleteVariantPhoto']);
             Route::delete('/variants/{variant}/banners/{upload}', [UploadController::class, 'deleteVariantBanner']);
+            Route::patch('/uploads/{upload}', [UploadController::class, 'updateAltText']);
             Route::put('/{id}', [ProductController::class, 'update']);     // Update a product (Admin only)
             Route::delete('/{id}', [ProductController::class, 'destroy']); // Delete a product (Admin only)
             Route::post('/import', [ProductController::class, 'importProductsFromCsv']);

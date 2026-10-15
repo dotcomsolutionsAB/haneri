@@ -12,6 +12,37 @@ use App\Models\UploadModel;
 
 class UploadController extends Controller
 {
+    public function updateAltText(Request $request, int $upload)
+    {
+        $validated = $request->validate([
+            'alt_text' => 'nullable|string|max:500',
+        ]);
+
+        $row = UploadModel::find($upload);
+        if (!$row) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload not found.',
+            ], 404);
+        }
+
+        $alt = isset($validated['alt_text'])
+            ? trim((string) $validated['alt_text'])
+            : '';
+
+        $row->alt_text = $alt === '' ? null : $alt;
+        $row->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Alt text updated.',
+            'data' => [
+                'id'       => $row->id,
+                'url'      => Storage::disk('public')->url($row->file_path),
+                'alt_text' => $row->alt_text,
+            ],
+        ], 200);
+    }
 
     public function deleteVariantPhoto(int $variant, int $photo)
     {
@@ -51,14 +82,15 @@ class UploadController extends Controller
             ->filter(fn($v) => $v > 0)
             ->values();
 
-        $files = UploadModel::whereIn('id', $remainingIds)->get(['id','file_path'])->keyBy('id');
+        $files = UploadModel::whereIn('id', $remainingIds)->get(['id','file_path','alt_text'])->keyBy('id');
 
         $fileObjs = [];
         foreach ($remainingIds as $id) {
             if (isset($files[$id])) {
                 $fileObjs[] = [
-                    'id'  => $id,
-                    'url' => Storage::disk('public')->url($files[$id]->file_path),
+                    'id'       => $id,
+                    'url'      => Storage::disk('public')->url($files[$id]->file_path),
+                    'alt_text' => $files[$id]->alt_text,
                 ];
             }
         }
@@ -112,7 +144,7 @@ class UploadController extends Controller
             ]);
         }
 
-        $files = UploadModel::whereIn('id', $remainingIds)->get(['id','file_path'])->keyBy('id');
+        $files = UploadModel::whereIn('id', $remainingIds)->get(['id','file_path','alt_text'])->keyBy('id');
 
         // Custom order: Main → BLDC → Scan → Colors → Unknown
         $order = [
@@ -134,6 +166,7 @@ class UploadController extends Controller
             $tmp[] = [
                 'id'       => $id,
                 'path'     => $path,
+                'alt_text' => $files[$id]->alt_text,
                 'sort_key' => $order[$typeKey],
             ];
         }
@@ -141,8 +174,9 @@ class UploadController extends Controller
         usort($tmp, fn($a,$b) => $a['sort_key'] <=> $b['sort_key']);
 
         $bannerObjs = array_map(fn($r) => [
-            'id'  => $r['id'],
-            'url' => Storage::disk('public')->url($r['path']),
+            'id'       => $r['id'],
+            'url'      => Storage::disk('public')->url($r['path']),
+            'alt_text' => $r['alt_text'],
         ], $tmp);
 
         return response()->json([
