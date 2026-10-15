@@ -184,6 +184,11 @@ class DelhiveryServiceController extends Controller
             'breadth' => 'nullable|numeric|min:1',
             'height'  => 'nullable|numeric|min:1',
             'pickup_name' => 'nullable|string|max:255',
+            'packages' => 'nullable|array|min:1',
+            'packages.*.length'  => 'required_with:packages|numeric|min:1',
+            'packages.*.breadth' => 'required_with:packages|numeric|min:1',
+            'packages.*.height'  => 'required_with:packages|numeric|min:1',
+            'packages.*.weight'  => 'required_with:packages|numeric|min:0.01',
         ]);
 
         if ($validator->fails()) {
@@ -203,6 +208,7 @@ class DelhiveryServiceController extends Controller
         $lengthCm = 10.0;
         $breadthCm = 10.0;
         $heightCm = 10.0;
+        $packageBreakdown = [];
 
         if ($through === 'order') {
             $orderId = (int) $request->input('order_id');
@@ -224,12 +230,6 @@ class DelhiveryServiceController extends Controller
 
             $originPin      = $orderData['pickup_pin'] ?? null;
             $destinationPin = $orderData['pin'] ?? null;
-            $weightInput    = $request->filled('weight')
-                ? $request->input('weight')
-                : ($orderData['weight'] ?? 1);
-            $lengthCm = (float) ($request->filled('length') ? $request->input('length') : ($orderData['shipment_length'] ?? 10));
-            $breadthCm = (float) ($request->filled('breadth') ? $request->input('breadth') : ($orderData['shipment_width'] ?? 10));
-            $heightCm = (float) ($request->filled('height') ? $request->input('height') : ($orderData['shipment_height'] ?? 10));
 
             if (!$originPin || !$destinationPin) {
                 return response()->json([
@@ -239,34 +239,99 @@ class DelhiveryServiceController extends Controller
                     'data'    => [],
                 ], 422);
             }
+
+            $requestPackages = $request->input('packages');
+            if (is_array($requestPackages) && count($requestPackages) > 0) {
+                foreach ($requestPackages as $pkg) {
+                    $packageBreakdown[] = [
+                        'length'  => max(1, (float) ($pkg['length'] ?? 10)),
+                        'breadth' => max(1, (float) ($pkg['breadth'] ?? 10)),
+                        'height'  => max(1, (float) ($pkg['height'] ?? 10)),
+                        'weight'  => max(0.01, (float) ($pkg['weight'] ?? 1)),
+                    ];
+                }
+            } elseif ($request->filled('weight') || $request->filled('length')) {
+                $packageBreakdown[] = [
+                    'length'  => max(1, (float) ($request->input('length', $orderData['shipment_length'] ?? 10))),
+                    'breadth' => max(1, (float) ($request->input('breadth', $orderData['shipment_width'] ?? 10))),
+                    'height'  => max(1, (float) ($request->input('height', $orderData['shipment_height'] ?? 10))),
+                    'weight'  => max(0.01, (float) ($request->filled('weight')
+                        ? $request->input('weight')
+                        : ($orderData['weight'] ?? 1))),
+                ];
+            } else {
+                foreach ((array) ($orderData['packages'] ?? []) as $pkg) {
+                    $packageBreakdown[] = [
+                        'length'  => max(1, (float) ($pkg['shipment_length'] ?? 10)),
+                        'breadth' => max(1, (float) ($pkg['shipment_width'] ?? 10)),
+                        'height'  => max(1, (float) ($pkg['shipment_height'] ?? 10)),
+                        'weight'  => max(0.01, (float) ($pkg['weight'] ?? 1)),
+                    ];
+                }
+                if ($packageBreakdown === []) {
+                    $packageBreakdown[] = [
+                        'length'  => max(1, (float) ($orderData['shipment_length'] ?? 10)),
+                        'breadth' => max(1, (float) ($orderData['shipment_width'] ?? 10)),
+                        'height'  => max(1, (float) ($orderData['shipment_height'] ?? 10)),
+                        'weight'  => max(0.01, (float) ($orderData['weight'] ?? 1)),
+                    ];
+                }
+            }
         } else {
             $originPin      = $request->input('origin_pin');
             $destinationPin = $request->input('destination_pin');
-            $weightInput    = $request->input('weight'); // in KG as per your payload
-            $lengthCm = (float) $request->input('length', 10);
-            $breadthCm = (float) $request->input('breadth', 10);
-            $heightCm = (float) $request->input('height', 10);
+            $packageBreakdown[] = [
+                'length'  => max(1, (float) $request->input('length', 10)),
+                'breadth' => max(1, (float) $request->input('breadth', 10)),
+                'height'  => max(1, (float) $request->input('height', 10)),
+                'weight'  => max(0.01, (float) $request->input('weight')),
+            ];
         }
 
-        $lengthCm = max(1, $lengthCm);
-        $breadthCm = max(1, $breadthCm);
-        $heightCm = max(1, $heightCm);
-        $actualKg = max(0.01, (float) $weightInput);
-        // Courier volumetric weight in kg. Charge whichever is higher.
-        $volumetricKg = ($lengthCm * $breadthCm * $heightCm) / 5000;
-        $chargedKg = max($actualKg, $volumetricKg);
+        $actualKg = 0.0;
+        $volumetricKg = 0.0;
+        $chargedKg = 0.0;
+        $details = [];
+        foreach ($packageBreakdown as $pkg) {
+            $lengthCm = $pkg['length'];
+            $breadthCm = $pkg['breadth'];
+            $heightCm = $pkg['height'];
+            $pkgActual = $pkg['weight'];
+            $pkgVolumetric = ($lengthCm * $breadthCm * $heightCm) / 5000;
+            $pkgCharged = max($pkgActual, $pkgVolumetric);
+            $actualKg += $pkgActual;
+            $volumetricKg += $pkgVolumetric;
+            $chargedKg += $pkgCharged;
+            $details[] = [
+                'length_cm' => round($lengthCm, 2),
+                'breadth_cm' => round($breadthCm, 2),
+                'height_cm' => round($heightCm, 2),
+                'actual_weight_kg' => round($pkgActual, 3),
+                'volumetric_weight_kg' => round($pkgVolumetric, 3),
+                'charged_weight_kg' => round($pkgCharged, 3),
+                'charged_on' => $pkgVolumetric > $pkgActual ? 'volumetric' : 'actual',
+            ];
+        }
+
+        $first = $details[0] ?? [
+            'length_cm' => 10,
+            'breadth_cm' => 10,
+            'height_cm' => 10,
+        ];
         $package = [
-            'length_cm' => round($lengthCm, 2),
-            'breadth_cm' => round($breadthCm, 2),
-            'height_cm' => round($heightCm, 2),
+            'length_cm' => $first['length_cm'],
+            'breadth_cm' => $first['breadth_cm'],
+            'height_cm' => $first['height_cm'],
             'actual_weight_kg' => round($actualKg, 3),
             'volumetric_weight_kg' => round($volumetricKg, 3),
-            'charged_weight_kg' => round($chargedKg, 3),
+            'charged_weight_kg' => round(max(0.01, $chargedKg), 3),
             'charged_on' => $volumetricKg > $actualKg ? 'volumetric' : 'actual',
+            'packages' => $details,
+            'package_count' => count($details),
         ];
 
         // Delhivery expects cgm in grams. Weight here is already kilograms.
-        $cgm = (int) round($chargedKg * 1000);
+        $cgm = (int) round(max(0.01, $chargedKg) * 1000);
 
         $baseQuery = [
             'ss'    => 'Delivered',     // ✅ delivery only (no RTO)
@@ -807,7 +872,8 @@ class DelhiveryServiceController extends Controller
             // Return the payload in the same structure as punchShipment API
             $response = [
                 'order_id' => $orderId,
-                'payload'  => $data['orderData']  // All the shipment data in the payload
+                'payload'  => $data['orderData'],
+                'packages' => $data['packages'] ?? [],
             ];
 
             return response()->json([
@@ -837,6 +903,15 @@ class DelhiveryServiceController extends Controller
             'payload.shipment_width'  => 'nullable|numeric|min:1',
             'payload.shipment_height' => 'nullable|numeric|min:1',
             'payload.weight'          => 'nullable|numeric|min:0.01',
+            'payload.packages'                    => 'nullable|array|min:1',
+            'payload.packages.*.products_description' => 'nullable|string|max:500',
+            'payload.packages.*.quantity'         => 'nullable|integer|min:1',
+            'payload.packages.*.weight'           => 'required_with:payload.packages|numeric|min:0.01',
+            'payload.packages.*.shipment_length'  => 'required_with:payload.packages|numeric|min:1',
+            'payload.packages.*.shipment_width'   => 'required_with:payload.packages|numeric|min:1',
+            'payload.packages.*.shipment_height'  => 'required_with:payload.packages|numeric|min:1',
+            'payload.packages.*.total_amount'     => 'nullable|numeric|min:0',
+            'payload.packages.*.cod_amount'       => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -865,6 +940,26 @@ class DelhiveryServiceController extends Controller
 
         $payload['shipping_mode'] = ($shippingMode === 'air') ? 'Express' : 'Surface';
         $payload['service_level'] = ($serviceLevel === 'express') ? 'express' : 'normal';
+
+        // Keep top-level dims in sync with the first package for legacy columns.
+        if (!empty($payload['packages']) && is_array($payload['packages'])) {
+            $first = $payload['packages'][0] ?? null;
+            if (is_array($first)) {
+                $payload['shipment_length'] = $first['shipment_length'] ?? $payload['shipment_length'] ?? 10;
+                $payload['shipment_width']  = $first['shipment_width'] ?? $payload['shipment_width'] ?? 10;
+                $payload['shipment_height'] = $first['shipment_height'] ?? $payload['shipment_height'] ?? 10;
+                $payload['weight'] = collect($payload['packages'])->sum(function ($pkg) {
+                    return (float) ($pkg['weight'] ?? 0);
+                });
+                $payload['quantity'] = collect($payload['packages'])->sum(function ($pkg) {
+                    return (int) ($pkg['quantity'] ?? 1);
+                });
+                $payload['products_description'] = collect($payload['packages'])
+                    ->map(fn ($pkg) => (string) ($pkg['products_description'] ?? ''))
+                    ->filter()
+                    ->implode(', ') ?: ($payload['products_description'] ?? null);
+            }
+        }
 
         try {
             // 1. Update the database with any changes from the payload (if needed)
@@ -955,9 +1050,9 @@ class DelhiveryServiceController extends Controller
             }
 
             // 3. Update the shipment data with Delhivery's response (e.g., tracking number, waybill)
-            $waybill = data_get($apiResponse, 'packages.0.waybill');
+            $waybills = $this->extractDelhiveryWaybills(is_array($apiResponse) ? $apiResponse : []);
 
-            if (!$waybill) {
+            if ($waybills === []) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Delhivery response did not include waybill.',
@@ -965,7 +1060,7 @@ class DelhiveryServiceController extends Controller
                 ], 400);
             }
 
-            $shipment->awb_no = $waybill;
+            $shipment->awb_no = implode(', ', $waybills);
             $shipment->status = 'booked';
             $shipment->response_payload = $apiResponse;
             $shipment->save();
@@ -973,7 +1068,9 @@ class DelhiveryServiceController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Shipment successfully booked with Delhivery.',
+                'message' => count($waybills) > 1
+                    ? 'Shipments successfully booked with Delhivery.'
+                    : 'Shipment successfully booked with Delhivery.',
                 'data'    => $apiResponse,
             ]);
         } catch (\Exception $e) {
@@ -988,39 +1085,66 @@ class DelhiveryServiceController extends Controller
      * Prefer the package remark (for example an insufficient wallet balance)
      * over Delhivery's generic rmk line.
      */
+    private function extractDelhiveryWaybills(array $apiResponse): array
+    {
+        $waybills = [];
+        foreach ((array) data_get($apiResponse, 'packages', []) as $package) {
+            if (!is_array($package)) {
+                continue;
+            }
+            $waybill = trim((string) ($package['waybill'] ?? ''));
+            if ($waybill !== '') {
+                $waybills[] = $waybill;
+            }
+        }
+
+        return array_values(array_unique($waybills));
+    }
+
     private function delhiveryBookingFailure(?array $apiResponse): ?string
     {
         if (!is_array($apiResponse)) {
             return 'Delhivery did not book the shipment.';
         }
 
-        $waybill = trim((string) data_get($apiResponse, 'packages.0.waybill', ''));
-        if ($waybill !== '') {
+        if ($this->extractDelhiveryWaybills($apiResponse) !== []) {
             return null;
         }
 
-        $packageStatus = strtolower((string) data_get($apiResponse, 'packages.0.status', ''));
+        $packages = (array) data_get($apiResponse, 'packages', []);
+        $anyFail = false;
+        $lines = [];
+        foreach ($packages as $package) {
+            if (!is_array($package)) {
+                continue;
+            }
+            $packageStatus = strtolower((string) ($package['status'] ?? ''));
+            if ($packageStatus === 'fail') {
+                $anyFail = true;
+            }
+            $remarks = $package['remarks'] ?? $package['remark'] ?? null;
+            if (is_string($remarks)) {
+                $remarks = [$remarks];
+            }
+            foreach (is_array($remarks) ? $remarks : [] as $line) {
+                $line = trim((string) $line);
+                if ($line !== '') {
+                    $lines[] = $line;
+                }
+            }
+        }
+
         $failed = ($apiResponse['success'] ?? null) === false
-            || $packageStatus === 'fail'
+            || $anyFail
             || isset($apiResponse['error'])
-            || isset($apiResponse['rmk']);
+            || isset($apiResponse['rmk'])
+            || $packages === [];
         if (!$failed) {
             return null;
         }
 
-        $remarks = data_get($apiResponse, 'packages.0.remarks', data_get($apiResponse, 'packages.0.remark'));
-        if (is_string($remarks)) {
-            $remarks = [$remarks];
-        }
-        $lines = [];
-        foreach (is_array($remarks) ? $remarks : [] as $line) {
-            $line = trim((string) $line);
-            if ($line !== '') {
-                $lines[] = $line;
-            }
-        }
         if ($lines !== []) {
-            return implode(' ', $lines);
+            return implode(' ', array_unique($lines));
         }
 
         $rmk = trim((string) ($apiResponse['rmk'] ?? ''));
@@ -1042,7 +1166,10 @@ class DelhiveryServiceController extends Controller
         if (!$user) throw new \Exception("User not found for this order.");
 
         // Items
-        $items = OrderItemModel::with(['product:id,name', 'variant:id,weight'])
+        $items = OrderItemModel::with([
+            'product:id,name',
+            'variant:id,weight,length,width,height,variant_value',
+        ])
             ->where('order_id', $order->id)
             ->get();
 
@@ -1051,22 +1178,45 @@ class DelhiveryServiceController extends Controller
         $descParts = [];
         $totalQty = 0;
         $totalWeight = 0.0;
+        $packages = [];
+        $paymentModePreview = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
 
         foreach ($items as $item) {
             $name = optional($item->product)->name ?? ('Product #'.$item->product_id);
-            $qty  = (int)$item->quantity;
+            $variantValue = optional($item->variant)->variant_value;
+            $qty  = max(1, (int) $item->quantity);
+            $label = $variantValue ? ($name.' ('.$variantValue.')') : $name;
 
-            $descParts[] = $name.' x '.$qty;
+            $descParts[] = $label.' x '.$qty;
             $totalQty += $qty;
 
-            $variantWeight = optional($item->variant)->weight;
-            if (!is_null($variantWeight)) {
-                $totalWeight += ((float)$variantWeight) * $qty;
-            }
+            $unitWeight = optional($item->variant)->weight;
+            $packageWeight = !is_null($unitWeight)
+                ? max(0.01, ((float) $unitWeight) * $qty)
+                : 1.0;
+            $totalWeight += $packageWeight;
+
+            $length = optional($item->variant)->length;
+            $width  = optional($item->variant)->width;
+            $height = optional($item->variant)->height;
+
+            $lineTotal = round(((float) $item->price) * $qty, 2);
+            $packages[] = [
+                'order_item_id'        => (int) $item->id,
+                'products_description' => $label.' x '.$qty,
+                'quantity'             => $qty,
+                'weight'               => round($packageWeight, 3),
+                'shipment_length'      => $length !== null ? (float) $length : 10.0,
+                'shipment_width'       => $width !== null ? (float) $width : 10.0,
+                'shipment_height'      => $height !== null ? (float) $height : 10.0,
+                'total_amount'         => $lineTotal,
+                'cod_amount'           => $paymentModePreview === 'COD' ? $lineTotal : 0.0,
+            ];
         }
 
         if ($totalWeight <= 0) $totalWeight = 1.0;
         $productsDescription = implode(', ', $descParts);
+        $firstPackage = $packages[0] ?? null;
 
         // Pickup resolve
         $pickup = null;
@@ -1159,9 +1309,10 @@ class DelhiveryServiceController extends Controller
             'pickup_state'         => $pickup->state,
             'pickup_phone'         => $pickup->phone ?: $pickup->alternate_phone,
 
-            'shipment_length'      => 10,
-            'shipment_width'       => 10,
-            'shipment_height'      => 10,
+            'shipment_length'      => $firstPackage['shipment_length'] ?? 10,
+            'shipment_width'       => $firstPackage['shipment_width'] ?? 10,
+            'shipment_height'      => $firstPackage['shipment_height'] ?? 10,
+            'packages'             => $packages,
 
             'shipping_mode'        => 'Surface',
             'service_level'        => 'normal',
@@ -1181,6 +1332,7 @@ class DelhiveryServiceController extends Controller
             'shipping_mode','service_level','address_type',
             'shipment_length','shipment_width','shipment_height',
             'pickup_name',
+            'packages',
         ];
 
         foreach ($allowed as $k) {
@@ -1201,6 +1353,7 @@ class DelhiveryServiceController extends Controller
             'user'       => $user,
             'pickup'     => $pickup,
             'items'      => $items,
+            'packages'   => $orderData['packages'] ?? $packages,
             'orderData'  => $orderData,
         ];
     }

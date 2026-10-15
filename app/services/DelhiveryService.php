@@ -259,43 +259,82 @@ class DelhiveryService
         $endpoint = $this->getBaseUrl() . '/api/cmu/create.json';
 
         try {
-            // 1) Build shipments array (1 shipment per order)
-            $shipments = [
-                [
-                    'name'           => $orderData['customer_name'],          // Consignee name
-                    'add'            => $orderData['customer_address'],
-                    'pin'            => $orderData['pin'],
-                    'city'           => $orderData['city'],
-                    'state'          => $orderData['state'],
-                    'country'        => 'India',
-                    'phone'          => $orderData['phone'],
-                    'order'          => $orderData['order_no'],              // Your order no
-                    'payment_mode'   => $orderData['payment_mode'],          // 'Prepaid' or 'COD'
-                    'products_desc'  => $orderData['products_description'],  // Short desc
-                    'cod_amount'     => $orderData['cod_amount'] ?? 0,       // If COD, else 0
-                    'total_amount'   => $orderData['total_amount'],          // Invoice total
-                    'order_date'     => $orderData['order_date'],            // YYYY-MM-DD
-                    'seller_add'     => $orderData['seller_address'],
-                    'seller_name'    => $orderData['seller_name'],
-                    'seller_inv'     => $orderData['seller_invoice'],        // Invoice no
-                    'quantity'       => $orderData['quantity'],              // Total items
-                    'weight'         => $orderData['weight'],                // In kg
-                    'shipping_mode'  => $orderData['shipping_mode'] ?? 'Surface',
-                    'service_level'  => $orderData['service_level'] ?? 'normal',
-                    'address_type'   => $orderData['address_type'] ?? 'home',
-                    // optional return address (else defaults to pickup)
-                    'return_pin'     => $orderData['return_pin']     ?? $orderData['pickup_pin'],
-                    'return_city'    => $orderData['return_city']    ?? $orderData['pickup_city'],
-                    'return_phone'   => $orderData['return_phone']   ?? $orderData['pickup_phone'],
-                    'return_add'     => $orderData['return_address'] ?? $orderData['pickup_address'],
-                    'return_state'   => $orderData['return_state']   ?? $orderData['pickup_state'],
-                    'return_country' => $orderData['return_country'] ?? 'India',
-                    'shipment_width'  => !empty($orderData['shipment_width'])  ? $orderData['shipment_width']  : 10,
-                    'shipment_height' => !empty($orderData['shipment_height']) ? $orderData['shipment_height'] : 10,
-                    'shipment_length' => !empty($orderData['shipment_length']) ? $orderData['shipment_length'] : 10,
+            // One Delhivery shipment object per physical package. Without pre-fetched
+            // waybills, each package needs a unique order id for auto-assigned AWBs.
+            $packages = [];
+            if (!empty($orderData['packages']) && is_array($orderData['packages'])) {
+                foreach ($orderData['packages'] as $index => $package) {
+                    if (!is_array($package)) {
+                        continue;
+                    }
+                    $packages[] = $package;
+                }
+            }
 
-                ],
-            ];
+            if ($packages === []) {
+                $packages[] = [
+                    'products_description' => $orderData['products_description'] ?? '',
+                    'quantity'             => $orderData['quantity'] ?? 1,
+                    'weight'               => $orderData['weight'] ?? 1,
+                    'shipment_length'      => $orderData['shipment_length'] ?? 10,
+                    'shipment_width'       => $orderData['shipment_width'] ?? 10,
+                    'shipment_height'      => $orderData['shipment_height'] ?? 10,
+                    'total_amount'         => $orderData['total_amount'] ?? 0,
+                    'cod_amount'           => $orderData['cod_amount'] ?? 0,
+                ];
+            }
+
+            $baseOrderNo = (string) ($orderData['order_no'] ?? '');
+            $multi = count($packages) > 1;
+            $shipments = [];
+
+            foreach ($packages as $index => $package) {
+                $packageNo = $index + 1;
+                $shipments[] = [
+                    'name'            => $orderData['customer_name'],
+                    'add'             => $orderData['customer_address'],
+                    'pin'             => $orderData['pin'],
+                    'city'            => $orderData['city'],
+                    'state'           => $orderData['state'],
+                    'country'         => 'India',
+                    'phone'           => $orderData['phone'],
+                    'order'           => $multi
+                        ? ($baseOrderNo . '-P' . $packageNo)
+                        : $baseOrderNo,
+                    'payment_mode'    => $orderData['payment_mode'],
+                    'products_desc'   => $package['products_description']
+                        ?? $package['products_desc']
+                        ?? ($orderData['products_description'] ?? ''),
+                    'cod_amount'      => $package['cod_amount'] ?? ($orderData['cod_amount'] ?? 0),
+                    'total_amount'    => $package['total_amount'] ?? ($orderData['total_amount'] ?? 0),
+                    'order_date'      => $orderData['order_date'],
+                    'seller_add'      => $orderData['seller_address'],
+                    'seller_name'     => $orderData['seller_name'],
+                    'seller_inv'      => $multi
+                        ? (($orderData['seller_invoice'] ?? ('INV-' . $baseOrderNo)) . '-P' . $packageNo)
+                        : ($orderData['seller_invoice'] ?? null),
+                    'quantity'        => (int) ($package['quantity'] ?? 1),
+                    'weight'          => (float) ($package['weight'] ?? ($orderData['weight'] ?? 1)),
+                    'shipping_mode'   => $orderData['shipping_mode'] ?? 'Surface',
+                    'service_level'   => $orderData['service_level'] ?? 'normal',
+                    'address_type'    => $orderData['address_type'] ?? 'home',
+                    'return_pin'      => $orderData['return_pin']     ?? $orderData['pickup_pin'],
+                    'return_city'     => $orderData['return_city']    ?? $orderData['pickup_city'],
+                    'return_phone'    => $orderData['return_phone']   ?? $orderData['pickup_phone'],
+                    'return_add'      => $orderData['return_address'] ?? $orderData['pickup_address'],
+                    'return_state'    => $orderData['return_state']   ?? $orderData['pickup_state'],
+                    'return_country'  => $orderData['return_country'] ?? 'India',
+                    'shipment_width'  => !empty($package['shipment_width'])
+                        ? $package['shipment_width']
+                        : (!empty($orderData['shipment_width']) ? $orderData['shipment_width'] : 10),
+                    'shipment_height' => !empty($package['shipment_height'])
+                        ? $package['shipment_height']
+                        : (!empty($orderData['shipment_height']) ? $orderData['shipment_height'] : 10),
+                    'shipment_length' => !empty($package['shipment_length'])
+                        ? $package['shipment_length']
+                        : (!empty($orderData['shipment_length']) ? $orderData['shipment_length'] : 10),
+                ];
+            }
 
             // 2) Pickup location (sender)
             $finalPayload = [

@@ -1809,7 +1809,16 @@ class OrderController extends Controller
                         $pq->select('id','name','slug');
                     },
                     'variant' => function ($vq) {
-                        $vq->select('id','product_id','variant_value','regular_price');
+                        $vq->select(
+                            'id',
+                            'product_id',
+                            'variant_value',
+                            'regular_price',
+                            'weight',
+                            'length',
+                            'width',
+                            'height'
+                        );
                     },
                 ]);
             },
@@ -1845,6 +1854,10 @@ class OrderController extends Controller
                     'id'            => $it->variant->id,
                     'variant_value' => $it->variant->variant_value,
                     'regular_price' => $money($it->variant->regular_price),
+                    'weight'        => $it->variant->weight !== null ? (float) $it->variant->weight : null,
+                    'length'        => $it->variant->length !== null ? (float) $it->variant->length : null,
+                    'width'         => $it->variant->width !== null ? (float) $it->variant->width : null,
+                    'height'        => $it->variant->height !== null ? (float) $it->variant->height : null,
                 ] : null,
             ];
         })->values()->all();
