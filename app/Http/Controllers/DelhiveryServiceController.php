@@ -1062,6 +1062,9 @@ class DelhiveryServiceController extends Controller
 
             $shipment->awb_no = implode(', ', $waybills);
             $shipment->status = 'booked';
+            $shipment->booked_at = Carbon::now();
+            $shipment->cancelled_at = null;
+            $shipment->error_message = null;
             $shipment->response_payload = $apiResponse;
             $shipment->save();
 
@@ -1080,6 +1083,243 @@ class DelhiveryServiceController extends Controller
                 'data'    => [],
             ], 500);
         }
+    }
+
+    /**
+     * Cancel Delhivery packages for an order while they are still ready to ship
+     * (manifested / pending) — not after pickup has started.
+     */
+    public function cancelShipment(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'order_id' => 'required|integer|exists:t_orders,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'data'    => $validator->errors(),
+            ], 422);
+        }
+
+        $orderId = (int) $request->input('order_id');
+        $shipment = OrderShipment::where('order_id', $orderId)->first();
+
+        if (!$shipment || empty($shipment->awb_no)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No booked Delhivery shipment found for this order.',
+                'data'    => [],
+            ], 404);
+        }
+
+        if (strtolower((string) $shipment->status) === 'cancelled') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This shipment is already cancelled.',
+                'data'    => [
+                    'status' => $shipment->status,
+                    'awb_no' => $shipment->awb_no,
+                ],
+            ], 422);
+        }
+
+        $waybills = $this->splitWaybills((string) $shipment->awb_no);
+        if ($waybills === []) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No valid AWB numbers found on this shipment.',
+                'data'    => [],
+            ], 422);
+        }
+
+        $delhiveryService = new DelhiveryService();
+
+        try {
+            $track = $delhiveryService->trackShipments($waybills);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to verify package status with Delhivery: ' . $e->getMessage(),
+                'data'    => [],
+            ], 502);
+        }
+
+        $statuses = $this->extractPackageStatuses($track, $waybills);
+        $blocked = [];
+        foreach ($statuses as $waybill => $statusLabel) {
+            if (!$this->isReadyToShipCancellable($statusLabel)) {
+                $blocked[] = [
+                    'waybill' => $waybill,
+                    'status'  => $statusLabel ?: 'unknown',
+                ];
+            }
+        }
+
+        if ($blocked !== []) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Shipment can only be cancelled while packages are ready to ship (not yet picked up).',
+                'data'    => [
+                    'blocked' => $blocked,
+                    'statuses' => $statuses,
+                ],
+            ], 422);
+        }
+
+        $results = [];
+        $failures = [];
+        foreach ($waybills as $waybill) {
+            $result = $delhiveryService->cancelWaybill($waybill);
+            $results[] = [
+                'waybill' => $waybill,
+                'success' => (bool) ($result['success'] ?? false),
+                'error'   => $result['error'] ?? null,
+                'raw'     => $result['raw'] ?? ($result['data'] ?? null),
+            ];
+            if (empty($result['success'])) {
+                $failures[] = $waybill . ': ' . ($result['error'] ?? 'failed');
+            }
+        }
+
+        if ($failures !== []) {
+            $shipment->error_message = 'Cancel partially failed: ' . implode('; ', $failures);
+            $shipment->response_payload = [
+                'cancel_attempt' => $results,
+                'track' => $track,
+            ];
+            $shipment->save();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Delhivery could not cancel all packages. ' . implode(' ', $failures),
+                'data'    => [
+                    'results' => $results,
+                ],
+            ], 400);
+        }
+
+        $shipment->status = 'cancelled';
+        $shipment->cancelled_at = Carbon::now();
+        $shipment->error_message = null;
+        $shipment->response_payload = [
+            'cancel' => $results,
+            'track_before_cancel' => $track,
+        ];
+        $shipment->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => count($waybills) > 1
+                ? 'Shipments cancelled with Delhivery. You can book again if needed.'
+                : 'Shipment cancelled with Delhivery. You can book again if needed.',
+            'data' => [
+                'order_id' => $orderId,
+                'status'   => $shipment->status,
+                'awb_no'   => $shipment->awb_no,
+                'results'  => $results,
+            ],
+        ]);
+    }
+
+    private function splitWaybills(string $awbNo): array
+    {
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($value) => trim((string) $value),
+            preg_split('/[,;\s]+/', $awbNo) ?: []
+        ))));
+    }
+
+    /**
+     * Map waybill => latest Delhivery status label from a track response.
+     */
+    private function extractPackageStatuses(array $track, array $waybills): array
+    {
+        $statuses = [];
+        foreach ($waybills as $waybill) {
+            $statuses[$waybill] = '';
+        }
+
+        foreach ((array) data_get($track, 'ShipmentData', []) as $entry) {
+            $shipment = is_array($entry) ? ($entry['Shipment'] ?? $entry) : null;
+            if (!is_array($shipment)) {
+                continue;
+            }
+            $awb = trim((string) ($shipment['AWB'] ?? $shipment['Awb'] ?? ''));
+            if ($awb === '') {
+                continue;
+            }
+            $status = data_get($shipment, 'Status.Status')
+                ?? data_get($shipment, 'Status.StatusType')
+                ?? data_get($shipment, 'Status.StatusCode')
+                ?? data_get($shipment, 'Status')
+                ?? '';
+            if (is_array($status)) {
+                $status = $status['Status'] ?? $status['StatusType'] ?? reset($status) ?: '';
+            }
+            $statuses[$awb] = trim((string) $status);
+        }
+
+        return $statuses;
+    }
+
+    /**
+     * Only allow cancel before the package is lined up / picked for movement.
+     */
+    private function isReadyToShipCancellable(?string $status): bool
+    {
+        $normalized = strtolower(trim((string) $status));
+        $normalized = preg_replace('/\s+/', ' ', $normalized) ?: '';
+
+        if ($normalized === '') {
+            // Fresh bookings sometimes track empty briefly; treat as cancellable.
+            return true;
+        }
+
+        $blockedFragments = [
+            'in transit',
+            'dispatched',
+            'out for delivery',
+            'ofd',
+            'delivered',
+            'rto',
+            'dto',
+            'picked up',
+            'ready for pickup',
+            'collected',
+            'left origin',
+            'reached',
+            'at destination',
+        ];
+        foreach ($blockedFragments as $fragment) {
+            if (str_contains($normalized, $fragment)) {
+                return false;
+            }
+        }
+        // "picked" alone (but allow "not picked")
+        if (str_contains($normalized, 'picked') && !str_contains($normalized, 'not picked')) {
+            return false;
+        }
+
+        $allowed = [
+            'manifested',
+            'pending',
+            'open',
+            'scheduled',
+            'not picked',
+            'ready to ship',
+            'udp',
+            'uploaded',
+        ];
+        foreach ($allowed as $label) {
+            if ($normalized === $label || str_contains($normalized, $label)) {
+                return true;
+            }
+        }
+
+        // Unknown early statuses: do not cancel blindly.
+        return false;
     }
     /**
      * Prefer the package remark (for example an insufficient wallet balance)

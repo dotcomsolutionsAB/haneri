@@ -169,6 +169,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/warehouses', [DelhiveryServiceController::class, 'listWarehouses']);
             Route::post('/check_shipment', [DelhiveryServiceController::class, 'checkShipment']); // check shipment all datas
             Route::post('/punch_shipment', [DelhiveryServiceController::class, 'punchShipment']); // after check punch
+            Route::post('/cancel_shipment', [DelhiveryServiceController::class, 'cancelShipment']); // cancel ready-to-ship packages
             Route::post('/create_ship_by_order', [DelhiveryServiceController::class, 'createShipByOrder']); // create shipment and save in db
 
             // All checks

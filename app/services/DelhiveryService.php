@@ -401,6 +401,87 @@ class DelhiveryService
 
         return json_decode($response->getBody()->getContents(), true);
     }
+
+    /**
+     * Cancel a manifested / ready-to-ship package by waybill.
+     * POST /api/p/edit with { waybill, cancellation: "true" }
+     */
+    public function cancelWaybill(string $waybill): array
+    {
+        $waybill = trim($waybill);
+        if ($waybill === '') {
+            return [
+                'success' => false,
+                'error'   => 'Waybill is required.',
+            ];
+        }
+
+        $endpoint = $this->getBaseUrl() . '/api/p/edit';
+
+        try {
+            $response = $this->client->post($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                    'Content-Type'  => 'application/json',
+                ],
+                'json' => [
+                    'waybill'      => $waybill,
+                    'cancellation' => 'true',
+                ],
+            ]);
+
+            $body = json_decode($response->getBody()->getContents(), true);
+            if (!is_array($body)) {
+                return [
+                    'success' => false,
+                    'error'   => 'Unexpected Delhivery cancel response.',
+                    'raw'     => $body,
+                ];
+            }
+
+            $status = strtolower((string) ($body['status'] ?? $body['Status'] ?? ''));
+            $ok = ($body['success'] ?? null) === true
+                || in_array($status, ['success', 'true', 'ok', 'cancelled', 'canceled'], true)
+                || (!isset($body['error']) && !isset($body['rmk']) && ($body['order_id'] ?? $body['waybill'] ?? null));
+
+            // Some Delhivery responses only return remark + status without success=true.
+            if (!$ok && isset($body['error'])) {
+                $ok = false;
+            } elseif (!$ok && empty($body['error']) && empty($body['rmk'])) {
+                $ok = true;
+            }
+
+            if (!$ok) {
+                return [
+                    'success' => false,
+                    'error'   => (string) ($body['error'] ?? $body['rmk'] ?? $body['remark'] ?? 'Delhivery refused cancellation.'),
+                    'raw'     => $body,
+                ];
+            }
+
+            return [
+                'success' => true,
+                'data'    => $body,
+            ];
+        } catch (ClientException $e) {
+            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+            Log::error('Delhivery API Client Error (cancelWaybill): ' . json_encode($responseBody));
+
+            return [
+                'success' => false,
+                'error'   => 'API Error: ' . ($responseBody['error'] ?? $responseBody['rmk'] ?? $e->getMessage()),
+                'raw'     => $responseBody,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to cancel Delhivery waybill: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'error'   => 'Cancellation failed: ' . $e->getMessage(),
+            ];
+        }
+    }
     
     public function getTat(
             string $originPin,

@@ -1920,6 +1920,7 @@ class OrderController extends Controller
                 'awb_no'             => $shipment->awb_no,
                 'courier_reference'  => $shipment->courier_reference,
                 'booked_at'          => optional($shipment->booked_at)->toIso8601String(),
+                'cancelled_at'       => optional($shipment->cancelled_at)->toIso8601String(),
                 'weight'             => $shipment->weight,
                 'shipment_length'    => $shipment->shipment_length,
                 'shipment_width'     => $shipment->shipment_width,
