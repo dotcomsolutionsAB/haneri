@@ -662,9 +662,9 @@ class DelhiveryServiceController extends Controller
                 $sellerAddress = $pickupAddress; // ✅ safest fallback
             }
 
-            $sellerInvoice = 'INV-' . $order->id; // or $order->invoice_no etc.
-
-            // 
+            $existingShipment = OrderShipment::where('order_id', $order->id)->first();
+            $clientOrderNo = $this->nextDelhiveryClientOrderNo($order->id, $existingShipment);
+            $sellerInvoice = 'INV-' . $clientOrderNo;
 
             // 8) Build payload for DelhiveryService->placeOrder()
             $orderData = [
@@ -677,7 +677,7 @@ class DelhiveryServiceController extends Controller
                 'phone'                => $finalPhone,
 
                 // Order / payment
-                'order_no'             => (string) $order->id,   // or your custom order number field
+                'order_no'             => $clientOrderNo,
                 'payment_mode'         => $paymentMode,
                 'total_amount'         => (float) $order->total_amount,
                 'cod_amount'           => $codAmount,
@@ -886,7 +886,6 @@ class DelhiveryServiceController extends Controller
 
         $orderId = (int)$request->order_id;
         $payload = $request->input('payload');  // Get the payload from frontend (updated or not)
-        $payload['order_no'] = (string) $orderId;
         try {
             $payload = $this->alignPickupWithDelhivery($payload);
         } catch (\RuntimeException $e) {
@@ -926,6 +925,17 @@ class DelhiveryServiceController extends Controller
         try {
             // 1. Update the database with any changes from the payload (if needed)
             $shipment = OrderShipment::firstOrNew(['order_id' => $orderId]);
+            $previousWaybills = $shipment->exists
+                ? $this->splitWaybills((string) ($shipment->awb_no ?? ''))
+                : [];
+
+            // Delhivery requires a fresh client order id after cancel; reusing 29-P1
+            // returns the cancelled AWB instead of creating a new shipment.
+            $payload['order_no'] = $this->nextDelhiveryClientOrderNo(
+                $orderId,
+                $shipment->exists ? $shipment : null
+            );
+            $payload['seller_invoice'] = 'INV-' . $payload['order_no'];
 
             // Update or create the shipment with all the relevant data
             $shipment->fill([
@@ -1020,6 +1030,28 @@ class DelhiveryServiceController extends Controller
                     'message' => 'Delhivery response did not include waybill.',
                     'data'    => $apiResponse,
                 ], 400);
+            }
+
+            // Guard: Delhivery sometimes echoes cancelled AWBs when the client order id is reused.
+            if (
+                $previousWaybills !== []
+                && count(array_diff($waybills, $previousWaybills)) === 0
+            ) {
+                $shipment->status = 'failed';
+                $shipment->error_message = 'Delhivery returned the previous cancelled AWB(s). Retry booking to get a new waybill.';
+                $shipment->response_payload = $apiResponse;
+                $shipment->save();
+
+                return response()->json([
+                    'success' => false,
+                    'message' => $shipment->error_message,
+                    'data'    => [
+                        'previous_awb' => $previousWaybills,
+                        'returned_awb' => $waybills,
+                        'order_no'     => $payload['order_no'],
+                        'raw'          => $apiResponse,
+                    ],
+                ], 409);
             }
 
             $shipment->awb_no = implode(', ', $waybills);
@@ -1183,6 +1215,38 @@ class DelhiveryServiceController extends Controller
                 'results'  => $results,
             ],
         ]);
+    }
+
+    /**
+     * Delhivery auto-assigns AWBs keyed by client order id. After cancel, the same
+     * id (e.g. 29-P1) returns the cancelled waybill — bump to 29-R2, 29-R3, …
+     */
+    private function nextDelhiveryClientOrderNo(int $orderId, ?OrderShipment $shipment = null): string
+    {
+        if (!$shipment) {
+            return (string) $orderId;
+        }
+
+        $status = strtolower((string) $shipment->status);
+        $needsNewId = $shipment->cancelled_at
+            || !empty($shipment->awb_no)
+            || in_array($status, ['cancelled', 'canceled', 'booked', 'failed'], true);
+
+        if (!$needsNewId) {
+            return (string) $orderId;
+        }
+
+        $prevNo = trim((string) data_get($shipment->request_payload, 'order_no', ''));
+        $attempt = 2;
+        if ($prevNo !== '' && preg_match(
+            '/^' . preg_quote((string) $orderId, '/') . '-R(\d+)$/',
+            $prevNo,
+            $matches
+        )) {
+            $attempt = ((int) $matches[1]) + 1;
+        }
+
+        return $orderId . '-R' . $attempt;
     }
 
     private function splitWaybills(string $awbNo): array
