@@ -13,6 +13,7 @@ class SettingController extends Controller
 {
     public const ANALYTICS_KEY = 'analytics';
     public const ANALYTICS_CACHE_KEY = 'site.analytics';
+    public const SELLER_KEY = 'seller';
 
     /**
      * Fetch all settings (Admin only)
@@ -62,6 +63,76 @@ class SettingController extends Controller
         unset($setting['id'], $setting['created_at'], $setting['updated_at']);
 
         return response()->json(['message' => 'Setting updated successfully!', 'data' => $setting], 200);
+    }
+
+    public function showSeller(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Seller details fetched successfully.',
+            'data' => self::sellerDetails(),
+        ]);
+    }
+
+    public function updateSeller(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'address' => 'required|string|max:500',
+        ]);
+
+        $payload = [
+            'name' => self::nullableTrim($data['name']),
+            'address' => self::nullableTrim($data['address']),
+        ];
+
+        if ($payload['name'] === null || $payload['address'] === null) {
+            throw ValidationException::withMessages([
+                'name' => ['Seller name and address are required.'],
+            ]);
+        }
+
+        SettingModel::updateOrCreate(
+            ['key' => self::SELLER_KEY],
+            ['value' => json_encode($payload)]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Seller details saved.',
+            'data' => $payload,
+        ]);
+    }
+
+    /**
+     * Name and address printed on the Delhivery label (seller_name / seller_add).
+     *
+     * @return array{name: string, address: string}
+     */
+    public static function sellerDetails(): array
+    {
+        $defaults = [
+            'name' => trim((string) config('shipping.seller_name', 'Haneri Electricals LLP')),
+            'address' => trim((string) config('shipping.seller_address', '')),
+        ];
+
+        $row = SettingModel::where('key', self::SELLER_KEY)->first();
+        if (!$row || empty($row->value)) {
+            return $defaults;
+        }
+
+        $decoded = json_decode($row->value, true);
+        if (!is_array($decoded)) {
+            return $defaults;
+        }
+
+        $name = self::nullableTrim($decoded['name'] ?? null);
+        $address = self::nullableTrim($decoded['address'] ?? null);
+
+        return [
+            'name' => $name ?? $defaults['name'],
+            'address' => $address ?? $defaults['address'],
+        ];
     }
 
     public function showAnalytics(): JsonResponse

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\SettingController;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\RequestException;
@@ -288,6 +289,13 @@ class DelhiveryService
             $orderCod = round((float) ($orderData['cod_amount'] ?? 0), 2);
             $money = self::allocatePackageAmounts($packages, $orderTotal, $orderCod);
             $sellerInvoice = (string) ($orderData['seller_invoice'] ?? ('INV-' . $baseOrderNo));
+            $seller = SettingController::sellerDetails();
+            $sellerName = $seller['name'] !== ''
+                ? $seller['name']
+                : (string) ($orderData['seller_name'] ?? '');
+            $sellerAddress = $seller['address'] !== ''
+                ? $seller['address']
+                : (string) ($orderData['seller_address'] ?? '');
 
             // Multi-box Cargo / MPS: one client order + one master AWB, N linked packages.
             // Prefetched waybills are mandatory for MPS.
@@ -308,6 +316,19 @@ class DelhiveryService
             $shipments = [];
             foreach ($packages as $index => $package) {
                 $weightKg = (float) ($package['weight'] ?? ($orderData['weight'] ?? 1));
+                $boxNo = $index + 1;
+                // Per-box invoice value (each fan). Never send 0 — Delhivery labels show ₹0.1.
+                $boxAmount = round((float) ($money[$index]['total_amount'] ?? 0), 2);
+                $boxCod = round((float) ($money[$index]['cod_amount'] ?? 0), 2);
+                if ($multi && $boxAmount < 1 && $orderTotal >= count($packages)) {
+                    $boxAmount = round($orderTotal / count($packages), 2);
+                }
+
+                // MPS: unique order/invoice per box so each label keeps its own price,
+                // while master_id links them as one Cargo / multi-box shipment.
+                $boxOrderNo = $multi ? ($baseOrderNo . '-B' . $boxNo) : $baseOrderNo;
+                $boxInvoice = $multi ? ($sellerInvoice . '-B' . $boxNo) : $sellerInvoice;
+
                 $row = [
                     'name'            => $orderData['customer_name'],
                     'add'             => $orderData['customer_address'],
@@ -316,19 +337,19 @@ class DelhiveryService
                     'state'           => $orderData['state'],
                     'country'         => 'India',
                     'phone'           => $orderData['phone'],
-                    // Same order id for every box in an MPS/Cargo shipment.
-                    'order'           => $baseOrderNo,
+                    'order'           => $boxOrderNo,
                     'payment_mode'    => $orderData['payment_mode'],
                     'products_desc'   => $package['products_description']
                         ?? $package['products_desc']
                         ?? ($orderData['products_description'] ?? ''),
-                    'cod_amount'      => $money[$index]['cod_amount'],
-                    'total_amount'    => $money[$index]['total_amount'],
+                    // Delhivery sample payloads use strings for money fields.
+                    'cod_amount'      => (string) $boxCod,
+                    'total_amount'    => (string) $boxAmount,
                     'order_date'      => $orderData['order_date'],
-                    'seller_add'      => $orderData['seller_address'],
-                    'seller_name'     => $orderData['seller_name'],
-                    'seller_inv'      => $sellerInvoice,
-                    'quantity'        => (int) ($package['quantity'] ?? 1),
+                    'seller_add'      => $sellerAddress,
+                    'seller_name'     => $sellerName,
+                    'seller_inv'      => $boxInvoice,
+                    'quantity'        => max(1, (int) ($package['quantity'] ?? 1)),
                     'weight'          => self::kgToDelhiveryGrams($weightKg),
                     'shipping_mode'   => $orderData['shipping_mode'] ?? 'Surface',
                     'service_level'   => $orderData['service_level'] ?? 'normal',
@@ -1021,21 +1042,36 @@ class DelhiveryService
                     $explicit,
                     static fn ($amount) => abs($amount - $orderTotal) < 0.02
                 )) === $n;
-            $useExplicit = !$allFullOrder && $sum > 0;
+            // Reject near-zero child amounts (Delhivery prints ₹0.1 on labels).
+            $hasTiny = count(array_filter(
+                $explicit,
+                static fn ($amount) => $amount < 1.0
+            )) > 0;
+            $useExplicit = !$allFullOrder && !$hasTiny && $sum > 0;
         }
 
         if ($useExplicit) {
             $totals = $explicit;
         } else {
-            $base = floor(($orderTotal / $n) * 100) / 100;
+            // Equal split of the order invoice across boxes (each fan gets its share).
+            $splitFrom = $orderTotal > 0
+                ? $orderTotal
+                : max(0, round(array_sum($explicit), 2));
+            if ($splitFrom <= 0) {
+                $splitFrom = (float) max(1, $n);
+            }
+            $base = floor(($splitFrom / $n) * 100) / 100;
+            if ($base < 1 && $splitFrom >= $n) {
+                $base = floor(($splitFrom / $n) * 100) / 100;
+            }
             $allocated = 0.0;
             $totals = [];
             for ($i = 0; $i < $n; $i++) {
                 if ($i === $n - 1) {
-                    $totals[$i] = round($orderTotal - $allocated, 2);
+                    $totals[$i] = round(max(0.01, $splitFrom - $allocated), 2);
                 } else {
-                    $totals[$i] = $base;
-                    $allocated = round($allocated + $base, 2);
+                    $totals[$i] = $base > 0 ? $base : round($splitFrom / $n, 2);
+                    $allocated = round($allocated + $totals[$i], 2);
                 }
             }
         }

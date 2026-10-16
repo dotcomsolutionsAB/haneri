@@ -225,6 +225,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::get('/', [SettingController::class, 'index']);
             Route::get('/analytics', [SettingController::class, 'showAnalytics']);
             Route::put('/analytics', [SettingController::class, 'updateAnalytics']);
+            Route::get('/seller', [SettingController::class, 'showSeller']);
+            Route::put('/seller', [SettingController::class, 'updateSeller']);
             Route::put('/{key}', [SettingController::class, 'update']);
         });
     });

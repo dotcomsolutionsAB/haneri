@@ -655,12 +655,9 @@ class DelhiveryServiceController extends Controller
             $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
             $codAmount   = $paymentMode === 'COD' ? (float) $order->total_amount : 0.0;
 
-            // Seller can still come from config
-            $sellerName    = config('shipping.seller_name', 'Your Store Name');
-            $sellerAddress = config('shipping.seller_address');
-            if (!$sellerAddress) {
-                $sellerAddress = $pickupAddress; // ✅ safest fallback
-            }
+            $seller = SettingController::sellerDetails();
+            $sellerName = $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP';
+            $sellerAddress = $seller['address'] !== '' ? $seller['address'] : $pickupAddress;
 
             $existingShipment = OrderShipment::where('order_id', $order->id)->first();
             $clientOrderNo = $this->nextDelhiveryClientOrderNo($order->id, $existingShipment);
@@ -936,6 +933,13 @@ class DelhiveryServiceController extends Controller
                 $shipment->exists ? $shipment : null
             );
             $payload['seller_invoice'] = 'INV-' . $payload['order_no'];
+            $seller = SettingController::sellerDetails();
+            if ($seller['name'] !== '') {
+                $payload['seller_name'] = $seller['name'];
+            }
+            if ($seller['address'] !== '') {
+                $payload['seller_address'] = $seller['address'];
+            }
 
             // Update or create the shipment with all the relevant data
             $shipment->fill([
@@ -1255,20 +1259,39 @@ class DelhiveryServiceController extends Controller
             return $packages;
         }
 
-        $items = OrderItemModel::where('order_id', $orderId)->get()->keyBy('id');
+        $items = OrderItemModel::where('order_id', $orderId)->orderBy('id')->get();
+        $byId = $items->keyBy('id');
         $isCod = strcasecmp($paymentMode, 'COD') === 0;
 
         foreach ($packages as $i => $package) {
             if (!is_array($package)) {
                 continue;
             }
+            $item = null;
             $itemId = isset($package['order_item_id']) ? (int) $package['order_item_id'] : 0;
-            if ($itemId > 0 && $items->has($itemId)) {
-                $item = $items->get($itemId);
-                $lineTotal = round(((float) $item->price) * max(1, (int) $item->quantity), 2);
-                $packages[$i]['total_amount'] = $lineTotal;
-                $packages[$i]['cod_amount'] = $isCod ? $lineTotal : 0.0;
+            if ($itemId > 0 && $byId->has($itemId)) {
+                $item = $byId->get($itemId);
+            } elseif ($items->has($i)) {
+                // Fall back to package index → order item order.
+                $item = $items[$i];
+                $packages[$i]['order_item_id'] = (int) $item->id;
             }
+
+            if (!$item) {
+                continue;
+            }
+
+            $qty = max(1, (int) $item->quantity);
+            $lineTotal = round(((float) $item->price) * $qty, 2);
+            if ($lineTotal < 1 && isset($item->subtotal)) {
+                $lineTotal = round((float) $item->subtotal, 2);
+            }
+            if ($lineTotal < 1) {
+                continue;
+            }
+
+            $packages[$i]['total_amount'] = $lineTotal;
+            $packages[$i]['cod_amount'] = $isCod ? $lineTotal : 0.0;
         }
 
         return $packages;
@@ -1585,9 +1608,9 @@ class DelhiveryServiceController extends Controller
         $paymentMode = $order->payment_status === 'paid' ? 'Prepaid' : 'COD';
         $codAmount   = $paymentMode === 'COD' ? (float)$order->total_amount : 0.0;
 
-        // Seller (prefer config; fallback pickup)
-        $sellerName = config('shipping.seller_name', 'Your Store Name');
-        $sellerAddress = config('shipping.seller_address') ?: $pickupAddress;
+        $seller = SettingController::sellerDetails();
+        $sellerName = $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP';
+        $sellerAddress = $seller['address'] !== '' ? $seller['address'] : $pickupAddress;
         $sellerInvoice = 'INV-' . $order->id;
 
         // Defaults
