@@ -1002,6 +1002,13 @@ class DelhiveryServiceController extends Controller
 
             $shipment->save();  // Save to DB
 
+            // Attach per-line invoice amounts so each box does not get the full order total.
+            $payload['packages'] = $this->enrichPackagesWithLineAmounts(
+                $orderId,
+                is_array($payload['packages'] ?? null) ? $payload['packages'] : [],
+                (string) ($payload['payment_mode'] ?? 'Prepaid')
+            );
+
             // 2. Now send the updated payload to Delhivery API to create the shipment
             $delhiveryService = new DelhiveryService();
             $apiResponse = $delhiveryService->placeOrder($payload); // Send the payload to Delhivery
@@ -1023,6 +1030,18 @@ class DelhiveryServiceController extends Controller
 
             // 3. Update the shipment data with Delhivery's response (e.g., tracking number, waybill)
             $waybills = $this->extractDelhiveryWaybills(is_array($apiResponse) ? $apiResponse : []);
+            $masterWaybill = is_array($apiResponse)
+                ? trim((string) ($apiResponse['master_waybill'] ?? ''))
+                : '';
+            if ($masterWaybill !== '' && !in_array($masterWaybill, $waybills, true)) {
+                array_unshift($waybills, $masterWaybill);
+            } elseif ($masterWaybill !== '') {
+                // Keep master first for display / Cargo tracking.
+                $waybills = array_values(array_unique(array_merge(
+                    [$masterWaybill],
+                    array_filter($waybills, static fn ($w) => $w !== $masterWaybill)
+                )));
+            }
 
             if ($waybills === []) {
                 return response()->json([
@@ -1054,7 +1073,11 @@ class DelhiveryServiceController extends Controller
                 ], 409);
             }
 
+            $isMps = $masterWaybill !== ''
+                || (is_array($apiResponse) && ($apiResponse['shipment_type'] ?? '') === 'MPS')
+                || count($waybills) > 1;
             $shipment->awb_no = implode(', ', $waybills);
+            $shipment->courier_reference = $masterWaybill !== '' ? $masterWaybill : ($waybills[0] ?? null);
             $shipment->status = 'booked';
             $shipment->booked_at = Carbon::now();
             $shipment->cancelled_at = null;
@@ -1062,12 +1085,15 @@ class DelhiveryServiceController extends Controller
             $shipment->response_payload = $apiResponse;
             $shipment->save();
 
+            $message = $isMps
+                ? ('Delhivery Cargo booked. Master AWB '
+                    . ($masterWaybill !== '' ? $masterWaybill : $waybills[0])
+                    . ' · ' . count($waybills) . ' packages.')
+                : 'Shipment successfully booked with Delhivery.';
 
             return response()->json([
                 'success' => true,
-                'message' => count($waybills) > 1
-                    ? 'Shipments successfully booked with Delhivery.'
-                    : 'Shipment successfully booked with Delhivery.',
+                'message' => $message,
                 'data'    => $apiResponse,
             ]);
         } catch (\Exception $e) {
@@ -1215,6 +1241,37 @@ class DelhiveryServiceController extends Controller
                 'results'  => $results,
             ],
         ]);
+    }
+
+    /**
+     * Fill package total_amount / cod_amount from order line items when possible.
+     */
+    private function enrichPackagesWithLineAmounts(
+        int $orderId,
+        array $packages,
+        string $paymentMode
+    ): array {
+        if ($packages === []) {
+            return $packages;
+        }
+
+        $items = OrderItemModel::where('order_id', $orderId)->get()->keyBy('id');
+        $isCod = strcasecmp($paymentMode, 'COD') === 0;
+
+        foreach ($packages as $i => $package) {
+            if (!is_array($package)) {
+                continue;
+            }
+            $itemId = isset($package['order_item_id']) ? (int) $package['order_item_id'] : 0;
+            if ($itemId > 0 && $items->has($itemId)) {
+                $item = $items->get($itemId);
+                $lineTotal = round(((float) $item->price) * max(1, (int) $item->quantity), 2);
+                $packages[$i]['total_amount'] = $lineTotal;
+                $packages[$i]['cod_amount'] = $isCod ? $lineTotal : 0.0;
+            }
+        }
+
+        return $packages;
     }
 
     /**

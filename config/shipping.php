@@ -14,5 +14,7 @@ return [
         'state'   => '',
         'phone'   => '',
     ],
+    // Registered Delhivery client name (Bulk Waybill `cl=`). Required for multi-box MPS/Cargo.
+    'delhivery_client' => env('DELHIVERY_CLIENT_NAME', ''),
 
 ];

@@ -259,11 +259,9 @@ class DelhiveryService
         $endpoint = $this->getBaseUrl() . '/api/cmu/create.json';
 
         try {
-            // One Delhivery shipment object per physical package. Without pre-fetched
-            // waybills, each package needs a unique order id for auto-assigned AWBs.
             $packages = [];
             if (!empty($orderData['packages']) && is_array($orderData['packages'])) {
-                foreach ($orderData['packages'] as $index => $package) {
+                foreach ($orderData['packages'] as $package) {
                     if (!is_array($package)) {
                         continue;
                     }
@@ -286,11 +284,31 @@ class DelhiveryService
 
             $baseOrderNo = (string) ($orderData['order_no'] ?? '');
             $multi = count($packages) > 1;
-            $shipments = [];
+            $orderTotal = round((float) ($orderData['total_amount'] ?? 0), 2);
+            $orderCod = round((float) ($orderData['cod_amount'] ?? 0), 2);
+            $money = self::allocatePackageAmounts($packages, $orderTotal, $orderCod);
+            $sellerInvoice = (string) ($orderData['seller_invoice'] ?? ('INV-' . $baseOrderNo));
 
+            // Multi-box Cargo / MPS: one client order + one master AWB, N linked packages.
+            // Prefetched waybills are mandatory for MPS.
+            $masterWaybill = null;
+            $waybills = [];
+            if ($multi) {
+                $fetched = $this->fetchWaybills(count($packages));
+                if (empty($fetched['success'])) {
+                    return [
+                        'error' => $fetched['error'] ?? 'Unable to prefetch Delhivery waybills for multi-box Cargo.',
+                        'raw'   => $fetched['raw'] ?? null,
+                    ];
+                }
+                $waybills = $fetched['waybills'];
+                $masterWaybill = $waybills[0];
+            }
+
+            $shipments = [];
             foreach ($packages as $index => $package) {
-                $packageNo = $index + 1;
-                $shipments[] = [
+                $weightKg = (float) ($package['weight'] ?? ($orderData['weight'] ?? 1));
+                $row = [
                     'name'            => $orderData['customer_name'],
                     'add'             => $orderData['customer_address'],
                     'pin'             => $orderData['pin'],
@@ -298,23 +316,20 @@ class DelhiveryService
                     'state'           => $orderData['state'],
                     'country'         => 'India',
                     'phone'           => $orderData['phone'],
-                    'order'           => $multi
-                        ? ($baseOrderNo . '-P' . $packageNo)
-                        : $baseOrderNo,
+                    // Same order id for every box in an MPS/Cargo shipment.
+                    'order'           => $baseOrderNo,
                     'payment_mode'    => $orderData['payment_mode'],
                     'products_desc'   => $package['products_description']
                         ?? $package['products_desc']
                         ?? ($orderData['products_description'] ?? ''),
-                    'cod_amount'      => $package['cod_amount'] ?? ($orderData['cod_amount'] ?? 0),
-                    'total_amount'    => $package['total_amount'] ?? ($orderData['total_amount'] ?? 0),
+                    'cod_amount'      => $money[$index]['cod_amount'],
+                    'total_amount'    => $money[$index]['total_amount'],
                     'order_date'      => $orderData['order_date'],
                     'seller_add'      => $orderData['seller_address'],
                     'seller_name'     => $orderData['seller_name'],
-                    'seller_inv'      => $multi
-                        ? (($orderData['seller_invoice'] ?? ('INV-' . $baseOrderNo)) . '-P' . $packageNo)
-                        : ($orderData['seller_invoice'] ?? null),
+                    'seller_inv'      => $sellerInvoice,
                     'quantity'        => (int) ($package['quantity'] ?? 1),
-                    'weight'          => (float) ($package['weight'] ?? ($orderData['weight'] ?? 1)),
+                    'weight'          => self::kgToDelhiveryGrams($weightKg),
                     'shipping_mode'   => $orderData['shipping_mode'] ?? 'Surface',
                     'service_level'   => $orderData['service_level'] ?? 'normal',
                     'address_type'    => $orderData['address_type'] ?? 'home',
@@ -334,25 +349,32 @@ class DelhiveryService
                         ? $package['shipment_length']
                         : (!empty($orderData['shipment_length']) ? $orderData['shipment_length'] : 10),
                 ];
+
+                if ($multi && $masterWaybill !== null) {
+                    $row['shipment_type'] = 'MPS';
+                    $row['master_id'] = $masterWaybill;
+                    $row['mps_children'] = (string) count($packages);
+                    $row['mps_amount'] = (string) (int) round($orderCod);
+                    $row['waybill'] = $waybills[$index];
+                }
+
+                $shipments[] = $row;
             }
 
-            // 2) Pickup location (sender)
             $finalPayload = [
                 'pickup_location' => [
                     // THIS "name" must match Delhivery-registered warehouse name (case sensitive)
                     'name'    => $orderData['pickup_name'],
                     'add'     => $orderData['pickup_address'],
-                    'pin'     => (string)$orderData['pickup_pin'],
+                    'pin'     => (string) $orderData['pickup_pin'],
                     'city'    => $orderData['pickup_city'],
                     'state'   => $orderData['pickup_state'],
                     'country' => 'India',
-                    'phone'   => (string)$orderData['pickup_phone'],
+                    'phone'   => (string) $orderData['pickup_phone'],
                 ],
                 'shipments' => $shipments,
             ];
 
-
-            // 3) Call Delhivery CMU API
             $response = $this->client->post($endpoint, [
                 'headers' => [
                     'Authorization' => 'Token ' . $this->apiKey,
@@ -364,7 +386,21 @@ class DelhiveryService
                 ],
             ]);
 
-            return json_decode($response->getBody()->getContents(), true);
+            $body = json_decode($response->getBody()->getContents(), true);
+            if (!is_array($body)) {
+                return [
+                    'error' => 'Unexpected Delhivery create response.',
+                    'raw'   => $body,
+                ];
+            }
+
+            if ($multi && $masterWaybill !== null) {
+                $body['master_waybill'] = $masterWaybill;
+                $body['shipment_type'] = 'MPS';
+                $body['package_count'] = count($packages);
+            }
+
+            return $body;
 
         } catch (ClientException $e) {
             $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
@@ -381,6 +417,122 @@ class DelhiveryService
                 'error' => 'Order creation failed: ' . $e->getMessage(),
             ];
         }
+    }
+
+    /**
+     * Prefetch N waybills for MPS / multi-box Cargo manifestation.
+     * GET /waybill/api/bulk/json/?cl={client}&token={key}&count={n}
+     *
+     * @return array{success: bool, waybills?: array<int, string>, error?: string, raw?: mixed}
+     */
+    public function fetchWaybills(int $count): array
+    {
+        $count = max(1, min(100, $count));
+        $clientName = trim((string) config('shipping.delhivery_client', env('DELHIVERY_CLIENT_NAME', '')));
+        if ($clientName === '') {
+            return [
+                'success' => false,
+                'error'   => 'Set DELHIVERY_CLIENT_NAME to your registered Delhivery client name (required to prefetch Cargo/MPS waybills).',
+            ];
+        }
+
+        $endpoint = $this->getBaseUrl() . '/waybill/api/bulk/json/';
+
+        try {
+            $response = $this->client->get($endpoint, [
+                'headers' => [
+                    'Authorization' => 'Token ' . $this->apiKey,
+                    'Accept'        => 'application/json',
+                ],
+                'query' => [
+                    'cl'    => $clientName,
+                    'token' => $this->apiKey,
+                    'count' => $count,
+                ],
+            ]);
+
+            $body = json_decode($response->getBody()->getContents(), true);
+            $waybills = self::normalizeFetchedWaybills($body);
+            if (count($waybills) < $count) {
+                return [
+                    'success' => false,
+                    'error'   => 'Delhivery returned fewer waybills than requested for multi-box Cargo.',
+                    'raw'     => $body,
+                ];
+            }
+
+            return [
+                'success'  => true,
+                'waybills' => array_slice($waybills, 0, $count),
+                'raw'      => $body,
+            ];
+        } catch (ClientException $e) {
+            $responseBody = json_decode($e->getResponse()->getBody()->getContents(), true);
+            Log::error('Delhivery API Client Error (fetchWaybills): ' . json_encode($responseBody));
+
+            return [
+                'success' => false,
+                'error'   => 'Waybill prefetch failed: ' . ($responseBody['rmk'] ?? $responseBody['error'] ?? $e->getMessage()),
+                'raw'     => $responseBody,
+            ];
+        } catch (\Exception $e) {
+            Log::error('Failed to fetch Delhivery waybills: ' . $e->getMessage());
+
+            return [
+                'success' => false,
+                'error'   => 'Waybill prefetch failed: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function normalizeFetchedWaybills(mixed $raw): array
+    {
+        if (is_string($raw)) {
+            $parts = preg_split('/[\s,;]+/', $raw) ?: [];
+            return array_values(array_filter(array_map('trim', $parts)));
+        }
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $candidates = [];
+        foreach (['waybills', 'Waybills', 'wbns', 'packages', 'data', 'result'] as $key) {
+            if (isset($raw[$key]) && is_array($raw[$key])) {
+                $candidates = $raw[$key];
+                break;
+            }
+            if (isset($raw[$key]) && is_string($raw[$key])) {
+                return self::normalizeFetchedWaybills($raw[$key]);
+            }
+        }
+        if ($candidates === [] && array_is_list($raw)) {
+            $candidates = $raw;
+        }
+
+        $out = [];
+        foreach ($candidates as $row) {
+            if (is_string($row) || is_numeric($row)) {
+                $value = trim((string) $row);
+                if ($value !== '') {
+                    $out[] = $value;
+                }
+                continue;
+            }
+            if (!is_array($row)) {
+                continue;
+            }
+            foreach (['waybill', 'wbn', 'AWB', 'awb'] as $key) {
+                if (!empty($row[$key])) {
+                    $out[] = trim((string) $row[$key]);
+                    break;
+                }
+            }
+        }
+
+        return array_values(array_unique($out));
     }
 
     public function trackShipments(array $waybillNumbers)
@@ -810,6 +962,112 @@ class DelhiveryService
         }
 
         return ['match' => null, 'names' => $names];
+    }
+
+    /**
+     * Haneri stores parcel weight in kilograms. Delhivery CMU treats `weight` as grams
+     * (One UI labels it "gm"). Values already > 50 are left as grams.
+     */
+    public static function kgToDelhiveryGrams(float $kg): int
+    {
+        if ($kg <= 0) {
+            return 1000;
+        }
+        if ($kg > 50) {
+            return (int) round($kg);
+        }
+
+        return (int) round($kg * 1000);
+    }
+
+    /**
+     * Split invoice / COD across packages. Prefers per-package totals when they look
+     * like real line amounts; otherwise divides the order total (avoids each box
+     * getting the full invoice value).
+     *
+     * @param  array<int, array>  $packages
+     * @return array<int, array{total_amount: float, cod_amount: float}>
+     */
+    public static function allocatePackageAmounts(
+        array $packages,
+        float $orderTotal,
+        float $orderCod
+    ): array {
+        $n = count($packages);
+        if ($n === 0) {
+            return [];
+        }
+
+        $orderTotal = max(0, round($orderTotal, 2));
+        $orderCod = max(0, round($orderCod, 2));
+
+        $explicit = [];
+        foreach ($packages as $i => $package) {
+            if (!is_array($package) || !array_key_exists('total_amount', $package)) {
+                continue;
+            }
+            if ($package['total_amount'] === null || $package['total_amount'] === '') {
+                continue;
+            }
+            $explicit[$i] = round((float) $package['total_amount'], 2);
+        }
+
+        $useExplicit = false;
+        if (count($explicit) === $n) {
+            $sum = round(array_sum($explicit), 2);
+            $allFullOrder = $n > 1
+                && $orderTotal > 0
+                && count(array_filter(
+                    $explicit,
+                    static fn ($amount) => abs($amount - $orderTotal) < 0.02
+                )) === $n;
+            $useExplicit = !$allFullOrder && $sum > 0;
+        }
+
+        if ($useExplicit) {
+            $totals = $explicit;
+        } else {
+            $base = floor(($orderTotal / $n) * 100) / 100;
+            $allocated = 0.0;
+            $totals = [];
+            for ($i = 0; $i < $n; $i++) {
+                if ($i === $n - 1) {
+                    $totals[$i] = round($orderTotal - $allocated, 2);
+                } else {
+                    $totals[$i] = $base;
+                    $allocated = round($allocated + $base, 2);
+                }
+            }
+        }
+
+        $sumTotals = array_sum($totals) ?: 1.0;
+        $out = [];
+        $codAllocated = 0.0;
+        for ($i = 0; $i < $n; $i++) {
+            $total = round((float) ($totals[$i] ?? 0), 2);
+
+            if ($useExplicit
+                && isset($packages[$i]['cod_amount'])
+                && $packages[$i]['cod_amount'] !== null
+                && $packages[$i]['cod_amount'] !== ''
+            ) {
+                $cod = round((float) $packages[$i]['cod_amount'], 2);
+            } elseif ($i === $n - 1) {
+                $cod = round($orderCod - $codAllocated, 2);
+            } else {
+                $cod = $orderCod > 0
+                    ? round($orderCod * ($total / $sumTotals), 2)
+                    : 0.0;
+                $codAllocated = round($codAllocated + $cod, 2);
+            }
+
+            $out[$i] = [
+                'total_amount' => $total,
+                'cod_amount'   => max(0, $cod),
+            ];
+        }
+
+        return $out;
     }
 
 }
