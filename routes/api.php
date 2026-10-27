@@ -188,6 +188,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         // Ship Rocket
         Route::prefix('shiprocket')->group(function () {
             Route::post('/create-shipment', [ShiprocketController::class, 'createShipment']);
+            Route::post('/book', [ShiprocketController::class, 'book']);
             Route::post('/punch-order/{order_id}', [ShiprocketController::class, 'punchOrderById']); // Puunch by order
             Route::post('/punch-by-payload', [ShiprocketController::class, 'punchByPayload']); // Punch by payload
             Route::post('/cancel', [ShiprocketController::class, 'cancelOrder']);  // Cancel order
@@ -232,6 +233,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::put('/seller', [SettingController::class, 'updateSeller']);
             Route::get('/abandoned-cart', [SettingController::class, 'showAbandonedCart']);
             Route::put('/abandoned-cart', [SettingController::class, 'updateAbandonedCart']);
+            Route::get('/shiprocket', [SettingController::class, 'showShiprocket']);
+            Route::put('/shiprocket', [SettingController::class, 'updateShiprocket']);
             Route::put('/{key}', [SettingController::class, 'update']);
         });
     });

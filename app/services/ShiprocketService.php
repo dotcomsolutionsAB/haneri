@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Http\Controllers\SettingController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -19,24 +20,92 @@ class ShiprocketService
         $this->password = (string) config('services.shiprocket.password');
     }
 
+    /**
+     * Admin settings win. Env values are used only when a field was never saved.
+     *
+     * @return array{email:string,password:string,pickup_location:string,cargo_access_token:string,cargo_refresh_token:string,cargo_client_id:string,cargo_base_url:string}
+     */
+    public function credentials(): array
+    {
+        $saved = SettingController::shiprocketCredentials();
+
+        return [
+            'email' => $saved['email'] !== '' ? $saved['email'] : $this->email,
+            'password' => $saved['password'] !== '' ? $saved['password'] : $this->password,
+            'pickup_location' => $saved['pickup_location'] !== ''
+                ? $saved['pickup_location']
+                : (string) config('services.shiprocket.pickup_location'),
+            'cargo_access_token' => $saved['cargo_access_token'],
+            'cargo_refresh_token' => $saved['cargo_refresh_token'],
+            'cargo_client_id' => $saved['cargo_client_id'],
+            'cargo_base_url' => rtrim((string) config('services.shiprocket.cargo_base_url', 'https://api.rocketbox.in/api'), '/'),
+        ];
+    }
+
+    public function pickupLocation(): string
+    {
+        return $this->credentials()['pickup_location'];
+    }
+
+    public static function forgetCachedToken(string $email, string $password): void
+    {
+        Cache::forget('shiprocket_token');
+        Cache::forget(self::tokenCacheKey($email, $password));
+    }
+
+    public static function forgetCachedCargoToken(string $accessToken, string $refreshToken): void
+    {
+        Cache::forget(self::cargoTokenCacheKey($accessToken, $refreshToken));
+    }
+
     public function token(): string
     {
-        // cache token for 9 days (Shiprocket tokens are long-lived; safe to refresh early)
-        return Cache::remember('shiprocket_token', now()->addDays(9), function () {
+        $creds = $this->credentials();
+        if ($creds['email'] === '' || $creds['password'] === '') {
+            throw new \RuntimeException('Shiprocket API email and password are not set. Add them in Admin settings.');
+        }
+
+        return Cache::remember(self::tokenCacheKey($creds['email'], $creds['password']), now()->addDays(9), function () use ($creds) {
             $res = Http::asJson()->post($this->baseUrl . '/v1/external/auth/login', [
-                'email' => $this->email,
-                'password' => $this->password,
+                'email' => $creds['email'],
+                'password' => $creds['password'],
             ]);
 
-            $res->throw();
-            $token = $res->json('token');
+            if (!$res->successful()) {
+                throw new \RuntimeException(self::errorText($res->json(), $res->body()));
+            }
 
+            $token = $res->json('token');
             if (!$token) {
                 throw new \RuntimeException('Shiprocket token missing in response');
             }
 
             return $token;
         });
+    }
+
+    private static function tokenCacheKey(string $email, string $password): string
+    {
+        return 'shiprocket_token_' . sha1($email . '|' . $password);
+    }
+
+    public static function cargoTokenCacheKey(string $accessToken, string $refreshToken): string
+    {
+        return 'shiprocket_cargo_token_' . sha1($accessToken . '|' . $refreshToken);
+    }
+
+    public static function errorText(mixed $json, string $body): string
+    {
+        $message = is_array($json) ? ($json['message'] ?? $json['error'] ?? $json['detail'] ?? null) : null;
+        if (is_string($message) && trim($message) !== '') {
+            return trim($message);
+        }
+        if (is_array($message)) {
+            return json_encode($message);
+        }
+        $trimmed = trim($body);
+
+        return $trimmed !== '' ? $trimmed : 'Shiprocket request failed.';
     }
 
     private function client()

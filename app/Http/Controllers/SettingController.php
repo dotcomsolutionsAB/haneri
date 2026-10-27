@@ -15,6 +15,7 @@ class SettingController extends Controller
     public const ANALYTICS_CACHE_KEY = 'site.analytics';
     public const SELLER_KEY = 'seller';
     public const ABANDONED_CART_KEY = 'abandoned_cart';
+    public const SHIPROCKET_KEY = 'shiprocket';
 
     /**
      * Fetch all settings (Admin only)
@@ -300,6 +301,101 @@ class SettingController extends Controller
             'meta_pixel_enabled' => (bool) ($decoded['meta_pixel_enabled'] ?? false),
             'meta_pixel_id' => self::nullableTrim($decoded['meta_pixel_id'] ?? null),
         ];
+    }
+
+    public function showShiprocket(): JsonResponse
+    {
+        $saved = self::shiprocketCredentials();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shiprocket settings fetched successfully.',
+            'data' => [
+                'email' => $saved['email'],
+                'password_set' => $saved['password'] !== '',
+                'pickup_location' => $saved['pickup_location'],
+                'cargo_client_id' => $saved['cargo_client_id'],
+                'cargo_access_token_set' => $saved['cargo_access_token'] !== '',
+                'cargo_refresh_token_set' => $saved['cargo_refresh_token'] !== '',
+                'configured' => $saved['email'] !== '' && $saved['password'] !== '' && $saved['pickup_location'] !== '',
+                'cargo_configured' => $saved['cargo_access_token'] !== ''
+                    && $saved['cargo_refresh_token'] !== ''
+                    && $saved['cargo_client_id'] !== '',
+            ],
+        ]);
+    }
+
+    public function updateShiprocket(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => 'required|email|max:255',
+            'password' => 'nullable|string|max:255',
+            'pickup_location' => 'required|string|max:100',
+            'cargo_client_id' => 'nullable|string|max:100',
+            'cargo_access_token' => 'nullable|string|max:500',
+            'cargo_refresh_token' => 'nullable|string|max:500',
+        ]);
+
+        $current = self::shiprocketCredentials();
+        $password = self::nullableTrim($data['password'] ?? null) ?? $current['password'];
+        $cargoAccess = self::nullableTrim($data['cargo_access_token'] ?? null) ?? $current['cargo_access_token'];
+        $cargoRefresh = self::nullableTrim($data['cargo_refresh_token'] ?? null) ?? $current['cargo_refresh_token'];
+
+        if ($password === '') {
+            throw ValidationException::withMessages([
+                'password' => ['Shiprocket API password is required the first time you save.'],
+            ]);
+        }
+
+        \App\services\ShiprocketService::forgetCachedToken($current['email'], $current['password']);
+        \App\services\ShiprocketService::forgetCachedCargoToken($current['cargo_access_token'], $current['cargo_refresh_token']);
+
+        $payload = [
+            'email' => trim($data['email']),
+            'password' => $password,
+            'pickup_location' => trim($data['pickup_location']),
+            'cargo_client_id' => self::nullableTrim($data['cargo_client_id'] ?? null) ?? '',
+            'cargo_access_token' => $cargoAccess,
+            'cargo_refresh_token' => $cargoRefresh,
+        ];
+
+        SettingModel::updateOrCreate(
+            ['key' => self::SHIPROCKET_KEY],
+            ['value' => json_encode($payload)]
+        );
+
+        return $this->showShiprocket();
+    }
+
+    /**
+     * @return array{email:string,password:string,pickup_location:string,cargo_access_token:string,cargo_refresh_token:string,cargo_client_id:string}
+     */
+    public static function shiprocketCredentials(): array
+    {
+        $empty = [
+            'email' => '',
+            'password' => '',
+            'pickup_location' => '',
+            'cargo_access_token' => '',
+            'cargo_refresh_token' => '',
+            'cargo_client_id' => '',
+        ];
+
+        $row = SettingModel::where('key', self::SHIPROCKET_KEY)->first();
+        if (!$row || empty($row->value)) {
+            return $empty;
+        }
+
+        $decoded = json_decode($row->value, true);
+        if (!is_array($decoded)) {
+            return $empty;
+        }
+
+        foreach ($empty as $key => $value) {
+            $empty[$key] = trim((string) ($decoded[$key] ?? ''));
+        }
+
+        return $empty;
     }
 
     private static function nullableTrim(mixed $value): ?string

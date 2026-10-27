@@ -61,6 +61,7 @@ return [
         'email' => env('SHIPROCKET_EMAIL'),
         'password' => env('SHIPROCKET_PASSWORD'),
         'pickup_location' => env('SHIPROCKET_PICKUP_LOCATION'),
+        'cargo_base_url' => env('SHIPROCKET_CARGO_BASE_URL', 'https://api.rocketbox.in/api'),
     ],
 
     'smsalert' => [

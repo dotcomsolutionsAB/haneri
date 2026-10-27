@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\services\ShiprocketService;
+use App\services\ShiprocketBookingService;
 use App\Models\OrderModel;
 use App\Models\OrderShipment;
 use Illuminate\Support\Facades\DB;
@@ -136,6 +137,33 @@ class ShiprocketController extends Controller
     }
 
     // create ship order by order id
+    public function book(Request $request, ShiprocketBookingService $booking)
+    {
+        $data = $request->validate([
+            'order_id' => 'required|integer|exists:t_orders,id',
+            'pickup_location' => 'nullable|string|max:100',
+            'shipping_mode' => 'nullable|in:surface,air',
+            'packages' => 'required|array|min:1',
+            'packages.*.weight' => 'required|numeric|min:0.1',
+            'packages.*.shipment_length' => 'required|numeric|min:1',
+            'packages.*.shipment_width' => 'required|numeric|min:1',
+            'packages.*.shipment_height' => 'required|numeric|min:1',
+            'packages.*.quantity' => 'nullable|integer|min:1',
+            'packages.*.products_description' => 'nullable|string|max:255',
+            'packages.*.total_amount' => 'nullable|numeric|min:0',
+            'pickup_name' => 'nullable|string|max:255',
+            'pickup_address' => 'nullable|string|max:500',
+            'pickup_pin' => 'nullable|string|max:12',
+            'pickup_city' => 'nullable|string|max:100',
+            'pickup_state' => 'nullable|string|max:100',
+            'pickup_phone' => 'nullable|string|max:20',
+        ]);
+
+        $result = $booking->book($data);
+
+        return response()->json($result['body'], $result['status']);
+    }
+
     public function punchOrderById(Request $request, $order_id, ShiprocketService $shiprocket)
     {
         // Optional dimensions from API call
@@ -856,8 +884,11 @@ class ShiprocketController extends Controller
             $orderId = (int) $request->input('order_id');
 
             $shipmentRow = OrderShipment::where('order_id', $orderId)
-                ->where('courier_reference', 'like', '%shiprocket_order_id=%')   // ✅ reliable always
-                ->whereNotIn('status', ['failed', 'cancelled'])
+                ->where(function ($query) {
+                    $query->where('courier_reference', 'like', '%shiprocket_order_id=%')
+                        ->orWhere('courier', 'like', '%Shiprocket%');
+                })
+                ->whereNotIn('status', ['failed', 'cancelled', 'FAILED', 'CANCELLED', 'canceled'])
                 ->latest('id')
                 ->first();
 
@@ -881,7 +912,8 @@ class ShiprocketController extends Controller
             }
         }
 
-        if (!$srOrderId) {
+        $isCargo = str_contains(strtolower((string) ($shipmentRow?->courier ?? '')), 'cargo');
+        if (!$srOrderId && !$isCargo) {
             return response()->json([
                 'code'    => 422,
                 'success' => false,
@@ -892,8 +924,15 @@ class ShiprocketController extends Controller
 
         DB::beginTransaction();
         try {
-            // ✅ Cancel on Shiprocket
-            $cancelRes = $shiprocket->cancelOrders([(int) $srOrderId]);
+            if ($isCargo) {
+                $creds = $shiprocket->credentials();
+                $cancelRes = app(ShiprocketBookingService::class)->cargoPost($creds, 'shipment/cancel/', [
+                    'awb' => (string) ($shipmentRow->awb_no ?? ''),
+                    'client_order_id' => (string) ($shipmentRow->courier_reference ?? ''),
+                ]);
+            } else {
+                $cancelRes = $shiprocket->cancelOrders([(int) $srOrderId]);
+            }
 
             // ✅ Update local DB row if found
             if ($shipmentRow) {

@@ -150,6 +150,20 @@ class CheckoutSchema
             $t->string('pickup_city')->nullable();
             $t->string('pickup_state')->nullable();
             $t->string('pickup_phone')->nullable();
+            $t->string('awb_no')->nullable();
+            $t->string('courier_reference')->nullable();
+            $t->json('request_payload')->nullable();
+            $t->json('response_payload')->nullable();
+            $t->text('error_message')->nullable();
+            $t->timestamp('booked_at')->nullable();
+            $t->timestamp('cancelled_at')->nullable();
+            $t->decimal('shipment_length', 8, 2)->nullable();
+            $t->decimal('shipment_width', 8, 2)->nullable();
+            $t->decimal('shipment_height', 8, 2)->nullable();
+            $t->string('shipping_mode')->nullable();
+            $t->string('seller_name')->nullable();
+            $t->text('seller_address')->nullable();
+            $t->string('seller_invoice')->nullable();
             $t->timestamps();
         });
         Schema::create('t_addresses', function (Blueprint $t) {

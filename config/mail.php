@@ -163,7 +163,7 @@ return [
         'trim',
         explode(',', (string) env(
             'ORDER_NOTIFICATION_EMAILS',
-            'manan@cognitivebranding.com,dotcomsolutiononline@gmail.com'
+            'info@haneri.in'
         ))
     ))),
 
