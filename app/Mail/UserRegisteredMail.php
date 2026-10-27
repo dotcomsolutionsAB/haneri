@@ -47,6 +47,11 @@ class UserRegisteredMail extends Mailable
                 'userName' => $this->user->name,
                 'userEmail' => $this->user->email,
                 'userPassword' => $this->password,
+                'siteName' => config('app.name', 'Haneri'),
+                'loginUrl' => env('APP_LOGIN_URL'),
+                'frontendUrl' => env('APP_FRONTEND_URL'),
+                'supportEmail' => env('MAIL_SUPPORT_EMAIL', config('mail.from.address')),
+                'techSupportEmail' => env('MAIL_TECH_SUPPORT_EMAIL', config('mail.from.address')),
             ],
         );
     }
