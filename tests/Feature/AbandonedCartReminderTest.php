@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Mail\AbandonedCartMail;
 use App\Models\CartModel;
 use App\Models\CartReminder;
+use App\Models\CartRestoreLink;
 use App\Models\CouponModel;
 use App\Models\OrderModel;
 use App\Models\ProductModel;
@@ -14,6 +15,7 @@ use App\Models\User;
 use App\services\AbandonedCartService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Sanctum\Sanctum;
 use Tests\Support\CheckoutSchema;
 use Tests\TestCase;
 
@@ -157,6 +159,95 @@ class AbandonedCartReminderTest extends TestCase
 
         $this->assertSame('not_sent', $statuses[(string) $user->id]);
         $this->assertSame('guest', $statuses['guest-cart-token']);
+    }
+
+    public function test_restore_link_puts_back_removed_items_without_changing_ones_still_there(): void
+    {
+        [$user, $variant] = $this->catalog();
+        $removed = $this->cart($user->id, $variant->id, now()->subHours(2));
+        CartModel::where('id', $removed->id)->update([
+            'quantity' => 2,
+            'updated_at' => now()->subHours(2),
+        ]);
+
+        $keptProduct = ProductModel::create([
+            'name' => 'Aero Fan',
+            'slug' => 'aero',
+            'is_active' => true,
+        ]);
+        $keptVariant = ProductVariantModel::create([
+            'product_id' => $keptProduct->id,
+            'variant_value' => 'White',
+            'regular_price' => 5000,
+            'customer_discount' => 0,
+        ]);
+        $kept = $this->cart($user->id, $keptVariant->id, now()->subHours(2));
+
+        Artisan::call('carts:remind-abandoned');
+
+        $token = null;
+        Mail::assertSent(AbandonedCartMail::class, function (AbandonedCartMail $mail) use (&$token) {
+            $query = [];
+            parse_str((string) parse_url($mail->cartUrl, PHP_URL_QUERY), $query);
+            $token = $query['restore'] ?? null;
+
+            return is_string($token) && $token !== '';
+        });
+
+        CartModel::where('id', $removed->id)->delete();
+
+        Sanctum::actingAs($user);
+        $this->postJson('/api/cart/restore', ['token' => $token])
+            ->assertOk()
+            ->assertJsonPath('data.restored', 1)
+            ->assertJsonPath('data.already_in_cart', 1);
+
+        $this->assertSame(2, (int) CartModel::where('variant_id', $variant->id)->value('quantity'));
+        $this->assertSame(1, (int) CartModel::where('id', $kept->id)->value('quantity'));
+    }
+
+    public function test_restore_link_does_not_fill_someone_elses_cart(): void
+    {
+        [$user, $variant] = $this->catalog();
+        $this->cart($user->id, $variant->id, now()->subHours(2));
+        Artisan::call('carts:remind-abandoned');
+        $token = CartRestoreLink::first()->token;
+        CartModel::query()->delete();
+
+        $other = User::create([
+            'name' => 'Other Customer',
+            'email' => 'other@example.com',
+            'password' => 'secret-pass-123',
+            'role' => 'customer',
+        ]);
+
+        Sanctum::actingAs($other);
+        $this->postJson('/api/cart/restore', ['token' => $token])->assertForbidden();
+        $this->assertSame(0, CartModel::count());
+
+        Sanctum::actingAs($user);
+        $this->postJson('/api/cart/restore', ['token' => $token])->assertOk();
+        $this->assertSame(1, CartModel::where('user_id', (string) $user->id)->count());
+        $this->assertSame(0, CartModel::where('user_id', (string) $other->id)->count());
+    }
+
+    public function test_restore_skips_a_product_that_is_no_longer_for_sale(): void
+    {
+        [$user, $variant] = $this->catalog();
+        $cart = $this->cart($user->id, $variant->id, now()->subHours(2));
+        Artisan::call('carts:remind-abandoned');
+        $token = CartRestoreLink::first()->token;
+
+        CartModel::where('id', $cart->id)->delete();
+        ProductModel::where('id', $variant->product_id)->update(['is_ecommerce' => false]);
+
+        Sanctum::actingAs($user);
+        $this->postJson('/api/cart/restore', ['token' => $token])
+            ->assertOk()
+            ->assertJsonPath('data.restored', 0)
+            ->assertJsonPath('data.unavailable', 1);
+
+        $this->assertSame(0, CartModel::count());
     }
 
     private function catalog(): array

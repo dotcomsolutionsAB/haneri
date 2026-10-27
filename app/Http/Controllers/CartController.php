@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Facades\Cookie;
 use App\Utils\GuestCart;
+use App\services\AbandonedCartService;
 use Str;
 use Hash;
 
@@ -490,5 +491,24 @@ class CartController extends Controller
         $cartItem->delete();
 
         return response()->json(['message' => 'Cart item deleted successfully!'], 200);
+    }
+
+    public function restore(Request $request, AbandonedCartService $carts)
+    {
+        $data = $request->validate([
+            'token' => 'required|string|max:80',
+        ]);
+
+        $user = Auth::guard('sanctum')->user();
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Sign in to restore your cart.',
+            ], 401);
+        }
+
+        $result = $carts->restore($user, $data['token']);
+
+        return response()->json($result['body'], $result['status']);
     }
 }

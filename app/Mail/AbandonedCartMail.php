@@ -29,10 +29,11 @@ class AbandonedCartMail extends Mailable
         public ?string $couponCode = null,
         public ?int $discountPercent = null,
         public ?Carbon $couponExpiresAt = null,
+        ?string $cartUrl = null,
     ) {
         $this->siteName = (string) env('APP_NAME', 'Haneri');
         $this->frontendUrl = rtrim((string) env('APP_FRONTEND_URL', 'https://haneri.com'), '/');
-        $this->cartUrl = $this->frontendUrl . '/cart';
+        $this->cartUrl = $cartUrl ?: $this->frontendUrl . '/cart';
         $this->supportEmail = (string) env('MAIL_SUPPORT_EMAIL', env('MAIL_FROM_ADDRESS'));
     }
 

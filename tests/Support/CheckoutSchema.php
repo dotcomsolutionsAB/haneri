@@ -194,6 +194,14 @@ class CheckoutSchema
             $t->string('coupon_code', 100)->nullable();
             $t->timestamps();
         });
+        Schema::create('t_cart_restore_links', function (Blueprint $t) {
+            $t->id();
+            $t->string('token', 80)->unique();
+            $t->unsignedBigInteger('user_id');
+            $t->json('items');
+            $t->timestamp('expires_at');
+            $t->timestamps();
+        });
         Schema::create('email_logs', function (Blueprint $t) {
             $t->id();
             $t->string('recipient_email');

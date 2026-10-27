@@ -5,9 +5,12 @@ namespace App\services;
 use App\Mail\AbandonedCartMail;
 use App\Models\CartModel;
 use App\Models\CartReminder;
+use App\Models\CartRestoreLink;
 use App\Models\CouponModel;
 use App\Models\EmailLog;
 use App\Models\OrderModel;
+use App\Models\ProductModel;
+use App\Models\ProductVariantModel;
 use App\Models\User;
 use App\Http\Controllers\SettingController;
 use Carbon\Carbon;
@@ -17,6 +20,8 @@ use Illuminate\Support\Str;
 class AbandonedCartService
 {
     public const COUPON_HOURS = 4;
+
+    public const RESTORE_DAYS = 7;
 
     /**
      * @return array{records: array<int, array<string, mixed>>, total: int}
@@ -229,6 +234,7 @@ class AbandonedCartService
             $coupon?->coupon_code,
             $stage === 2 ? $percent : null,
             $coupon?->expires_at,
+            $this->restoreUrl($user, $lines),
         );
 
         try {
@@ -257,6 +263,144 @@ class AbandonedCartService
 
             return false;
         }
+    }
+
+    /**
+     * Put emailed lines back when they are missing. A line that is still in the
+     * cart keeps its current quantity.
+     *
+     * @return array{status: int, body: array<string, mixed>}
+     */
+    public function restore(User $user, string $token): array
+    {
+        if ($user->role === 'admin') {
+            return $this->restoreResponse(403, false, 'Admin accounts cannot add products to the cart.');
+        }
+
+        $link = CartRestoreLink::where('token', $token)->first();
+        if (!$link || $link->expires_at->lte(now())) {
+            return $this->restoreResponse(410, false, 'This cart link has expired.');
+        }
+        if ((int) $link->user_id !== (int) $user->id) {
+            return $this->restoreResponse(403, false, 'Sign in with the account that received this email.');
+        }
+
+        $restored = 0;
+        $already = 0;
+        $unavailable = 0;
+
+        foreach ($link->items ?? [] as $item) {
+            if (!is_array($item)) {
+                $unavailable++;
+                continue;
+            }
+
+            $productId = (int) ($item['product_id'] ?? 0);
+            $variantId = isset($item['variant_id']) && $item['variant_id'] !== null
+                ? (int) $item['variant_id']
+                : null;
+            $quantity = max(1, (int) ($item['quantity'] ?? 1));
+
+            $product = ProductModel::find($productId);
+            if (!$product || !$product->is_ecommerce || !$product->is_active) {
+                $unavailable++;
+                continue;
+            }
+
+            if ($variantId) {
+                $variant = ProductVariantModel::query()
+                    ->where('id', $variantId)
+                    ->where('product_id', $productId)
+                    ->first();
+                if (!$variant) {
+                    $unavailable++;
+                    continue;
+                }
+            }
+
+            $existing = CartModel::query()
+                ->where('user_id', (string) $user->id)
+                ->where('product_id', $productId)
+                ->where(function ($query) use ($variantId) {
+                    if ($variantId) {
+                        $query->where('variant_id', $variantId);
+                    } else {
+                        $query->whereNull('variant_id');
+                    }
+                })
+                ->first();
+
+            if ($existing) {
+                $already++;
+                continue;
+            }
+
+            CartModel::create([
+                'user_id' => (string) $user->id,
+                'product_id' => $productId,
+                'variant_id' => $variantId,
+                'quantity' => $quantity,
+            ]);
+            $restored++;
+        }
+
+        if ($restored > 0) {
+            $message = 'We put the items from your email back in your cart.';
+        } elseif ($unavailable > 0 && $already === 0) {
+            $message = 'Those products are no longer available.';
+        } else {
+            $message = 'Your cart already has these items.';
+        }
+
+        return [
+            'status' => 200,
+            'body' => [
+                'success' => true,
+                'message' => $message,
+                'data' => [
+                    'restored' => $restored,
+                    'already_in_cart' => $already,
+                    'unavailable' => $unavailable,
+                ],
+            ],
+        ];
+    }
+
+    private function restoreUrl(User $user, $lines): string
+    {
+        $snapshot = [];
+        foreach ($lines as $line) {
+            $snapshot[] = [
+                'product_id' => (int) $line->product_id,
+                'variant_id' => $line->variant_id ? (int) $line->variant_id : null,
+                'quantity' => max(1, (int) $line->quantity),
+            ];
+        }
+
+        $link = CartRestoreLink::create([
+            'token' => Str::random(40),
+            'user_id' => $user->id,
+            'items' => $snapshot,
+            'expires_at' => now()->addDays(self::RESTORE_DAYS),
+        ]);
+
+        $frontend = rtrim((string) env('APP_FRONTEND_URL', 'https://haneri.com'), '/');
+
+        return $frontend . '/cart?restore=' . $link->token;
+    }
+
+    /**
+     * @return array{status: int, body: array<string, mixed>}
+     */
+    private function restoreResponse(int $status, bool $success, string $message): array
+    {
+        return [
+            'status' => $status,
+            'body' => [
+                'success' => $success,
+                'message' => $message,
+            ],
+        ];
     }
 
     private function createCoupon(User $user, int $percent): CouponModel

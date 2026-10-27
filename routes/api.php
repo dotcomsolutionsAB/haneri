@@ -51,6 +51,7 @@ Route::post('/shiprocket/rates', [ShiprocketController::class, 'getShippingRates
         Route::post('/update/{id}', [CartController::class, 'update']); // Update an item in the cart
         Route::delete('/remove/{id}', [CartController::class, 'destroy']);// Remove an item from the cart
         Route::post('/cart-from-quotation', [CartController::class, 'createCartFromQuotation']);
+        Route::post('/restore', [CartController::class, 'restore']);
 
     });
 // });
