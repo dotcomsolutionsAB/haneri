@@ -13,6 +13,7 @@ use App\Models\UploadModel;
 use App\Models\PaymentModel;
 use App\Mail\OrderStatusUpdate;
 use App\Models\EmailLog;
+use App\services\GstInvoice;
 use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
@@ -353,6 +354,19 @@ class InvoiceController extends Controller
         $total = (float) $order->total_amount;
         $grandTotal = round($subTotal + $taxAmount + $shippingCharge, 2);
 
+        $seller = SettingController::sellerDetails();
+        $sellerAddress = $seller['address'];
+        if ($sellerAddress === '' || stripos($sellerAddress, 'your full warehouse') !== false) {
+            $sellerAddress = trim((string) config('blade_static_data.company.address'));
+        }
+        $sellerState = GstInvoice::sellerState($seller['gstin'], $seller['state'], $sellerAddress);
+        $ship = GstInvoice::shippingBlock((string) ($order->shipping_address ?? ''));
+        $taxSplit = GstInvoice::taxSplit($taxAmount, $sellerState, $ship['state']);
+        $logo = storage_path('app/public/upload/logo/Haneri_Logo.png');
+        if (!is_file($logo)) {
+            $logo = public_path('storage/upload/logo/Haneri_Logo.png');
+        }
+
         if (!File::isDirectory(dirname($fullPath))) {
             File::makeDirectory(dirname($fullPath), 0755, true, true);
         }
@@ -376,14 +390,23 @@ class InvoiceController extends Controller
                 'user' => $order->user,
                 'items' => $order->items,
                 'invoiceNumber' => $invoiceNumber,
+                'itemsSubtotal' => $itemsSubtotal,
                 'subTotal' => $subTotal,
                 'taxAmount' => $taxAmount,
+                'taxSplit' => $taxSplit,
                 'shippingCharge' => $shippingCharge,
                 'discount' => $discount,
                 'couponCode' => $order->coupon_code,
                 'grandTotal' => $grandTotal,
                 'totalAmount' => $total,
-                'fallbackLogo' => is_file($fallbackLogo) ? $fallbackLogo : null,
+                'sellerName' => $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP',
+                'sellerAddress' => $sellerAddress,
+                'sellerGstin' => $seller['gstin'],
+                'sellerState' => $sellerState,
+                'ship' => $ship,
+                'statusLabel' => GstInvoice::statusLabel($order->status, $order->delivery_status),
+                'amountInWords' => GstInvoice::amountInWords($total),
+                'logoPath' => is_file($logo) ? $logo : null,
             ])->render();
 
             $mpdf->WriteHTML($html);

@@ -81,11 +81,15 @@ class SettingController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:255',
             'address' => 'required|string|max:500',
+            'gstin' => ['nullable', 'string', 'max:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/i'],
+            'state' => 'nullable|string|max:80',
         ]);
 
         $payload = [
             'name' => self::nullableTrim($data['name']),
             'address' => self::nullableTrim($data['address']),
+            'gstin' => strtoupper(self::nullableTrim($data['gstin'] ?? null) ?? ''),
+            'state' => self::nullableTrim($data['state'] ?? null) ?? '',
         ];
 
         if ($payload['name'] === null || $payload['address'] === null) {
@@ -109,13 +113,15 @@ class SettingController extends Controller
     /**
      * Name and address printed on the Delhivery label (seller_name / seller_add).
      *
-     * @return array{name: string, address: string}
+     * @return array{name: string, address: string, gstin: string, state: string}
      */
     public static function sellerDetails(): array
     {
         $defaults = [
             'name' => trim((string) config('shipping.seller_name', 'Haneri Electricals LLP')),
             'address' => trim((string) config('shipping.seller_address', '')),
+            'gstin' => strtoupper(trim((string) config('shipping.seller_gstin', ''))),
+            'state' => trim((string) config('shipping.seller_state', '')),
         ];
 
         $row = SettingModel::where('key', self::SELLER_KEY)->first();
@@ -130,10 +136,14 @@ class SettingController extends Controller
 
         $name = self::nullableTrim($decoded['name'] ?? null);
         $address = self::nullableTrim($decoded['address'] ?? null);
+        $gstin = self::nullableTrim($decoded['gstin'] ?? null);
+        $state = self::nullableTrim($decoded['state'] ?? null);
 
         return [
             'name' => $name ?? $defaults['name'],
             'address' => $address ?? $defaults['address'],
+            'gstin' => strtoupper($gstin ?? $defaults['gstin']),
+            'state' => $state ?? $defaults['state'],
         ];
     }
 
