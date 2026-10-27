@@ -315,15 +315,9 @@ class InvoiceController extends Controller
             $relativePath = $existingUpload->file_path
                 ?: ('upload/order_invoice/' . $invoiceNumber . '.pdf');
         } else {
-            $dt = $order->created_at ?? now();
-            $year = $dt->format('Y');
-            $month = $dt->format('m');
-            $orderIdStr = (string) $order->id;
-            $series = strlen($orderIdStr) < 4
-                ? str_pad($orderIdStr, 4, '0', STR_PAD_LEFT)
-                : $orderIdStr;
-            $invoiceNumber = "HAN-INV-{$year}-{$month}-{$series}";
-            $relativePath = 'upload/order_invoice/' . $invoiceNumber . '.pdf';
+            $invoiceNumber = SettingController::allocateSalesInvoiceNumber();
+            $safeName = str_replace(['/', '\\'], '-', $invoiceNumber);
+            $relativePath = 'upload/order_invoice/' . $safeName . '.pdf';
         }
 
         $relativePath = ltrim(str_replace('\\', '/', (string) $relativePath), '/');

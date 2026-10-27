@@ -231,6 +231,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::put('/analytics', [SettingController::class, 'updateAnalytics']);
             Route::get('/seller', [SettingController::class, 'showSeller']);
             Route::put('/seller', [SettingController::class, 'updateSeller']);
+            Route::get('/sales-invoice', [SettingController::class, 'showSalesInvoice']);
+            Route::put('/sales-invoice', [SettingController::class, 'updateSalesInvoice']);
             Route::get('/abandoned-cart', [SettingController::class, 'showAbandonedCart']);
             Route::put('/abandoned-cart', [SettingController::class, 'updateAbandonedCart']);
             Route::get('/shiprocket', [SettingController::class, 'showShiprocket']);

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\SettingModel;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class SettingController extends Controller
@@ -16,6 +17,7 @@ class SettingController extends Controller
     public const SELLER_KEY = 'seller';
     public const ABANDONED_CART_KEY = 'abandoned_cart';
     public const SHIPROCKET_KEY = 'shiprocket';
+    public const SALES_INVOICE_KEY = 'sales_invoice';
 
     /**
      * Fetch all settings (Admin only)
@@ -145,6 +147,99 @@ class SettingController extends Controller
             'gstin' => strtoupper($gstin ?? $defaults['gstin']),
             'state' => $state ?? $defaults['state'],
         ];
+    }
+
+    public function showSalesInvoice(): JsonResponse
+    {
+        $config = self::salesInvoiceConfig();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Sales invoice series fetched successfully.',
+            'data' => [
+                'prefix' => $config['prefix'],
+                'next_number' => $config['next_number'],
+                'pad' => $config['pad'],
+                'preview' => self::formatSalesInvoiceNumber($config),
+            ],
+        ]);
+    }
+
+    public function updateSalesInvoice(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'prefix' => ['required', 'string', 'max:30', 'regex:/^[A-Za-z0-9][A-Za-z0-9 \-\/]*$/'],
+            'next_number' => 'required|integer|min:1|max:9999999',
+            'pad' => 'required|integer|min:1|max:8',
+        ]);
+
+        $config = [
+            'prefix' => trim($data['prefix']),
+            'next_number' => (int) $data['next_number'],
+            'pad' => (int) $data['pad'],
+        ];
+
+        SettingModel::updateOrCreate(
+            ['key' => self::SALES_INVOICE_KEY],
+            ['value' => json_encode($config)]
+        );
+
+        return $this->showSalesInvoice();
+    }
+
+    /**
+     * Take the next sales invoice number and advance the counter.
+     */
+    public static function allocateSalesInvoiceNumber(): string
+    {
+        return DB::transaction(function () {
+            $row = SettingModel::where('key', self::SALES_INVOICE_KEY)->lockForUpdate()->first();
+            $parsed = json_decode((string) ($row->value ?? ''), true);
+            $config = self::salesInvoiceConfig(is_array($parsed) ? $parsed : []);
+            $number = self::formatSalesInvoiceNumber($config);
+            $config['next_number']++;
+
+            SettingModel::updateOrCreate(
+                ['key' => self::SALES_INVOICE_KEY],
+                ['value' => json_encode($config)]
+            );
+
+            return $number;
+        });
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $decoded
+     * @return array{prefix: string, next_number: int, pad: int}
+     */
+    public static function salesInvoiceConfig(?array $decoded = null): array
+    {
+        if ($decoded === null) {
+            $row = SettingModel::where('key', self::SALES_INVOICE_KEY)->first();
+            $stored = $row ? json_decode($row->value ?? '', true) : null;
+            $decoded = is_array($stored) ? $stored : [];
+        }
+
+        $prefix = trim((string) ($decoded['prefix'] ?? 'HAN-INV-'));
+        if ($prefix === '') {
+            $prefix = 'HAN-INV-';
+        }
+        $next = (int) ($decoded['next_number'] ?? 1);
+        $pad = (int) ($decoded['pad'] ?? 4);
+
+        return [
+            'prefix' => $prefix,
+            'next_number' => max(1, $next),
+            'pad' => min(8, max(1, $pad)),
+        ];
+    }
+
+    /**
+     * @param  array{prefix: string, next_number: int, pad: int}  $config
+     */
+    public static function formatSalesInvoiceNumber(array $config): string
+    {
+        return $config['prefix'].str_pad((string) $config['next_number'], $config['pad'], '0', STR_PAD_LEFT);
     }
 
     public function showAbandonedCart(): JsonResponse
