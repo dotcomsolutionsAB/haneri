@@ -28,6 +28,7 @@ use App\Http\Controllers\SeoController;
 
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\SiteConfigController;
+use App\Http\Controllers\AbandonedCartController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -220,6 +221,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
         });
 
         Route::post('/contact/fetch', [ContactFormController::class, 'fetch']);
+        Route::get('/abandoned-carts', [AbandonedCartController::class, 'index']);
 
         Route::prefix('settings')->group(function () {
             Route::get('/', [SettingController::class, 'index']);
@@ -227,6 +229,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
             Route::put('/analytics', [SettingController::class, 'updateAnalytics']);
             Route::get('/seller', [SettingController::class, 'showSeller']);
             Route::put('/seller', [SettingController::class, 'updateSeller']);
+            Route::get('/abandoned-cart', [SettingController::class, 'showAbandonedCart']);
+            Route::put('/abandoned-cart', [SettingController::class, 'updateAbandonedCart']);
             Route::put('/{key}', [SettingController::class, 'update']);
         });
     });

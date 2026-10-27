@@ -145,12 +145,7 @@ class OrderController extends Controller
 
                 $coupon = CouponModel::query()
                     ->where('coupon_code', $couponCode)
-                    ->where('status', 'active')
-                    ->whereDate('validity', '>=', now()->toDateString())
-                    ->where(function ($qq) use ($user_id) {
-                        $qq->whereNull('user_id')
-                        ->orWhere('user_id', $user_id);
-                    })
+                    ->redeemable($user_id)
                     ->lockForUpdate()
                     ->first();
 
@@ -466,12 +461,7 @@ class OrderController extends Controller
             if ($couponCode !== '') {
                 $coupon = CouponModel::query()
                     ->where('coupon_code', $couponCode)
-                    ->where('status', 'active')
-                    ->whereDate('validity', '>=', now()->toDateString())
-                    ->where(function ($qq) use ($orderUser) {
-                        $qq->whereNull('user_id')
-                            ->orWhere('user_id', $orderUser->id);
-                    })
+                    ->redeemable($orderUser->id)
                     ->lockForUpdate()
                     ->first();
 

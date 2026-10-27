@@ -14,6 +14,7 @@ class SettingController extends Controller
     public const ANALYTICS_KEY = 'analytics';
     public const ANALYTICS_CACHE_KEY = 'site.analytics';
     public const SELLER_KEY = 'seller';
+    public const ABANDONED_CART_KEY = 'abandoned_cart';
 
     /**
      * Fetch all settings (Admin only)
@@ -133,6 +134,48 @@ class SettingController extends Controller
             'name' => $name ?? $defaults['name'],
             'address' => $address ?? $defaults['address'],
         ];
+    }
+
+    public function showAbandonedCart(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Abandoned cart settings fetched successfully.',
+            'data' => [
+                'discount_percent' => self::abandonedCartDiscount(),
+            ],
+        ]);
+    }
+
+    public function updateAbandonedCart(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'discount_percent' => 'required|integer|min:1|max:100',
+        ]);
+
+        SettingModel::updateOrCreate(
+            ['key' => self::ABANDONED_CART_KEY],
+            ['value' => json_encode(['discount_percent' => (int) $data['discount_percent']])]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Abandoned cart discount saved.',
+            'data' => ['discount_percent' => (int) $data['discount_percent']],
+        ]);
+    }
+
+    public static function abandonedCartDiscount(): int
+    {
+        $row = SettingModel::where('key', self::ABANDONED_CART_KEY)->first();
+        if (!$row || empty($row->value)) {
+            return 10;
+        }
+
+        $decoded = json_decode($row->value, true);
+        $percent = (int) ($decoded['discount_percent'] ?? 10);
+
+        return ($percent >= 1 && $percent <= 100) ? $percent : 10;
     }
 
     public function showAnalytics(): JsonResponse

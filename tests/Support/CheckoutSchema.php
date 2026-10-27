@@ -176,6 +176,22 @@ class CheckoutSchema
             $t->string('status')->default('active');
             $t->unsignedInteger('count')->default(0);
             $t->date('validity');
+            $t->timestamp('expires_at')->nullable();
+            $t->timestamps();
+        });
+        Schema::create('t_settings', function (Blueprint $t) {
+            $t->id();
+            $t->string('key')->unique();
+            $t->text('value')->nullable();
+            $t->timestamps();
+        });
+        Schema::create('t_cart_reminders', function (Blueprint $t) {
+            $t->id();
+            $t->string('user_id')->unique();
+            $t->timestamp('anchor_at')->nullable();
+            $t->timestamp('first_sent_at')->nullable();
+            $t->timestamp('second_sent_at')->nullable();
+            $t->string('coupon_code', 100)->nullable();
             $t->timestamps();
         });
         Schema::create('email_logs', function (Blueprint $t) {
