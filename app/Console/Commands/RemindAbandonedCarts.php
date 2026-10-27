@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\AbandonedCartService;
+use App\services\AbandonedCartService;
 use Illuminate\Console\Command;
 
 class RemindAbandonedCarts extends Command

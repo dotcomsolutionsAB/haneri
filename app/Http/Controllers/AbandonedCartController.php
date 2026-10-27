@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\AbandonedCartService;
+use App\services\AbandonedCartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

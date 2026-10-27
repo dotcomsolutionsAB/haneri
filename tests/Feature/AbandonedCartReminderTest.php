@@ -11,7 +11,7 @@ use App\Models\ProductModel;
 use App\Models\ProductVariantModel;
 use App\Models\SettingModel;
 use App\Models\User;
-use App\Services\AbandonedCartService;
+use App\services\AbandonedCartService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Mail;
 use Tests\Support\CheckoutSchema;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services;
+namespace App\services;
 
 use App\Mail\AbandonedCartMail;
 use App\Models\CartModel;
