@@ -175,7 +175,7 @@
                     <td class="muted">{{ $loop->iteration }}</td>
                     <td><strong>{{ optional($item->product)->name ?? 'Product #'.$item->product_id }}</strong></td>
                     <td>{{ \App\services\GstInvoice::formatHsn(optional($item->variant)->hsn) }}</td>
-                    <td>{{ optional($item->variant)->variant_value ?? optional($item->variant)->value ?? '—' }}</td>
+                    <td>{{ optional($item->variant)->optionLabel() ?: '—' }}</td>
                     <td class="right">{{ number_format($rate, 2) }}</td>
                     <td class="center">{{ $qty }}</td>
                     <td class="right">{{ number_format($rate * $qty, 2) }}</td>

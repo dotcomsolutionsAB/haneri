@@ -301,7 +301,7 @@ class CartController extends Controller
                 }
 
                 // Get variant_value from ProductVariantModel
-                $variantType = $cartItem->variant->variant_value;
+                $variantType = $cartItem->variant->optionLabel();
 
                 $variant_id = $cartItem->variant->id;
 

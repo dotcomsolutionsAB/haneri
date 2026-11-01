@@ -59,6 +59,7 @@ class CheckoutSchema
             $t->unsignedBigInteger('product_id');
             $t->string('variant_type')->nullable();
             $t->string('variant_value')->nullable();
+            $t->string('light_option', 20)->nullable();
             $t->decimal('regular_price', 10, 2);
             $t->decimal('customer_discount', 5, 2)->default(0);
             $t->decimal('dealer_discount', 5, 2)->default(0);

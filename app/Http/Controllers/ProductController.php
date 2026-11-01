@@ -398,6 +398,7 @@ class ProductController extends Controller
             'variants.*.description' => 'nullable|string', // Optional description
             'variants.*.variant_type' => 'required_with:variants|string',
             'variants.*.variant_value' => 'required_with:variants|string',
+            'variants.*.light_option' => 'nullable|in:with,without',
             'variants.*.regular_price' => 'required_with:variants|numeric',
             // 'variants.*.selling_price' => 'required_with:variants|numeric',
             // 'variants.*.sales_price_vendor' => 'required_with:variants|numeric',
@@ -452,6 +453,7 @@ class ProductController extends Controller
                     'description' => $variant['description'] ?? null,
                     'variant_type' => $variant['variant_type'],
                     'variant_value' => $variant['variant_value'],
+                    'light_option' => $this->lightOption($variant['light_option'] ?? null),
                     'regular_price' => $variant['regular_price'],
                     'customer_discount' => $variant['customer_discount'] ?? null,
                     'dealer_discount' => $variant['dealer_discount'] ?? null,
@@ -468,6 +470,7 @@ class ProductController extends Controller
                     'id' => $createdVariant->id,
                     'variant_type' => $createdVariant->variant_type,
                     'variant_value' => $createdVariant->variant_value,
+                    'light_option' => $createdVariant->light_option,
                     'hsn' => $createdVariant->hsn,
                 ];
             }
@@ -506,7 +509,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
+                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,light_option,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
                 ])
                     ->when(is_numeric($id), function ($query) use ($id) {
                         $query->where('id', $id);
@@ -667,7 +670,7 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
+                'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,light_option,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
             ])->where('is_active', '!=', 0);
 
             /* --- filters --- */
@@ -1067,7 +1070,7 @@ class ProductController extends Controller
                     'brand:id,name',
                     'category:id,name',
                     'features:id,product_id,feature_name,feature_value,is_filterable',
-                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
+                    'variants:id,product_id,photo_id,banner_id,variant_type,min_qty,is_cod,weight,description,variant_value,light_option,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,3d_file,3d_placeholder,customer_discount,dealer_discount,architect_discount'
                 ])->findOrFail($id);
 
                 $user = auth()->user();
@@ -1210,7 +1213,7 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
+                'variants:id,product_id,photo_id,variant_type,min_qty,is_cod,weight,description,variant_value,light_option,discount_price,regular_price,hsn,regular_tax,selling_tax,video_url,product_pdf,customer_discount,dealer_discount,architect_discount'
             ]);
 
             /* --- filters --- */
@@ -1435,6 +1438,7 @@ class ProductController extends Controller
             'variants.*.description' => 'sometimes|string',
             'variants.*.variant_type' => 'required_with:variants|string',
             'variants.*.variant_value' => 'required_with:variants|string',
+            'variants.*.light_option' => 'nullable|in:with,without',
             'variants.*.discount_price' => 'nullable|numeric',
             'variants.*.regular_price' => 'sometimes|numeric',
             'variants.*.customer_discount' => 'nullable|numeric',
@@ -1506,6 +1510,9 @@ class ProductController extends Controller
                                 'description' => $variant['description'] ?? $existing->description,
                                 'variant_type' => $variant['variant_type'] ?? $existing->variant_type,
                                 'variant_value' => $variant['variant_value'] ?? $existing->variant_value,
+                                'light_option' => array_key_exists('light_option', $variant)
+                                    ? $this->lightOption($variant['light_option'])
+                                    : $existing->light_option,
                                 'discount_price' => array_key_exists('discount_price', $variant) ? $variant['discount_price'] : $existing->discount_price,
                                 'regular_price' => $variant['regular_price'] ?? $existing->regular_price,
                                 'customer_discount' => array_key_exists('customer_discount', $variant) ? $variant['customer_discount'] : $existing->customer_discount,
@@ -1527,6 +1534,7 @@ class ProductController extends Controller
                             'description' => $variant['description'] ?? null,
                             'variant_type' => $variant['variant_type'],
                             'variant_value' => $variant['variant_value'],
+                            'light_option' => $this->lightOption($variant['light_option'] ?? null),
                             'discount_price' => $variant['discount_price'] ?? null,
                             'regular_price' => $variant['regular_price'] ?? 0,
                             'customer_discount' => $variant['customer_discount'] ?? null,
@@ -1550,7 +1558,7 @@ class ProductController extends Controller
                 'brand:id,name',
                 'category:id,name',
                 'features:id,product_id,feature_name,feature_value,is_filterable',
-                'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_value,discount_price,regular_price,customer_discount,dealer_discount,architect_discount,hsn,regular_tax,selling_tax,video_url,product_pdf'
+                'variants:id,product_id,variant_type,min_qty,is_cod,weight,description,variant_value,light_option,discount_price,regular_price,customer_discount,dealer_discount,architect_discount,hsn,regular_tax,selling_tax,video_url,product_pdf'
             ]);
 
             // 🎯 Build response EXACTLY like your original format
@@ -1579,6 +1587,7 @@ class ProductController extends Controller
                         'weight' => $v->weight !== null ? (string)$v->weight : null,
                         'description' => $v->description,
                         'variant_value' => $v->variant_value,
+                        'light_option' => $v->light_option,
                         'discount_price' => $v->discount_price !== null ? number_format((float)$v->discount_price, 2, '.', '') : null,
                         'regular_price' => number_format((float)$v->regular_price, 2, '.', ''),
                         'hsn' => $v->hsn,
@@ -1972,6 +1981,7 @@ class ProductController extends Controller
             'variants.*.description' => 'nullable|string',
             'variants.*.variant_type' => 'required|string',
             'variants.*.variant_value' => 'required|string',
+            'variants.*.light_option' => 'nullable|in:with,without',
             'variants.*.discount_price' => 'nullable|numeric',
             'variants.*.regular_price' => 'required|numeric',
             'variants.*.customer_discount' => 'nullable|numeric',
@@ -1997,6 +2007,7 @@ class ProductController extends Controller
                     'description'        => $v['description'] ?? null,
                     'variant_type'       => $v['variant_type'],
                     'variant_value'      => $v['variant_value'],
+                    'light_option'       => $this->lightOption($v['light_option'] ?? null),
                     'discount_price'     => $v['discount_price'] ?? null,
                     'regular_price'      => $v['regular_price'],
                     'customer_discount'  => $v['customer_discount'] ?? null,
@@ -2027,6 +2038,7 @@ class ProductController extends Controller
                     'weight' => $v->weight !== null ? (string)$v->weight : null,
                     'description' => $v->description,
                     'variant_value' => $v->variant_value,
+                    'light_option' => $v->light_option,
                     'discount_price' => $v->discount_price !== null ? number_format((float)$v->discount_price, 2, '.', '') : null,
                     'regular_price' => number_format((float)$v->regular_price, 2, '.', ''),
                     'hsn' => $v->hsn,
@@ -2300,6 +2312,13 @@ class ProductController extends Controller
             'success' => true,
             'message' => 'Dimensions saved.',
         ]);
+    }
+
+    private function lightOption($value): ?string
+    {
+        $value = is_string($value) ? strtolower(trim($value)) : '';
+
+        return in_array($value, ['with', 'without'], true) ? $value : null;
     }
 
     private function nullableString($value): ?string

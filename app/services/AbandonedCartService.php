@@ -123,7 +123,7 @@ class AbandonedCartService
             $value += $price * $qty;
             $items[] = [
                 'name' => $line->product->name ?? 'Product',
-                'variant' => $line->variant->variant_value ?? null,
+                'variant' => $line->variant?->optionLabel() ?: null,
                 'quantity' => $qty,
                 'price' => $price,
             ];
@@ -213,7 +213,7 @@ class AbandonedCartService
             $qty = (int) $line->quantity;
             $items[] = [
                 'name' => $line->product->name ?? 'Product',
-                'variant' => $line->variant->variant_value ?? null,
+                'variant' => $line->variant?->optionLabel() ?: null,
                 'qty' => $qty,
                 'price' => $price,
                 'total' => round($price * $qty, 2),
@@ -432,7 +432,7 @@ class AbandonedCartService
     {
         return CartModel::with([
             'product:id,name',
-            'variant:id,variant_value,regular_price,customer_discount',
+            'variant:id,variant_value,light_option,regular_price,customer_discount',
         ])->where('user_id', $userId)->get();
     }
 

@@ -471,12 +471,12 @@ class RazorpayController extends Controller
                 return;
             }
 
-            $items = OrderItemModel::with(['product:id,name', 'variant:id,variant_type,variant_value'])
+            $items = OrderItemModel::with(['product:id,name', 'variant:id,variant_type,variant_value,light_option'])
                 ->where('order_id', $order->id)
                 ->get()
                 ->map(function ($it) {
                     $vType = optional($it->variant)->variant_type;
-                    $vValue = optional($it->variant)->variant_value;
+                    $vValue = optional($it->variant)->optionLabel();
                     $variantLabel = $vValue ? ($vType ? ($vType.': '.$vValue) : $vValue) : null;
 
                     return [

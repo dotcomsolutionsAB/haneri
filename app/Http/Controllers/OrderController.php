@@ -1421,7 +1421,7 @@ class OrderController extends Controller
             return [
                 'product_id'    => $item->product_id,
                 'product_name'  => optional($item->product)->name,      // change if your column is different
-                'variant value' => optional($item->variant)->variant_value,     // if you prefer key "variant_value", rename here
+                'variant value' => optional($item->variant)->optionLabel(),
                 'variant_id'    => $item->variant_id,
                 'quantity'      => $item->quantity,
                 'price'         => $item->price,
@@ -1801,6 +1801,7 @@ class OrderController extends Controller
                             'id',
                             'product_id',
                             'variant_value',
+                            'light_option',
                             'regular_price',
                             'weight',
                             'length',
@@ -1840,7 +1841,7 @@ class OrderController extends Controller
                 ] : null,
                 'variant'    => $it->variant ? [
                     'id'            => $it->variant->id,
-                    'variant_value' => $it->variant->variant_value,
+                    'variant_value' => $it->variant->optionLabel(),
                     'regular_price' => $money($it->variant->regular_price),
                     'weight'        => $it->variant->weight !== null ? (float) $it->variant->weight : null,
                     'length'        => $it->variant->length !== null ? (float) $it->variant->length : null,

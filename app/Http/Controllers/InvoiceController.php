@@ -33,13 +33,13 @@ class InvoiceController extends Controller
         // 2. Quotation items
         $q_items = QuotationItemModel::with([
                 'product:id,name',
-                'variant:id,product_id,variant_value'
+                'variant:id,product_id,variant_value,light_option'
             ])
             ->where('quotation_id', $quotation->id)
             ->get()
             ->map(function ($item) {
                 $item->product_name  = $item->product->name ?? '';
-                $item->variant_value = $item->variant->variant_value ?? '';
+                $item->variant_value = $item->variant?->optionLabel() ?? '';
                 $item->rate          = $item->price;
                 $item->total         = $item->price * $item->quantity;
                 return $item;
