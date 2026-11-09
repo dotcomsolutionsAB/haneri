@@ -163,7 +163,7 @@ return [
         'trim',
         explode(',', (string) env(
             'ORDER_NOTIFICATION_EMAILS',
-            'info@haneri.in'
+            'info@haneri.in,arnavkapur2@gmail.com'
         ))
     ))),
 
