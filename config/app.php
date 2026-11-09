@@ -127,4 +127,10 @@ return [
     'redirect_after_register' => env('APP_REDIRECT_AFTER_REGISTER', env('APP_FRONTEND_URL', 'https://haneri.com')),
     'redirect_after_login'    => env('APP_REDIRECT_AFTER_LOGIN', env('APP_FRONTEND_URL', 'https://haneri.com')),
 
+    // Shared secret for GET/POST /api/cron/cancel-stale-orders. Empty disables the endpoint.
+    'cron_token' => env('CRON_TOKEN'),
+
+    // Unpaid orders still marked pending are cancelled once they are older than this.
+    'pending_order_cancel_hours' => (int) env('PENDING_ORDER_CANCEL_HOURS', 48),
+
 ];

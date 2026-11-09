@@ -29,6 +29,7 @@ use App\Http\Controllers\SeoController;
 use App\Http\Controllers\BlogController;
 use App\Http\Controllers\SiteConfigController;
 use App\Http\Controllers\AbandonedCartController;
+use App\Http\Controllers\CronController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -43,6 +44,7 @@ Route::post('/test/sms-alert', [SmsAlertTestController::class, 'sendTestOtp']);
 Route::post('/delivery/shipping-cost', [DelhiveryServiceController::class, 'getShippingCost']);
 Route::post('/delivery/track', [DelhiveryServiceController::class, 'trackShipments']);
 Route::post('/shiprocket/rates', [ShiprocketController::class, 'getShippingRates']);
+Route::match(['get', 'post'], '/cron/cancel-stale-orders', [CronController::class, 'cancelStaleOrders']);
 
 // Route::middleware(['cors'])->group(function () {
     Route::prefix('cart')->group(function () {
