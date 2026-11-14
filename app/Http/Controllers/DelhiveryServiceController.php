@@ -1537,27 +1537,37 @@ class DelhiveryServiceController extends Controller
             $totalQty += $qty;
 
             $unitWeight = optional($item->variant)->weight;
-            $packageWeight = !is_null($unitWeight)
-                ? max(0.01, ((float) $unitWeight) * $qty)
+            $oneWeight = !is_null($unitWeight)
+                ? max(0.01, (float) $unitWeight)
                 : 1.0;
-            $totalWeight += $packageWeight;
 
             $length = optional($item->variant)->length;
             $width  = optional($item->variant)->width;
             $height = optional($item->variant)->height;
 
+            // Each unit ships in its own carton. Delhivery multi-box starts only
+            // when there is more than one package, so quantity 2 must be 2 boxes.
             $lineTotal = round(((float) $item->price) * $qty, 2);
-            $packages[] = [
-                'order_item_id'        => (int) $item->id,
-                'products_description' => $label.' x '.$qty,
-                'quantity'             => $qty,
-                'weight'               => round($packageWeight, 3),
-                'shipment_length'      => $length !== null ? (float) $length : 10.0,
-                'shipment_width'       => $width !== null ? (float) $width : 10.0,
-                'shipment_height'      => $height !== null ? (float) $height : 10.0,
-                'total_amount'         => $lineTotal,
-                'cod_amount'           => $paymentModePreview === 'COD' ? $lineTotal : 0.0,
-            ];
+            $unitAmount = round($lineTotal / $qty, 2);
+            for ($n = 1; $n <= $qty; $n++) {
+                $boxAmount = $n === $qty
+                    ? round($lineTotal - ($unitAmount * ($qty - 1)), 2)
+                    : $unitAmount;
+                $totalWeight += $oneWeight;
+                $packages[] = [
+                    'order_item_id'        => (int) $item->id,
+                    'products_description' => $qty > 1
+                        ? $label.' ('.$n.' of '.$qty.')'
+                        : $label,
+                    'quantity'             => 1,
+                    'weight'               => round($oneWeight, 3),
+                    'shipment_length'      => $length !== null ? (float) $length : 10.0,
+                    'shipment_width'       => $width !== null ? (float) $width : 10.0,
+                    'shipment_height'      => $height !== null ? (float) $height : 10.0,
+                    'total_amount'         => $boxAmount,
+                    'cod_amount'           => $paymentModePreview === 'COD' ? $boxAmount : 0.0,
+                ];
+            }
         }
 
         if ($totalWeight <= 0) $totalWeight = 1.0;
