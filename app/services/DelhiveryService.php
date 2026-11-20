@@ -288,14 +288,12 @@ class DelhiveryService
             $orderTotal = round((float) ($orderData['total_amount'] ?? 0), 2);
             $orderCod = round((float) ($orderData['cod_amount'] ?? 0), 2);
             $money = self::allocatePackageAmounts($packages, $orderTotal, $orderCod);
-            $sellerInvoice = (string) ($orderData['seller_invoice'] ?? ('INV-' . $baseOrderNo));
-            $seller = SettingController::sellerDetails();
-            $sellerName = $seller['name'] !== ''
-                ? $seller['name']
-                : (string) ($orderData['seller_name'] ?? '');
-            $sellerAddress = $seller['address'] !== ''
-                ? $seller['address']
-                : (string) ($orderData['seller_address'] ?? '');
+            $sellerInvoice = trim((string) ($orderData['seller_invoice'] ?? ''));
+            if ($sellerInvoice === '') {
+                return [
+                    'error' => 'Generate the sales invoice first, then book Delhivery.',
+                ];
+            }
 
             // Multi-box Cargo / MPS: one client order + one master AWB, N linked packages.
             // Prefetched waybills are mandatory for MPS.
@@ -313,88 +311,15 @@ class DelhiveryService
                 $masterWaybill = $waybills[0];
             }
 
-            $shipments = [];
-            foreach ($packages as $index => $package) {
-                $weightKg = (float) ($package['weight'] ?? ($orderData['weight'] ?? 1));
-                $boxNo = $index + 1;
-                // Per-box invoice value (each fan). Never send 0 — Delhivery labels show ₹0.1.
-                $boxAmount = round((float) ($money[$index]['total_amount'] ?? 0), 2);
-                $boxCod = round((float) ($money[$index]['cod_amount'] ?? 0), 2);
-                if ($multi && $boxAmount < 1 && $orderTotal >= count($packages)) {
-                    $boxAmount = round($orderTotal / count($packages), 2);
-                }
-
-                // MPS: unique order/invoice per box so each label keeps its own price,
-                // while master_id links them as one Cargo / multi-box shipment.
-                $boxOrderNo = $multi ? ($baseOrderNo . '-B' . $boxNo) : $baseOrderNo;
-                $boxInvoice = $multi ? ($sellerInvoice . '-B' . $boxNo) : $sellerInvoice;
-
-                $row = [
-                    'name'            => $orderData['customer_name'],
-                    'add'             => $orderData['customer_address'],
-                    'pin'             => $orderData['pin'],
-                    'city'            => $orderData['city'],
-                    'state'           => $orderData['state'],
-                    'country'         => 'India',
-                    'phone'           => $orderData['phone'],
-                    'order'           => $boxOrderNo,
-                    'payment_mode'    => $orderData['payment_mode'],
-                    'products_desc'   => $package['products_description']
-                        ?? $package['products_desc']
-                        ?? ($orderData['products_description'] ?? ''),
-                    // Delhivery sample payloads use strings for money fields.
-                    'cod_amount'      => (string) $boxCod,
-                    'total_amount'    => (string) $boxAmount,
-                    'order_date'      => $orderData['order_date'],
-                    'seller_add'      => $sellerAddress,
-                    'seller_name'     => $sellerName,
-                    'seller_inv'      => $boxInvoice,
-                    'quantity'        => max(1, (int) ($package['quantity'] ?? 1)),
-                    'weight'          => self::kgToDelhiveryGrams($weightKg),
-                    'shipping_mode'   => $orderData['shipping_mode'] ?? 'Surface',
-                    'service_level'   => $orderData['service_level'] ?? 'normal',
-                    'address_type'    => $orderData['address_type'] ?? 'home',
-                    'return_pin'      => $orderData['return_pin']     ?? $orderData['pickup_pin'],
-                    'return_city'     => $orderData['return_city']    ?? $orderData['pickup_city'],
-                    'return_phone'    => $orderData['return_phone']   ?? $orderData['pickup_phone'],
-                    'return_add'      => $orderData['return_address'] ?? $orderData['pickup_address'],
-                    'return_state'    => $orderData['return_state']   ?? $orderData['pickup_state'],
-                    'return_country'  => $orderData['return_country'] ?? 'India',
-                    'shipment_width'  => !empty($package['shipment_width'])
-                        ? $package['shipment_width']
-                        : (!empty($orderData['shipment_width']) ? $orderData['shipment_width'] : 10),
-                    'shipment_height' => !empty($package['shipment_height'])
-                        ? $package['shipment_height']
-                        : (!empty($orderData['shipment_height']) ? $orderData['shipment_height'] : 10),
-                    'shipment_length' => !empty($package['shipment_length'])
-                        ? $package['shipment_length']
-                        : (!empty($orderData['shipment_length']) ? $orderData['shipment_length'] : 10),
-                ];
-
-                if ($multi && $masterWaybill !== null) {
-                    $row['shipment_type'] = 'MPS';
-                    $row['master_id'] = $masterWaybill;
-                    $row['mps_children'] = (string) count($packages);
-                    $row['mps_amount'] = (string) (int) round($orderCod);
-                    $row['waybill'] = $waybills[$index];
-                }
-
-                $shipments[] = $row;
-            }
-
-            $finalPayload = [
-                'pickup_location' => [
-                    // THIS "name" must match Delhivery-registered warehouse name (case sensitive)
-                    'name'    => $orderData['pickup_name'],
-                    'add'     => $orderData['pickup_address'],
-                    'pin'     => (string) $orderData['pickup_pin'],
-                    'city'    => $orderData['pickup_city'],
-                    'state'   => $orderData['pickup_state'],
-                    'country' => 'India',
-                    'phone'   => (string) $orderData['pickup_phone'],
-                ],
-                'shipments' => $shipments,
-            ];
+            $composed = self::composeCreatePayload(
+                $orderData,
+                $packages,
+                $money,
+                $sellerInvoice,
+                $waybills,
+                $masterWaybill
+            );
+            $finalPayload = $composed['payload'];
 
             $response = $this->client->post($endpoint, [
                 'headers' => [
@@ -412,8 +337,11 @@ class DelhiveryService
                 return [
                     'error' => 'Unexpected Delhivery create response.',
                     'raw'   => $body,
+                    'cmu_request' => $finalPayload,
                 ];
             }
+
+            $body['cmu_request'] = $finalPayload;
 
             if ($multi && $masterWaybill !== null) {
                 $body['master_waybill'] = $masterWaybill;
@@ -999,6 +927,119 @@ class DelhiveryService
         }
 
         return (int) round($kg * 1000);
+    }
+
+    /**
+     * Build the Delhivery CMU create.json `data` object.
+     * MPS uses the same client `order` and `seller_inv` on every box (Delhivery sample).
+     *
+     * @param  array<string, mixed>  $orderData
+     * @param  array<int, array<string, mixed>>  $packages
+     * @param  array<int, array{total_amount: float, cod_amount: float}>  $money
+     * @param  array<int, string>  $waybills
+     * @return array{payload: array<string, mixed>}
+     */
+    public static function composeCreatePayload(
+        array $orderData,
+        array $packages,
+        array $money,
+        string $sellerInvoice,
+        array $waybills = [],
+        ?string $masterWaybill = null
+    ): array {
+        $baseOrderNo = (string) ($orderData['order_no'] ?? '');
+        $multi = count($packages) > 1;
+        $orderTotal = round((float) ($orderData['total_amount'] ?? 0), 2);
+        $orderCod = round((float) ($orderData['cod_amount'] ?? 0), 2);
+
+        $seller = SettingController::sellerDetails();
+        $sellerName = $seller['name'] !== ''
+            ? $seller['name']
+            : (string) ($orderData['seller_name'] ?? '');
+        $sellerAddress = $seller['address'] !== ''
+            ? $seller['address']
+            : (string) ($orderData['seller_address'] ?? '');
+
+        $shipments = [];
+        foreach ($packages as $index => $package) {
+            $weightKg = (float) ($package['weight'] ?? ($orderData['weight'] ?? 1));
+            // Per-box invoice value. Never send 0 — Delhivery labels show ₹0.1.
+            $boxAmount = round((float) ($money[$index]['total_amount'] ?? 0), 2);
+            $boxCod = round((float) ($money[$index]['cod_amount'] ?? 0), 2);
+            if ($multi && $boxAmount < 1 && $orderTotal >= count($packages)) {
+                $boxAmount = round($orderTotal / count($packages), 2);
+            }
+            if ($boxAmount < 1 && $orderTotal >= 1) {
+                $boxAmount = max(1.0, round($orderTotal / max(1, count($packages)), 2));
+            }
+
+            $row = [
+                'name'            => $orderData['customer_name'],
+                'add'             => $orderData['customer_address'],
+                'pin'             => $orderData['pin'],
+                'city'            => $orderData['city'],
+                'state'           => $orderData['state'],
+                'country'         => 'India',
+                'phone'           => $orderData['phone'],
+                // Same order id for every box in an MPS/Cargo shipment (Delhivery contract).
+                'order'           => $baseOrderNo,
+                'payment_mode'    => $orderData['payment_mode'],
+                'products_desc'   => $package['products_description']
+                    ?? $package['products_desc']
+                    ?? ($orderData['products_description'] ?? ''),
+                'cod_amount'      => (string) $boxCod,
+                'total_amount'    => (string) $boxAmount,
+                'order_date'      => $orderData['order_date'],
+                'seller_add'      => $sellerAddress,
+                'seller_name'     => $sellerName,
+                'seller_inv'      => $sellerInvoice,
+                'quantity'        => max(1, (int) ($package['quantity'] ?? 1)),
+                'weight'          => self::kgToDelhiveryGrams($weightKg),
+                'shipping_mode'   => $orderData['shipping_mode'] ?? 'Surface',
+                'service_level'   => $orderData['service_level'] ?? 'normal',
+                'address_type'    => $orderData['address_type'] ?? 'home',
+                'return_pin'      => $orderData['return_pin']     ?? $orderData['pickup_pin'],
+                'return_city'     => $orderData['return_city']    ?? $orderData['pickup_city'],
+                'return_phone'    => $orderData['return_phone']   ?? $orderData['pickup_phone'],
+                'return_add'      => $orderData['return_address'] ?? $orderData['pickup_address'],
+                'return_state'    => $orderData['return_state']   ?? $orderData['pickup_state'],
+                'return_country'  => $orderData['return_country'] ?? 'India',
+                'shipment_width'  => !empty($package['shipment_width'])
+                    ? $package['shipment_width']
+                    : (!empty($orderData['shipment_width']) ? $orderData['shipment_width'] : 10),
+                'shipment_height' => !empty($package['shipment_height'])
+                    ? $package['shipment_height']
+                    : (!empty($orderData['shipment_height']) ? $orderData['shipment_height'] : 10),
+                'shipment_length' => !empty($package['shipment_length'])
+                    ? $package['shipment_length']
+                    : (!empty($orderData['shipment_length']) ? $orderData['shipment_length'] : 10),
+            ];
+
+            if ($multi && $masterWaybill !== null && isset($waybills[$index])) {
+                $row['shipment_type'] = 'MPS';
+                $row['master_id'] = $masterWaybill;
+                $row['mps_children'] = (string) count($packages);
+                $row['mps_amount'] = (string) (int) round($orderCod);
+                $row['waybill'] = $waybills[$index];
+            }
+
+            $shipments[] = $row;
+        }
+
+        return [
+            'payload' => [
+                'pickup_location' => [
+                    'name'    => $orderData['pickup_name'],
+                    'add'     => $orderData['pickup_address'],
+                    'pin'     => (string) $orderData['pickup_pin'],
+                    'city'    => $orderData['pickup_city'],
+                    'state'   => $orderData['pickup_state'],
+                    'country' => 'India',
+                    'phone'   => (string) $orderData['pickup_phone'],
+                ],
+                'shipments' => $shipments,
+            ],
+        ];
     }
 
     /**

@@ -661,7 +661,14 @@ class DelhiveryServiceController extends Controller
 
             $existingShipment = OrderShipment::where('order_id', $order->id)->first();
             $clientOrderNo = $this->nextDelhiveryClientOrderNo($order->id, $existingShipment);
-            $sellerInvoice = 'INV-' . $clientOrderNo;
+            $sellerInvoice = $this->salesInvoiceNumberForOrder((int) $order->id);
+            if ($sellerInvoice === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Generate the sales invoice first, then book Delhivery.',
+                    'data'    => [],
+                ], 422);
+            }
 
             // 8) Build payload for DelhiveryService->placeOrder()
             $orderData = [
@@ -882,6 +889,15 @@ class DelhiveryServiceController extends Controller
         }
 
         $orderId = (int)$request->order_id;
+        $salesInvoice = $this->salesInvoiceNumberForOrder($orderId);
+        if ($salesInvoice === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Generate the sales invoice first, then book Delhivery.',
+                'data'    => [],
+            ], 422);
+        }
+
         $payload = $request->input('payload');  // Get the payload from frontend (updated or not)
         try {
             $payload = $this->alignPickupWithDelhivery($payload);
@@ -932,7 +948,7 @@ class DelhiveryServiceController extends Controller
                 $orderId,
                 $shipment->exists ? $shipment : null
             );
-            $payload['seller_invoice'] = 'INV-' . $payload['order_no'];
+            $payload['seller_invoice'] = $salesInvoice;
             $seller = SettingController::sellerDetails();
             if ($seller['name'] !== '') {
                 $payload['seller_name'] = $seller['name'];
@@ -1016,6 +1032,15 @@ class DelhiveryServiceController extends Controller
             // 2. Now send the updated payload to Delhivery API to create the shipment
             $delhiveryService = new DelhiveryService();
             $apiResponse = $delhiveryService->placeOrder($payload); // Send the payload to Delhivery
+
+            // Keep the exact CMU `data` JSON we posted for label disputes / audits.
+            if (is_array($apiResponse) && isset($apiResponse['cmu_request'])) {
+                $storedPayload = is_array($shipment->request_payload)
+                    ? $shipment->request_payload
+                    : $payload;
+                $storedPayload['cmu_request'] = $apiResponse['cmu_request'];
+                $shipment->request_payload = $storedPayload;
+            }
 
             // Package remarks carry the real reason. rmk is often a generic internal-error line.
             $failure = $this->delhiveryBookingFailure(is_array($apiResponse) ? $apiResponse : null);
@@ -1248,7 +1273,22 @@ class DelhiveryServiceController extends Controller
     }
 
     /**
+     * Sales invoice number from the generated PDF upload (uploads.alt_text).
+     */
+    private function salesInvoiceNumberForOrder(int $orderId): ?string
+    {
+        $order = OrderModel::with('invoiceFile')->find($orderId);
+        if (!$order || !$order->invoice_id) {
+            return null;
+        }
+        $number = trim((string) optional($order->invoiceFile)->alt_text);
+
+        return $number !== '' ? $number : null;
+    }
+
+    /**
      * Fill package total_amount / cod_amount from order line items when possible.
+     * When several packages share one order_item_id, split the line total across them.
      */
     private function enrichPackagesWithLineAmounts(
         int $orderId,
@@ -1263,8 +1303,10 @@ class DelhiveryServiceController extends Controller
         $byId = $items->keyBy('id');
         $isCod = strcasecmp($paymentMode, 'COD') === 0;
 
+        $resolvedItemIds = [];
         foreach ($packages as $i => $package) {
             if (!is_array($package)) {
+                $resolvedItemIds[$i] = null;
                 continue;
             }
             $item = null;
@@ -1272,15 +1314,25 @@ class DelhiveryServiceController extends Controller
             if ($itemId > 0 && $byId->has($itemId)) {
                 $item = $byId->get($itemId);
             } elseif ($items->has($i)) {
-                // Fall back to package index → order item order.
                 $item = $items[$i];
                 $packages[$i]['order_item_id'] = (int) $item->id;
             }
+            $resolvedItemIds[$i] = $item ? (int) $item->id : null;
+        }
 
+        $indexesByItem = [];
+        foreach ($resolvedItemIds as $i => $itemId) {
+            if ($itemId === null) {
+                continue;
+            }
+            $indexesByItem[$itemId][] = $i;
+        }
+
+        foreach ($indexesByItem as $itemId => $indexes) {
+            $item = $byId->get($itemId);
             if (!$item) {
                 continue;
             }
-
             $qty = max(1, (int) $item->quantity);
             $lineTotal = round(((float) $item->price) * $qty, 2);
             if ($lineTotal < 1 && isset($item->subtotal)) {
@@ -1290,8 +1342,17 @@ class DelhiveryServiceController extends Controller
                 continue;
             }
 
-            $packages[$i]['total_amount'] = $lineTotal;
-            $packages[$i]['cod_amount'] = $isCod ? $lineTotal : 0.0;
+            $boxCount = count($indexes);
+            $unitAmount = round($lineTotal / $boxCount, 2);
+            $allocated = 0.0;
+            foreach ($indexes as $n => $i) {
+                $boxAmount = $n === $boxCount - 1
+                    ? round($lineTotal - $allocated, 2)
+                    : $unitAmount;
+                $allocated = round($allocated + $boxAmount, 2);
+                $packages[$i]['total_amount'] = $boxAmount;
+                $packages[$i]['cod_amount'] = $isCod ? $boxAmount : 0.0;
+            }
         }
 
         return $packages;
@@ -1621,7 +1682,7 @@ class DelhiveryServiceController extends Controller
         $seller = SettingController::sellerDetails();
         $sellerName = $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP';
         $sellerAddress = $seller['address'] !== '' ? $seller['address'] : $pickupAddress;
-        $sellerInvoice = 'INV-' . $order->id;
+        $sellerInvoice = $this->salesInvoiceNumberForOrder((int) $order->id) ?? '';
 
         // Defaults
         $orderData = [

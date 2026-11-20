@@ -1818,6 +1818,7 @@ class OrderController extends Controller
                 $pq->select('id','order_id','amount','status','created_at');
             },
             'latestShipment',
+            'invoiceFile',
         ])->find($id);
 
         if (!$order) {
@@ -1827,6 +1828,12 @@ class OrderController extends Controller
                 'message' => 'Order not found.',
                 'data' => null,
             ], 404);
+        }
+
+        $invoiceNumber = trim((string) optional($order->invoiceFile)->alt_text);
+        $invoiceUrl = null;
+        if ($order->invoiceFile && $order->invoiceFile->file_path) {
+            $invoiceUrl = asset('storage/' . ltrim((string) $order->invoiceFile->file_path, '/'));
         }
 
         $items = $order->items->map(function ($it) use ($money, $mulMoney) {
@@ -1924,6 +1931,11 @@ class OrderController extends Controller
                 'error_message'      => $shipment->error_message,
                 'pickup_pin'         => $shipment->pickup_pin,
                 'shipping_pin'       => $shipment->shipping_pin,
+            ] : null,
+            'invoice'           => $order->invoice_id ? [
+                'id'     => $order->invoice_id,
+                'number' => $invoiceNumber !== '' ? $invoiceNumber : null,
+                'url'    => $invoiceUrl,
             ] : null,
         ];
 

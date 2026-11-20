@@ -67,11 +67,17 @@ class CheckoutSchema
             $t->integer('is_cod')->default(0);
             $t->string('photo_id')->nullable();
             $t->decimal('weight', 8, 3)->nullable();
+            $t->decimal('length', 8, 2)->nullable();
+            $t->decimal('width', 8, 2)->nullable();
+            $t->decimal('height', 8, 2)->nullable();
             $t->timestamps();
         });
         Schema::create('t_uploads', function (Blueprint $t) {
             $t->id();
             $t->string('file_path')->nullable();
+            $t->string('type')->nullable();
+            $t->string('size')->nullable();
+            $t->string('alt_text')->nullable();
             $t->timestamps();
         });
         Schema::create('t_users_discount', function (Blueprint $t) {
