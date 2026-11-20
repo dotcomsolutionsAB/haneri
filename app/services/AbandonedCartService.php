@@ -248,6 +248,30 @@ class AbandonedCartService
                 ],
             ]);
 
+            parse_str((string) parse_url($mailable->cartUrl, PHP_URL_QUERY), $query);
+            $restoreToken = (string) ($query['restore'] ?? '');
+            if ($stage === 1 && $coupon === null) {
+                WhatsAppService::sendCheckoutIncomplete(
+                    (string) $user->mobile,
+                    (string) $user->name,
+                    $items,
+                    $restoreToken
+                );
+            }
+            if ($stage === 2 && $coupon !== null) {
+                WhatsAppService::sendCartCoupon(
+                    (string) $user->mobile,
+                    (string) $user->name,
+                    $items,
+                    (string) $coupon->coupon_code,
+                    $percent.'% off',
+                    $coupon->expires_at
+                        ? $coupon->expires_at->timezone(config('app.timezone'))->format('d M Y, h:i A')
+                        : '',
+                    $restoreToken
+                );
+            }
+
             return true;
         } catch (\Throwable $e) {
             if ($coupon) {

@@ -98,6 +98,7 @@ class CheckoutSchema
             $t->string('status')->default('pending');
             $t->string('payment_status')->default('pending');
             $t->timestamp('mail_sent_at')->nullable();
+            $t->timestamp('admin_whatsapp_sent_at')->nullable();
             $t->string('delivery_status')->default('pending');
             $t->string('shipping_charge')->default('0');
             $t->string('coupon_code')->nullable();

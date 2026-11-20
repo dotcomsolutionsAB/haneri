@@ -76,6 +76,11 @@ return [
         'api_version' => env('WHATSAPP_API_VERSION', 'v22.0'),
         'otp_template' => env('WHATSAPP_OTP_TEMPLATE', 'haneri_otp'),
         'otp_language' => env('WHATSAPP_OTP_TEMPLATE_LANGUAGE', 'en'),
+        'order_confirmed_template' => env('WHATSAPP_ORDER_CONFIRMED_TEMPLATE', 'haneri_order_confirmed'),
+        'order_dispatched_template' => env('WHATSAPP_ORDER_DISPATCHED_TEMPLATE', 'haneri_order_dispatched'),
+        'checkout_incomplete_template' => env('WHATSAPP_CHECKOUT_INCOMPLETE_TEMPLATE', 'haneri_checkout_incomplete'),
+        'cart_coupon_template' => env('WHATSAPP_CART_COUPON_TEMPLATE', 'haneri_cart_offer'),
+        'admin_order_template' => env('WHATSAPP_ADMIN_ORDER_TEMPLATE', 'haneri_admin_order_paid'),
     ],
 
     'smsalert' => [

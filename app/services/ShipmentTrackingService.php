@@ -215,6 +215,16 @@ class ShipmentTrackingService
                 throw $e;
             }
 
+            if ($milestone === 'dispatched') {
+                WhatsAppService::sendOrderDispatched(
+                    (string) ($user->mobile ?: $locked->customer_phone),
+                    (string) $user->name,
+                    (string) $order->id,
+                    (string) ($locked->courier ?: 'Courier'),
+                    implode(', ', $this->waybills($locked))
+                );
+            }
+
             $sent[] = $milestone;
             $locked->milestones_sent = array_values(array_unique($sent));
             $locked->save();

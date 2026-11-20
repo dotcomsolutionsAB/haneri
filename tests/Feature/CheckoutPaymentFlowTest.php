@@ -11,8 +11,11 @@ use App\Models\OtpModel;
 use App\Models\PaymentModel;
 use App\Models\ProductModel;
 use App\Models\ProductVariantModel;
+use App\Models\SettingModel;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\CheckoutSchema;
@@ -511,6 +514,121 @@ class CheckoutPaymentFlowTest extends TestCase
         ])->assertStatus(200);
         $this->assertSame(1, PaymentModel::where('order_id', $order->id)->count());
         Mail::assertSent(NewWebsiteOrderMail::class, 3);
+    }
+
+    public function test_admin_saves_order_alert_names_and_mobiles(): void
+    {
+        $admin = $this->makeUser(['role' => 'admin']);
+        Sanctum::actingAs($admin);
+
+        $this->putJson('/api/settings/order-alerts', [
+            'recipients' => [
+                ['name' => 'Arnav', 'mobile' => '98765 43210'],
+                ['name' => 'Arnav', 'mobile' => '9876543210'],
+            ],
+        ])->assertStatus(422);
+
+        $this->putJson('/api/settings/order-alerts', [
+            'recipients' => [
+                ['name' => 'Arnav', 'mobile' => '+91 98765 43210'],
+                ['name' => 'Manan', 'mobile' => '9123456780'],
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.recipients.0.mobile', '9876543210')
+            ->assertJsonPath('data.recipients.1.name', 'Manan');
+
+        $this->getJson('/api/settings/order-alerts')
+            ->assertOk()
+            ->assertJsonCount(2, 'data.recipients');
+
+        Sanctum::actingAs($this->makeUser());
+        $this->getJson('/api/settings/order-alerts')->assertForbidden();
+    }
+
+    public function test_paid_order_whatsapp_goes_to_each_admin_once_from_checkout_and_webhook(): void
+    {
+        config([
+            'services.whatsapp.token' => 'test-token',
+            'services.whatsapp.phone_number_id' => '1196510793549419',
+            'services.whatsapp.business_account_id' => '1271818951690161',
+            'services.whatsapp.api_version' => 'v22.0',
+            'services.whatsapp.admin_order_template' => 'haneri_admin_order_paid',
+            'services.razorpay.webhook_secret' => 'hook-secret',
+        ]);
+        Cache::flush();
+        Http::fake([
+            'graph.facebook.com/*message_templates*' => Http::response([
+                'data' => [['name' => 'haneri_admin_order_paid', 'status' => 'APPROVED']],
+            ]),
+            'graph.facebook.com/*/messages' => Http::response(['messages' => [['id' => 'wamid.1']]], 200),
+        ]);
+        SettingModel::create([
+            'key' => 'order_alerts',
+            'value' => json_encode([
+                'recipients' => [
+                    ['name' => 'Arnav', 'mobile' => '9876543210'],
+                    ['name' => 'Manan', 'mobile' => '9123456780'],
+                ],
+            ]),
+        ]);
+
+        $user = $this->makeUser(['name' => 'Santosh', 'mobile' => '9988776655']);
+        $paidOnPage = $this->placeOrder($user, 16990);
+        $this->postJson("/api/orders/{$paidOnPage['order_id']}/verify-payment", [
+            'razorpay_order_id' => $paidOnPage['razorpay_order_id'],
+            'razorpay_payment_id' => 'pay_PAGE',
+            'razorpay_signature' => $this->sign($paidOnPage['razorpay_order_id'], 'pay_PAGE'),
+        ])->assertOk();
+
+        $this->postWebhook([
+            'event' => 'payment.captured',
+            'payload' => ['payment' => ['entity' => [
+                'id' => 'pay_PAGE',
+                'order_id' => $paidOnPage['razorpay_order_id'],
+                'method' => 'upi',
+            ]]],
+        ])->assertOk();
+
+        $webhookOnly = $this->placeOrder($user, 16990);
+        $this->postWebhook([
+            'event' => 'payment.captured',
+            'payload' => ['payment' => ['entity' => [
+                'id' => 'pay_HOOK',
+                'order_id' => $webhookOnly['razorpay_order_id'],
+                'method' => 'card',
+            ]]],
+        ])->assertOk();
+        $this->postWebhook([
+            'event' => 'payment.captured',
+            'payload' => ['payment' => ['entity' => [
+                'id' => 'pay_HOOK',
+                'order_id' => $webhookOnly['razorpay_order_id'],
+                'method' => 'card',
+            ]]],
+        ])->assertOk();
+
+        $sent = collect(Http::recorded())
+            ->filter(fn ($pair) => str_contains($pair[0]->url(), '/messages')
+                && $pair[0]['template']['name'] === 'haneri_admin_order_paid');
+        $this->assertCount(4, $sent);
+        $this->assertEqualsCanonicalizing(
+            ['919876543210', '919123456780', '919876543210', '919123456780'],
+            $sent->map(fn ($pair) => $pair[0]['to'])->all()
+        );
+        $this->assertNotNull(OrderModel::find($paidOnPage['order_id'])->admin_whatsapp_sent_at);
+        $this->assertNotNull(OrderModel::find($webhookOnly['order_id'])->admin_whatsapp_sent_at);
+    }
+
+    private function postWebhook(array $payload)
+    {
+        $body = json_encode($payload);
+        $signature = hash_hmac('sha256', $body, 'hook-secret');
+
+        return $this->call('POST', '/api/razorpay/webhook', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_X_RAZORPAY_SIGNATURE' => $signature,
+        ], $body);
     }
 
     public function test_payment_with_a_bad_signature_is_rejected_and_order_stays_unpaid(): void

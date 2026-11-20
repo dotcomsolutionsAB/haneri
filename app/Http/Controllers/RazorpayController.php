@@ -16,6 +16,7 @@ use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\EmailLog;
+use App\services\WhatsAppService;
 
 class RazorpayController extends Controller
 {
@@ -490,6 +491,7 @@ class RazorpayController extends Controller
                 ->toArray();
 
             $customerNotified = false;
+            $this->notifyAdminOrderPaid($orderUser, $order, $items);
             try {
                 Mail::to($orderUser->email)->send(new OrderPlacedMail($orderUser, $order, $items));
                 $order->mail_sent_at = now();
@@ -499,6 +501,13 @@ class RazorpayController extends Controller
                     'recipient_user_id' => $orderUser->id,
                     'subject' => 'Order Confirmed • #'.$order->id.' • '.config('app.name'),
                 ]);
+                WhatsAppService::sendOrderConfirmed(
+                    (string) $orderUser->mobile,
+                    (string) $orderUser->name,
+                    (string) $order->id,
+                    $items,
+                    (float) $order->total_amount
+                );
             } catch (\Throwable $e) {
                 Log::warning('OrderPlacedMail failed for order '.$orderId.': '.$e->getMessage());
                 EmailLog::record($orderUser->email, OrderPlacedMail::class, 'failed', [
@@ -511,6 +520,39 @@ class RazorpayController extends Controller
                 $this->notifyOrderRecipients($orderUser, $order, $items);
             }
         });
+    }
+
+    /**
+     * One WhatsApp per saved admin mobile, the first time this paid order is confirmed.
+     * The thank-you page and the Razorpay webhook both arrive here.
+     *
+     * @param  array<int, array{name:string,variant:?string,qty:int,price:float,total:float}>  $items
+     */
+    private function notifyAdminOrderPaid(User $orderUser, OrderModel $order, array $items): void
+    {
+        if ($order->admin_whatsapp_sent_at) {
+            return;
+        }
+
+        $recipients = SettingController::orderAlertRecipients();
+        if ($recipients === []) {
+            return;
+        }
+
+        $order->admin_whatsapp_sent_at = now();
+        $order->save();
+
+        $customer = trim($orderUser->name.' '.$orderUser->mobile);
+        foreach ($recipients as $recipient) {
+            WhatsAppService::sendAdminOrderPaid(
+                $recipient['mobile'],
+                $recipient['name'],
+                (string) $order->id,
+                $customer,
+                $items,
+                (float) $order->total_amount
+            );
+        }
     }
 
     /**

@@ -14,6 +14,8 @@ use App\Models\SettingModel;
 use App\Models\User;
 use App\services\AbandonedCartService;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 use Tests\Support\CheckoutSchema;
@@ -68,6 +70,83 @@ class AbandonedCartReminderTest extends TestCase
         $this->assertNotNull($reminder->first_sent_at);
         $this->assertNotNull($reminder->second_sent_at);
         $this->assertSame($coupon->coupon_code, $reminder->coupon_code);
+    }
+
+    public function test_the_discount_reminder_is_sent_on_whatsapp_with_the_coupon(): void
+    {
+        config([
+            'services.whatsapp.token' => 'test-token',
+            'services.whatsapp.phone_number_id' => '1196510793549419',
+            'services.whatsapp.business_account_id' => '1271818951690161',
+            'services.whatsapp.api_version' => 'v22.0',
+            'services.whatsapp.cart_coupon_template' => 'haneri_cart_offer',
+        ]);
+        Cache::flush();
+        Http::fake([
+            'graph.facebook.com/*message_templates*' => Http::response([
+                'data' => [['name' => 'haneri_cart_offer', 'status' => 'APPROVED']],
+            ]),
+            'graph.facebook.com/*/messages' => Http::response(['messages' => [['id' => 'wamid.1']]], 200),
+        ]);
+
+        [$user, $variant] = $this->catalog();
+        $user->update(['mobile' => '9876543210']);
+        $this->cart($user->id, $variant->id, now()->subHours(25));
+
+        Artisan::call('carts:remind-abandoned');
+
+        $coupon = CouponModel::first();
+        $this->assertNotNull($coupon);
+        Mail::assertSent(AbandonedCartMail::class, function (AbandonedCartMail $mail) use ($coupon) {
+            return $mail->stage === 2 && $mail->couponCode === $coupon->coupon_code;
+        });
+        Http::assertSent(function ($request) use ($coupon) {
+            if (! str_contains($request->url(), '/messages')) {
+                return false;
+            }
+            $body = $request['template']['components'][0]['parameters'];
+
+            return $request['to'] === '919876543210'
+                && $request['template']['name'] === 'haneri_cart_offer'
+                && $body[2]['text'] === $coupon->coupon_code
+                && $body[3]['text'] === '10% off';
+        });
+        Http::assertNotSent(function ($request) {
+            return str_contains($request->url(), '/messages')
+                && $request['template']['name'] === 'haneri_checkout_incomplete';
+        });
+    }
+
+    public function test_the_first_reminder_is_sent_on_whatsapp_without_a_coupon(): void
+    {
+        config([
+            'services.whatsapp.token' => 'test-token',
+            'services.whatsapp.phone_number_id' => '1196510793549419',
+            'services.whatsapp.business_account_id' => '1271818951690161',
+            'services.whatsapp.api_version' => 'v22.0',
+            'services.whatsapp.checkout_incomplete_template' => 'haneri_checkout_incomplete',
+        ]);
+        Cache::flush();
+        Http::fake([
+            'graph.facebook.com/*message_templates*' => Http::response([
+                'data' => [['name' => 'haneri_checkout_incomplete', 'status' => 'APPROVED']],
+            ]),
+            'graph.facebook.com/*/messages' => Http::response(['messages' => [['id' => 'wamid.1']]], 200),
+        ]);
+
+        [$user, $variant] = $this->catalog();
+        $user->update(['mobile' => '9876543210']);
+        $this->cart($user->id, $variant->id, now()->subHours(2));
+
+        Artisan::call('carts:remind-abandoned');
+
+        Mail::assertSent(AbandonedCartMail::class, fn (AbandonedCartMail $mail) => $mail->stage === 1 && $mail->couponCode === null);
+        $this->assertSame(0, CouponModel::count());
+        Http::assertSent(function ($request) {
+            return str_contains($request->url(), '/messages')
+                && $request['template']['name'] === 'haneri_checkout_incomplete'
+                && $request['to'] === '919876543210';
+        });
     }
 
     public function test_second_email_uses_the_saved_discount_percent(): void

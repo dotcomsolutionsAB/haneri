@@ -16,6 +16,7 @@ class SettingController extends Controller
     public const ANALYTICS_CACHE_KEY = 'site.analytics';
     public const SELLER_KEY = 'seller';
     public const ABANDONED_CART_KEY = 'abandoned_cart';
+    public const ORDER_ALERTS_KEY = 'order_alerts';
     public const SHIPROCKET_KEY = 'shiprocket';
     public const SALES_INVOICE_KEY = 'sales_invoice';
 
@@ -269,6 +270,94 @@ class SettingController extends Controller
             'message' => 'Abandoned cart discount saved.',
             'data' => ['discount_percent' => (int) $data['discount_percent']],
         ]);
+    }
+
+    public function showOrderAlerts(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Order alert recipients fetched successfully.',
+            'data' => ['recipients' => self::orderAlertRecipients()],
+        ]);
+    }
+
+    public function updateOrderAlerts(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'recipients' => 'present|array|max:20',
+            'recipients.*.name' => 'required|string|max:80',
+            'recipients.*.mobile' => 'required|string|max:20',
+        ]);
+
+        $recipients = [];
+        $seen = [];
+        foreach ($data['recipients'] as $index => $row) {
+            $name = trim((string) $row['name']);
+            $mobile = self::normalizeMobile((string) $row['mobile']);
+            if ($name === '' || $mobile === null) {
+                throw ValidationException::withMessages([
+                    "recipients.$index.mobile" => ['Enter a name and a 10-digit mobile number.'],
+                ]);
+            }
+            if (isset($seen[$mobile])) {
+                throw ValidationException::withMessages([
+                    "recipients.$index.mobile" => ['This mobile number is already in the list.'],
+                ]);
+            }
+            $seen[$mobile] = true;
+            $recipients[] = ['name' => $name, 'mobile' => $mobile];
+        }
+
+        SettingModel::updateOrCreate(
+            ['key' => self::ORDER_ALERTS_KEY],
+            ['value' => json_encode(['recipients' => $recipients])]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Order alert recipients saved.',
+            'data' => ['recipients' => $recipients],
+        ]);
+    }
+
+    /**
+     * @return array<int, array{name: string, mobile: string}>
+     */
+    public static function orderAlertRecipients(): array
+    {
+        $row = SettingModel::where('key', self::ORDER_ALERTS_KEY)->first();
+        $decoded = $row && ! empty($row->value) ? json_decode($row->value, true) : null;
+        if (! is_array($decoded)) {
+            return [];
+        }
+
+        $recipients = [];
+        foreach ((array) ($decoded['recipients'] ?? []) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $name = trim((string) ($row['name'] ?? ''));
+            $mobile = self::normalizeMobile((string) ($row['mobile'] ?? ''));
+            if ($name === '' || $mobile === null) {
+                continue;
+            }
+            $recipients[] = ['name' => $name, 'mobile' => $mobile];
+        }
+
+        return $recipients;
+    }
+
+    private static function normalizeMobile(string $mobile): ?string
+    {
+        $digits = preg_replace('/\D/', '', $mobile) ?? '';
+        if (strlen($digits) === 12 && str_starts_with($digits, '91')) {
+            $digits = substr($digits, 2);
+        }
+        if (strlen($digits) === 11 && str_starts_with($digits, '0')) {
+            $digits = substr($digits, 1);
+        }
+
+        return preg_match('/^[6-9]\d{9}$/', $digits) === 1 ? $digits : null;
     }
 
     public static function abandonedCartDiscount(): int

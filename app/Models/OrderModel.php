@@ -23,6 +23,12 @@ class OrderModel extends Model
         'discount_amount',
         'razorpay_order_id',
         'mail_sent_at',
+        'admin_whatsapp_sent_at',
+    ];
+
+    protected $casts = [
+        'mail_sent_at' => 'datetime',
+        'admin_whatsapp_sent_at' => 'datetime',
     ];
 
      /**
