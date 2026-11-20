@@ -1668,6 +1668,9 @@ class OrderController extends Controller
                             'awb_no'          => $sh->awb_no ?: null,
                             'courier_reference' => $sh->courier_reference ?: null,
                             'booked_at'       => optional($sh->booked_at)->toIso8601String(),
+                            'carrier_status'  => $sh->carrier_status,
+                            'status_location' => $sh->status_location,
+                            'milestones_sent' => $sh->milestones_sent ?? [],
                         ];
                     }
                 }
@@ -1909,6 +1912,9 @@ class OrderController extends Controller
                 'awb_no'             => $shipment->awb_no,
                 'courier_reference'  => $shipment->courier_reference,
                 'booked_at'          => optional($shipment->booked_at)->toIso8601String(),
+                'carrier_status'     => $shipment->carrier_status,
+                'status_location'    => $shipment->status_location,
+                'milestones_sent'    => $shipment->milestones_sent ?? [],
                 'cancelled_at'       => optional($shipment->cancelled_at)->toIso8601String(),
                 'weight'             => $shipment->weight,
                 'shipment_length'    => $shipment->shipment_length,

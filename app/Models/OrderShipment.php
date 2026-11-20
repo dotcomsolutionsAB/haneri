@@ -13,6 +13,10 @@ class OrderShipment extends Model
         'user_id',
         'courier',
         'status',
+        'carrier_status',
+        'carrier_status_at',
+        'status_location',
+        'milestones_sent',
         'customer_name',
         'customer_phone',
         'customer_email',
@@ -62,7 +66,9 @@ class OrderShipment extends Model
     protected $casts = [
         'request_payload'  => 'array',
         'response_payload' => 'array',
+        'milestones_sent'  => 'array',
         'booked_at'        => 'datetime',
+        'carrier_status_at'=> 'datetime',
         'delivered_at'     => 'datetime',
         'cancelled_at'     => 'datetime',
     ];

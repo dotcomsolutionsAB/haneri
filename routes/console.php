@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('carts:remind-abandoned')->everyFifteenMinutes()->withoutOverlapping();
 Schedule::command('orders:cancel-stale')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('shipments:sync-status')->everyFifteenMinutes()->withoutOverlapping();

@@ -30,6 +30,7 @@ use App\Http\Controllers\BlogController;
 use App\Http\Controllers\SiteConfigController;
 use App\Http\Controllers\AbandonedCartController;
 use App\Http\Controllers\CronController;
+use App\Http\Controllers\ShipmentWebhookController;
 
 Route::post('/register', [AuthController::class, 'register']); // Register (normal or Google)
 Route::post('/login/{otp?}', [AuthController::class, 'login']); // Login (normal, OTP, or Google)
@@ -287,3 +288,5 @@ Route::middleware(['auth:sanctum'])->group(function () {
 });
 Route::post('/razorpay/callback', [RazorpayController::class, 'handleCallback']);
 Route::post('/razorpay/webhook', [RazorpayController::class, 'handleWebhook']);
+Route::post('/delhivery/webhook', [ShipmentWebhookController::class, 'delhivery']);
+Route::post('/shiprocket/webhook', [ShipmentWebhookController::class, 'shiprocket']);

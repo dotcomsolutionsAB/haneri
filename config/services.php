@@ -62,6 +62,20 @@ return [
         'password' => env('SHIPROCKET_PASSWORD'),
         'pickup_location' => env('SHIPROCKET_PICKUP_LOCATION'),
         'cargo_base_url' => env('SHIPROCKET_CARGO_BASE_URL', 'https://api.rocketbox.in/api'),
+        'webhook_token' => env('SHIPROCKET_WEBHOOK_TOKEN'),
+    ],
+
+    'delhivery' => [
+        'webhook_token' => env('DELHIVERY_WEBHOOK_TOKEN'),
+    ],
+
+    'whatsapp' => [
+        'token' => env('WHATSAPP_ACCESS_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'business_account_id' => env('WHATSAPP_BUSINESS_ACCOUNT_ID'),
+        'api_version' => env('WHATSAPP_API_VERSION', 'v22.0'),
+        'otp_template' => env('WHATSAPP_OTP_TEMPLATE', 'haneri_otp'),
+        'otp_language' => env('WHATSAPP_OTP_TEMPLATE_LANGUAGE', 'en'),
     ],
 
     'smsalert' => [

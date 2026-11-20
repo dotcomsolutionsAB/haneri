@@ -157,7 +157,12 @@ class CheckoutSchema
             $t->json('response_payload')->nullable();
             $t->text('error_message')->nullable();
             $t->timestamp('booked_at')->nullable();
+            $t->timestamp('delivered_at')->nullable();
             $t->timestamp('cancelled_at')->nullable();
+            $t->string('carrier_status')->nullable();
+            $t->timestamp('carrier_status_at')->nullable();
+            $t->string('status_location')->nullable();
+            $t->json('milestones_sent')->nullable();
             $t->decimal('shipment_length', 8, 2)->nullable();
             $t->decimal('shipment_width', 8, 2)->nullable();
             $t->decimal('shipment_height', 8, 2)->nullable();

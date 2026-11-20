@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Mail;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Auth;
+use App\services\WhatsAppService;
 use App\Utils\SendSmsAlertUtility;
 use Illuminate\Http\Request;
 use App\Models\User;
@@ -352,11 +353,12 @@ class AuthController extends Controller
         }
 
         SendSmsAlertUtility::sendOtp($mobile, (string) $six_digit_otp, '10');
+        WhatsAppService::sendOtp($mobile, (string) $six_digit_otp);
 
         return response()->json([
             'code'    => 200,
             'success' => true,
-            'message' => 'OTP sent successfully via SMS!',
+            'message' => 'OTP sent successfully.',
             'data'    => [],          // nothing extra to send back
         ], 200);
     }
@@ -513,11 +515,12 @@ class AuthController extends Controller
         }
 
         SendSmsAlertUtility::sendOtp($mobile, $six_digit_otp, '2');
+        WhatsAppService::sendOtp($mobile, $six_digit_otp);
 
         return response()->json([
             'code'    => 200,
             'success' => true,
-            'message' => 'OTP sent successfully via SMS!',
+            'message' => 'OTP sent successfully.',
             'data'    => [],
         ], 200);
     }
