@@ -80,19 +80,22 @@
             margin-top: 28px;
         }
         .sign-block {
-            width: 200px;
+            width: 168px;
             margin-left: auto;
             text-align: right;
+            font-size: 10.5px;
         }
         .sign-block img {
             display: block;
-            margin: 6px 0 2px auto;
-            height: 42px;
-            width: auto;
+            margin: 1px 8px -8px auto;
+            width: 76px;
+            height: 32px;
         }
         .sign-line {
             border-top: 1px solid #1f4e4a;
-            padding-top: 6px;
+            padding-top: 4px;
+            font-size: 9.5px;
+            color: #5c6b69;
         }
         .disclaimer {
             margin-top: 22px;
@@ -368,9 +371,9 @@
         <div class="sign-block">
             For <strong>{{ $sellerName }}</strong>
             @if(!empty($signPath))
-                <img src="{{ $signPath }}" alt="Authorised signature">
+                <img src="{{ $signPath }}" alt="Authorised signature" width="76" height="32">
             @else
-                <div style="height: 42px;"></div>
+                <div style="height: 32px;"></div>
             @endif
             <div class="sign-line">Authorised signatory</div>
         </div>
