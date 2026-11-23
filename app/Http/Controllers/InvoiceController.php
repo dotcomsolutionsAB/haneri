@@ -508,9 +508,26 @@ class InvoiceController extends Controller
                 'format' => 'A4',
                 'default_font' => 'dejavusans',
                 'margin_top' => 0,
-                'margin_bottom' => 0,
+                'margin_left' => 0,
+                'margin_right' => 0,
+                'margin_bottom' => 16,
+                'margin_footer' => 0,
                 'tempDir' => $tempDir,
             ]);
+
+            $footerName = e($sellerName);
+            $footerPhone = e((string) config('blade_static_data.company.phone'));
+            $footerEmail = e(strtolower((string) config('blade_static_data.company.support_email')));
+            $mpdf->SetHTMLFooter(
+                '<div style="text-align:center;font-size:8.5px;color:#5c6b69;font-family:dejavusans;padding:0 36px 6px 36px;">'
+                .'This is a computer generated invoice. &nbsp;·&nbsp; Subject to Gautam Budh Nagar jurisdiction.'
+                .'</div>'
+                .'<div style="background:#1f4e4a;color:#ffffff;font-size:8.5px;text-align:center;'
+                .'line-height:26px;font-family:dejavusans;">'
+                .$footerName.' &nbsp;&nbsp;·&nbsp;&nbsp; '.$footerPhone
+                .' &nbsp;&nbsp;·&nbsp;&nbsp; '.$footerEmail
+                .'</div>'
+            );
 
             $html = view('pdf.order_invoice', [
                 'order' => $order,
