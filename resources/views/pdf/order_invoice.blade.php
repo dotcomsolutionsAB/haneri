@@ -117,8 +117,14 @@
     $gstin = strtoupper(trim((string) ($sellerGstin ?? '')));
     $boxes = (int) ($boxCount ?? 0);
     $hsnFallback = (string) ($defaultHsn ?? '841451');
+    $copyLabels = $copyLabels ?? [
+        'Original for the recipient',
+        'Duplicate for the transporter',
+        'Triplicate for the supplier',
+    ];
 @endphp
-<div class="sheet">
+@foreach($copyLabels as $copyLabel)
+<div class="sheet"@if(!$loop->last) style="page-break-after: always;"@endif>
     <table class="meta-table">
         <tr>
             <td style="width: 55%; vertical-align: middle;">
@@ -130,7 +136,8 @@
             </td>
             <td style="width: 45%; text-align: right; vertical-align: middle;">
                 <div class="brand" style="font-size: 18px; letter-spacing: 2px; font-weight: bold;">TAX INVOICE</div>
-                <div style="margin-top: 4px;">{{ $invoiceNumber }}</div>
+                <div class="label" style="margin-top: 3px; letter-spacing: 1px;">{{ $copyLabel }}</div>
+                <div style="margin-top: 6px;">{{ $invoiceNumber }}</div>
                 <div class="muted">{{ optional($order->created_at)->format('d M Y') ?? now()->format('d M Y') }}</div>
             </td>
         </tr>
@@ -200,13 +207,14 @@
     <table class="items" style="margin-top: 16px;">
         <thead>
             <tr>
-                <th style="width: 28px;">#</th>
+                <th style="width: 24px;">#</th>
                 <th>Description</th>
-                <th style="width: 72px;">HSN</th>
-                <th style="width: 80px;">Variant</th>
-                <th class="right" style="width: 72px;">Rate</th>
-                <th class="center" style="width: 36px;">Qty</th>
-                <th class="right" style="width: 84px;">Amount</th>
+                <th style="width: 58px;">HSN</th>
+                <th style="width: 70px;">Variant</th>
+                <th class="right" style="width: 78px;">Rate (incl. GST)</th>
+                <th class="right" style="width: 72px;">Taxable value</th>
+                <th class="center" style="width: 48px;">Qty</th>
+                <th class="right" style="width: 78px;">Amount</th>
             </tr>
         </thead>
         <tbody>
@@ -214,6 +222,8 @@
                 @php
                     $rate = (float) ($item->price ?? 0);
                     $qty = (int) ($item->quantity ?? 0);
+                    $lineIncl = round($rate * $qty, 2);
+                    $lineTaxable = $lineIncl > 0 ? round($lineIncl / 1.18, 2) : 0.0;
                 @endphp
                 <tr>
                     <td class="muted">{{ $loop->iteration }}</td>
@@ -221,8 +231,9 @@
                     <td>{{ \App\services\GstInvoice::formatHsn(optional($item->variant)->hsn, $hsnFallback) }}</td>
                     <td>{{ optional($item->variant)->optionLabel() ?: '—' }}</td>
                     <td class="right">{{ number_format($rate, 2) }}</td>
-                    <td class="center">{{ $qty }}</td>
-                    <td class="right">{{ number_format($rate * $qty, 2) }}</td>
+                    <td class="right">{{ number_format($lineTaxable, 2) }}</td>
+                    <td class="center">{{ $qty }} NOS</td>
+                    <td class="right">{{ number_format($lineIncl, 2) }}</td>
                 </tr>
             @endforeach
         </tbody>
@@ -238,6 +249,11 @@
             <td></td>
             <td class="muted right">Discount{{ !empty($couponCode) ? ' ('.$couponCode.')' : '' }}</td>
             <td class="right">₹{{ number_format($discount, 2) }}</td>
+        </tr>
+        <tr>
+            <td></td>
+            <td class="muted right">Shipping</td>
+            <td class="right">₹{{ number_format($shippingCharge, 2) }}</td>
         </tr>
         <tr>
             <td></td>
@@ -262,11 +278,6 @@
                 <td class="right">₹{{ number_format($taxSplit['igst'], 2) }}</td>
             </tr>
         @endif
-        <tr>
-            <td></td>
-            <td class="muted right">Shipping</td>
-            <td class="right">₹{{ number_format($shippingCharge, 2) }}</td>
-        </tr>
     </table>
 
     <div class="total-bar">
@@ -301,7 +312,7 @@
                 <thead>
                     <tr>
                         <th>HSN/SAC</th>
-                        <th class="center" style="width: 36px;">Qty</th>
+                        <th class="center" style="width: 52px;">Qty</th>
                         <th class="right" style="width: 78px;">Taxable</th>
                         @if($showIntra)
                             <th class="right" style="width: 62px;">CGST 9%</th>
@@ -316,7 +327,7 @@
                     @foreach($hsnRows as $hsnRow)
                         <tr>
                             <td>{{ $hsnRow['hsn_label'] }}</td>
-                            <td class="center">{{ $hsnRow['qty'] }}</td>
+                            <td class="center">{{ $hsnRow['qty'] }} NOS</td>
                             <td class="right">{{ number_format($hsnRow['taxable'], 2) }}</td>
                             @if($showIntra)
                                 <td class="right">{{ number_format($hsnRow['cgst'], 2) }}</td>
@@ -331,7 +342,7 @@
                 <tfoot>
                     <tr>
                         <td>Total</td>
-                        <td class="center">{{ $hsnQtyTotal }}</td>
+                        <td class="center">{{ $hsnQtyTotal }} NOS</td>
                         <td class="right">{{ number_format($hsnTaxableTotal, 2) }}</td>
                         @if($showIntra)
                             <td class="right">{{ number_format($hsnCgstTotal, 2) }}</td>
@@ -347,6 +358,7 @@
     @endif
 
 </div>
+@endforeach
 
 <div class="sign-block">
     For <strong>{{ $sellerName }}</strong>

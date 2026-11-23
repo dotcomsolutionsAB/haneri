@@ -156,17 +156,35 @@ class GstInvoice
     public static function formatHsn(?string $hsn, ?string $fallback = null): string
     {
         $raw = self::normalizeHsn($hsn, $fallback);
-        if ($raw === '') {
-            return '—';
+
+        return $raw !== '' ? $raw : '—';
+    }
+
+    /**
+     * Clean seller address for print: fix "A48 ,", state casing, and trailing ", IN".
+     */
+    public static function formatSellerAddress(string $address): string
+    {
+        $address = trim(preg_replace('/\s+/', ' ', $address) ?? '');
+        if ($address === '') {
+            return '';
         }
-        if (preg_match('/^\d{8}$/', $raw)) {
-            return substr($raw, 0, 4).' '.substr($raw, 4, 2).' '.substr($raw, 6, 2);
-        }
-        if (preg_match('/^\d{6}$/', $raw)) {
-            return substr($raw, 0, 4).' '.substr($raw, 4, 2);
+        // "A48 ," / "A-48," → "A 48,"
+        $address = preg_replace('/\bA[-\s]*(\d+)\s*,/i', 'A $1,', $address) ?? $address;
+        $address = preg_replace('/\s+,/', ',', $address) ?? $address;
+        $address = preg_replace('/,\s*/', ', ', $address) ?? $address;
+        // Drop a bare country suffix when the state is already present.
+        $address = preg_replace('/,\s*(IN|India)\s*$/i', '', $address) ?? $address;
+        foreach (self::STATES as $label) {
+            $pattern = '/\b'.preg_quote($label, '/').'\b/i';
+            $address = preg_replace_callback(
+                $pattern,
+                static fn (array $m) => $label,
+                $address
+            ) ?? $address;
         }
 
-        return $raw;
+        return trim($address, " \t,");
     }
 
     public static function normalizeHsn(?string $hsn, ?string $fallback = null): string
@@ -204,11 +222,14 @@ class GstInvoice
         float $itemsSubtotal,
         float $discount,
         bool $intra,
-        ?string $defaultHsn = null
+        ?string $defaultHsn = null,
+        float $shippingCharge = 0.0
     ): array {
         $itemsSubtotal = max(0, round($itemsSubtotal, 2));
         $discount = max(0, round($discount, 2));
-        $merchandiseIncl = max(0, round($itemsSubtotal - $discount, 2));
+        $shippingCharge = max(0, round($shippingCharge, 2));
+        // Shipping is GST-inclusive and taxed with the goods (not added after tax).
+        $merchandiseIncl = max(0, round($itemsSubtotal - $discount + $shippingCharge, 2));
         $taxRate = 0.18;
         $defaultHsn = $defaultHsn ?? (string) config('shipping.default_hsn', '841451');
 

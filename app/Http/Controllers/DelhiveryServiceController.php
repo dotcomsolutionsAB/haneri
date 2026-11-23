@@ -656,7 +656,9 @@ class DelhiveryServiceController extends Controller
             $codAmount   = $paymentMode === 'COD' ? (float) $order->total_amount : 0.0;
 
             $seller = SettingController::sellerDetails();
-            $sellerName = $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP';
+            $sellerName = $seller['name'] !== ''
+                ? $seller['name']
+                : (string) config('shipping.seller_name', 'HANERI ELECTRICAL LLP');
             $sellerAddress = $seller['address'] !== '' ? $seller['address'] : $pickupAddress;
 
             $existingShipment = OrderShipment::where('order_id', $order->id)->first();
@@ -1680,7 +1682,9 @@ class DelhiveryServiceController extends Controller
         $codAmount   = $paymentMode === 'COD' ? (float)$order->total_amount : 0.0;
 
         $seller = SettingController::sellerDetails();
-        $sellerName = $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP';
+        $sellerName = $seller['name'] !== ''
+            ? $seller['name']
+            : (string) config('shipping.seller_name', 'HANERI ELECTRICAL LLP');
         $sellerAddress = $seller['address'] !== '' ? $seller['address'] : $pickupAddress;
         $sellerInvoice = $this->salesInvoiceNumberForOrder((int) $order->id) ?? '';
 

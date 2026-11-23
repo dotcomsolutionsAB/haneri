@@ -56,9 +56,35 @@ class GstInvoiceTest extends TestCase
 
     public function test_hsn_is_grouped_and_an_unshipped_order_reads_as_confirmed(): void
     {
-        $this->assertSame('8414 51', GstInvoice::formatHsn('841451'));
+        $this->assertSame('841451', GstInvoice::formatHsn('841451'));
+        $this->assertSame('84145100', GstInvoice::formatHsn('8414 51 00'));
         $this->assertSame('Confirmed', GstInvoice::statusLabel('completed', 'pending'));
         $this->assertSame('Delivered', GstInvoice::statusLabel('completed', 'completed'));
+    }
+
+    public function test_seller_address_is_cleaned_for_print(): void
+    {
+        $this->assertSame(
+            'First Floor, A 48, Sector 57, Noida - 201301, Uttar Pradesh',
+            GstInvoice::formatSellerAddress(
+                'First Floor, A48 , Sector 57, Noida - 201301, Uttar pradesh, IN'
+            )
+        );
+    }
+
+    public function test_hsn_summary_includes_shipping_in_taxable_value(): void
+    {
+        $items = [
+            (object) [
+                'price' => 1180,
+                'quantity' => 1,
+                'variant' => (object) ['hsn' => '841451'],
+            ],
+        ];
+        $rows = GstInvoice::hsnSummary($items, 1180.0, 0.0, false, '841451', 118.0);
+
+        $this->assertEqualsWithDelta(1100.0, $rows[0]['taxable'], 0.01);
+        $this->assertEqualsWithDelta(198.0, $rows[0]['igst'], 0.01);
     }
 
     public function test_hsn_summary_groups_taxable_value_for_igst(): void

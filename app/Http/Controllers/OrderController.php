@@ -1874,9 +1874,10 @@ class OrderController extends Controller
         );
         $discountAmount = $storedDiscount > 0 ? $storedDiscount : $inferredDiscount;
 
-        // GST split on merchandise after coupon (excl. shipping)
+        // GST split on merchandise after coupon, with shipping in the taxable base.
         $merchandiseIncl = max(0, round($itemsSubtotal - $discountAmount, 2));
-        $split = $splitInclusive($merchandiseIncl, 18);
+        $baseIncl = max(0, round($merchandiseIncl + $shippingCharge, 2));
+        $split = $splitInclusive($baseIncl, 18);
 
         $shipment = $order->latestShipment;
         // Shape data
@@ -1884,8 +1885,8 @@ class OrderController extends Controller
             'id'                => $order->id,
             'total_amount'      => $money($order->total_amount), // payable (incl. GST + shipping)
             'items_subtotal'    => $money($itemsSubtotal),
-            'total'             => $split['base'],               // merchandise excl. GST
-            'tax'               => $split['tax'],                // GST on merchandise
+            'total'             => $split['base'],               // taxable value (items − discount + shipping, excl. GST)
+            'tax'               => $split['tax'],                // GST on taxable value
             'shipping_charge'   => $money($shippingCharge),
             'discount_amount'   => $money($discountAmount),
             'coupon_code'       => $order->coupon_code,

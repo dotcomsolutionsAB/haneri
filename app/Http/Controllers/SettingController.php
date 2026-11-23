@@ -121,7 +121,7 @@ class SettingController extends Controller
     public static function sellerDetails(): array
     {
         $defaults = [
-            'name' => trim((string) config('shipping.seller_name', 'Haneri Electricals LLP')),
+            'name' => trim((string) config('shipping.seller_name', 'HANERI ELECTRICAL LLP')),
             'address' => trim((string) config('shipping.seller_address', '')),
             'gstin' => strtoupper(trim((string) config('shipping.seller_gstin', ''))),
             'state' => trim((string) config('shipping.seller_state', '')),

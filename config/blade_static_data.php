@@ -2,11 +2,11 @@
 
 return [
     'company' => [
-        'name'    => 'HANERI ELECTRICALS LLP',
+        'name'    => 'HANERI ELECTRICAL LLP',
         'support_email'   => 'support@haneri.com',
         'tech_email'   => 'techsupport@haneri.com',
         'phone'   => '+91 8377826826',
-        'address' => 'Corporate Office: A-48, SECTOR 57, NOIDA, UTTAR PRADESH, PINCODE - 201301',
+        'address' => 'First Floor, A 48, Sector 57, Noida, Gautambuddha Nagar, Uttar Pradesh - 201301',
     ],
 
     'assets' => [

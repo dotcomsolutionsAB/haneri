@@ -2,8 +2,10 @@
 
 return [
 
-    // Seller info (for invoices / Delhivery) — defaults match Haneri's Tally tax invoice.
-    'seller_name'    => 'Haneri Electricals LLP',
+    // Seller info (for invoices / Delhivery) — must match the GST registration certificate.
+    'seller_name'    => (($n = trim((string) env('SELLER_NAME', ''))) !== ''
+        ? $n
+        : 'HANERI ELECTRICAL LLP'),
     'seller_address' => env(
         'SELLER_ADDRESS',
         'First Floor, A 48, Sector 57, Noida, Gautambuddha Nagar, Uttar Pradesh - 201301'

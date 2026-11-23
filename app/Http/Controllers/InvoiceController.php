@@ -440,18 +440,20 @@ class InvoiceController extends Controller
         );
         $discount = $storedDiscount > 0 ? $storedDiscount : $inferredDiscount;
 
+        // Shipping is part of the GST base (taxed at 18%), not added after tax.
         $merchandiseIncl = max(0, round($itemsSubtotal - $discount, 2));
+        $baseIncl = max(0, round($merchandiseIncl + $shippingCharge, 2));
         $taxRate = 0.18;
-        if ($merchandiseIncl > 0) {
-            $subTotal = round($merchandiseIncl / (1 + $taxRate), 2);
-            $taxAmount = round($merchandiseIncl - $subTotal, 2);
+        if ($baseIncl > 0) {
+            $subTotal = round($baseIncl / (1 + $taxRate), 2);
+            $taxAmount = round($baseIncl - $subTotal, 2);
         } else {
             $subTotal = 0.00;
             $taxAmount = 0.00;
         }
 
         $total = (float) $order->total_amount;
-        $grandTotal = round($subTotal + $taxAmount + $shippingCharge, 2);
+        $grandTotal = $baseIncl;
 
         $seller = SettingController::sellerDetails();
         $sellerAddress = $seller['address'];
@@ -461,10 +463,14 @@ class InvoiceController extends Controller
                 config('blade_static_data.company.address')
             ));
         }
+        $sellerAddress = GstInvoice::formatSellerAddress($sellerAddress);
         $sellerGstin = trim((string) $seller['gstin']);
         if ($sellerGstin === '') {
             $sellerGstin = strtoupper(trim((string) config('shipping.seller_gstin', '09ABZFA2370D1Z8')));
         }
+        $sellerName = $seller['name'] !== ''
+            ? $seller['name']
+            : (string) config('shipping.seller_name', 'HANERI ELECTRICAL LLP');
         $sellerState = GstInvoice::sellerState($sellerGstin, $seller['state'], $sellerAddress);
         $ship = GstInvoice::shippingBlock((string) ($order->shipping_address ?? ''));
         $taxSplit = GstInvoice::taxSplit($taxAmount, $sellerState, $ship['state']);
@@ -474,7 +480,8 @@ class InvoiceController extends Controller
             $itemsSubtotal,
             $discount,
             (bool) ($taxSplit['intra'] ?? false),
-            $defaultHsn
+            $defaultHsn,
+            $shippingCharge
         );
         $logo = storage_path('app/public/upload/logo/Haneri_Logo.png');
         if (!is_file($logo)) {
@@ -515,7 +522,7 @@ class InvoiceController extends Controller
                 'boxCount' => max(1, $boxCount),
                 'defaultHsn' => $defaultHsn,
                 'hsnRows' => $hsnRows,
-                'sellerName' => $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP',
+                'sellerName' => $sellerName,
                 'sellerAddress' => $sellerAddress,
                 'sellerGstin' => $sellerGstin,
                 'sellerState' => $sellerState,
