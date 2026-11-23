@@ -142,10 +142,16 @@ class SettingController extends Controller
         $gstin = self::nullableTrim($decoded['gstin'] ?? null);
         $state = self::nullableTrim($decoded['state'] ?? null);
 
+        // Prefer saved GSTIN; if the row has an empty string, fall back to config default.
+        $resolvedGstin = strtoupper($gstin ?? $defaults['gstin']);
+        if ($resolvedGstin === '' && $defaults['gstin'] !== '') {
+            $resolvedGstin = $defaults['gstin'];
+        }
+
         return [
             'name' => $name ?? $defaults['name'],
             'address' => $address ?? $defaults['address'],
-            'gstin' => strtoupper($gstin ?? $defaults['gstin']),
+            'gstin' => $resolvedGstin,
             'state' => $state ?? $defaults['state'],
         ];
     }

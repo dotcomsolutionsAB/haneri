@@ -167,27 +167,19 @@ class InvoiceController extends Controller
                 return $deny;
             }
 
-            // If a final invoice already exists on disk, stream that.
-            if ($order->invoiceFile && $order->invoiceFile->file_path) {
-                $existing = storage_path('app/public/' . ltrim((string) $order->invoiceFile->file_path, '/'));
-                if (is_file($existing)) {
-                    $name = trim((string) ($order->invoiceFile->alt_text ?: ('order-'.$order->id)));
-                    $safe = str_replace(['/', '\\'], '-', $name);
-
-                    return response()->file($existing, [
-                        'Content-Type' => 'application/pdf',
-                        'Content-Disposition' => 'inline; filename="'.$safe.'.pdf"',
-                    ]);
-                }
+            // Always re-render from current seller settings / order lines so GSTIN
+            // updates show immediately. Do not stream a stale on-disk PDF.
+            // Reuse the issued sales number when one exists; otherwise draft label.
+            $invoiceNumber = trim((string) optional($order->invoiceFile)->alt_text);
+            if ($invoiceNumber === '') {
+                $invoiceNumber = 'DRAFT-'.$order->id;
             }
-
-            // Draft preview — no counter bump, no upload row.
-            $binary = $this->renderOrderInvoicePdf($order, 'DRAFT-'.$order->id);
-            $filename = 'draft-invoice-order-'.$order->id.'.pdf';
+            $safe = str_replace(['/', '\\'], '-', $invoiceNumber);
+            $binary = $this->renderOrderInvoicePdf($order, $invoiceNumber);
 
             return response($binary, 200, [
                 'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                'Content-Disposition' => 'inline; filename="'.$safe.'.pdf"',
                 'Cache-Control' => 'no-store, private',
             ]);
         } catch (\Throwable $e) {
