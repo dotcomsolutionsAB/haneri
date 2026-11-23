@@ -83,21 +83,27 @@
         .hsn-wrap .label {
             margin-bottom: 6px;
         }
-        .sign-block {
-            width: 168px;
-            margin-left: auto;
+        .sign-wrap {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .sign-card {
+            width: 180px;
+            border-collapse: collapse;
+        }
+        .sign-card td {
             text-align: right;
             font-size: 10.5px;
+            padding: 0;
+            vertical-align: bottom;
         }
-        .sign-block img {
-            display: block;
-            margin: 1px 8px -8px auto;
-            width: 76px;
-            height: 32px;
+        .sign-card .sign-img {
+            padding: 6px 8px 0 0;
+            height: 36px;
         }
-        .sign-line {
+        .sign-card .sign-line {
             border-top: 1px solid #1f4e4a;
-            padding-top: 4px;
+            padding-top: 5px;
             font-size: 9.5px;
             color: #5c6b69;
         }
@@ -357,15 +363,30 @@
 </tr>
 <tr>
 <td class="sheet-end" valign="bottom">
-    <div class="sign-block">
-        For <strong>{{ $sellerName }}</strong>
-        @if(!empty($signPath))
-            <img src="{{ $signPath }}" alt="Authorised signature" width="76" height="32">
-        @else
-            <div style="height: 32px;"></div>
-        @endif
-        <div class="sign-line">Authorised signatory</div>
-    </div>
+    <table class="sign-wrap">
+        <tr>
+            <td style="width: 58%;"></td>
+            <td style="width: 42%;" align="right">
+                <table class="sign-card" align="right">
+                    <tr>
+                        <td>For <strong>{{ $sellerName }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="sign-img" align="right">
+                            @if(!empty($signPath))
+                                <img src="{{ $signPath }}" alt="Authorised signature" width="70" height="28">
+                            @else
+                                &nbsp;
+                            @endif
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="sign-line">Authorised signatory</td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </td>
 </tr>
 </table>
