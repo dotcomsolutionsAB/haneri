@@ -79,6 +79,9 @@
     $email = strtolower((string) ($user->email ?? ''));
     $payment = ucfirst(strtolower((string) ($order->payment_status ?? 'pending')));
     $place = $ship['state'] ?? null;
+    $gstin = strtoupper(trim((string) ($sellerGstin ?? '')));
+    $boxes = (int) ($boxCount ?? 0);
+    $hsnFallback = (string) ($defaultHsn ?? '841451');
 @endphp
 <div class="sheet">
     <table class="meta-table">
@@ -106,7 +109,9 @@
                 <div class="label">Sold by</div>
                 <strong>{{ $sellerName }}</strong><br>
                 <span class="muted">{{ $sellerAddress }}</span><br>
-                <span style="display: inline-block; margin-top: 6px;">GSTIN: {{ $sellerGstin !== '' ? $sellerGstin : '—' }}</span><br>
+                <span style="display: inline-block; margin-top: 6px;">
+                    GST No / GSTIN: {{ $gstin !== '' ? $gstin : '—' }}
+                </span><br>
                 <span>State: {{ $sellerState['name'] }} ({{ $sellerState['code'] }})</span>
             </td>
             <td style="width: 50%; vertical-align: top;">
@@ -119,7 +124,7 @@
                     Tel: {{ $user->mobile }}<br>
                 @endif
                 @if(!empty($user->gstin))
-                    GSTIN: {{ strtoupper($user->gstin) }}<br>
+                    GST No / GSTIN: {{ strtoupper($user->gstin) }}<br>
                 @endif
                 <div class="label" style="margin-top: 10px;">Ship to</div>
                 @if(!empty($ship['name']) && strcasecmp($ship['name'], (string) ($user->name ?? '')) !== 0)
@@ -138,17 +143,21 @@
 
     <table class="meta-table" style="margin-top: 14px; background: #f4f8f7;">
         <tr>
-            <td style="padding: 8px 12px; width: 33%;">
+            <td style="padding: 8px 12px; width: 25%;">
                 <span class="muted">Order</span><br>
                 <strong>{{ $order->id }}</strong>
             </td>
-            <td style="padding: 8px 12px; width: 33%;">
+            <td style="padding: 8px 12px; width: 25%;">
                 <span class="muted">Payment</span><br>
                 <strong>{{ $payment }}</strong>
             </td>
-            <td style="padding: 8px 12px; width: 34%;">
+            <td style="padding: 8px 12px; width: 25%;">
                 <span class="muted">Status</span><br>
                 <strong>{{ $statusLabel }}</strong>
+            </td>
+            <td style="padding: 8px 12px; width: 25%;">
+                <span class="muted">No of boxes</span><br>
+                <strong>{{ max(1, $boxes) }}</strong>
             </td>
         </tr>
     </table>
@@ -174,7 +183,7 @@
                 <tr>
                     <td class="muted">{{ $loop->iteration }}</td>
                     <td><strong>{{ optional($item->product)->name ?? 'Product #'.$item->product_id }}</strong></td>
-                    <td>{{ \App\services\GstInvoice::formatHsn(optional($item->variant)->hsn) }}</td>
+                    <td>{{ \App\services\GstInvoice::formatHsn(optional($item->variant)->hsn, $hsnFallback) }}</td>
                     <td>{{ optional($item->variant)->optionLabel() ?: '—' }}</td>
                     <td class="right">{{ number_format($rate, 2) }}</td>
                     <td class="center">{{ $qty }}</td>
@@ -229,13 +238,24 @@
         Grand total&nbsp;&nbsp;₹{{ number_format($totalAmount, 2) }}
     </div>
     <div class="words">
-        <span class="muted">Amount in words</span><br>
+        <span class="muted">Amount chargeable (in words)</span><br>
         <strong>{{ $amountInWords }}</strong>
+        @if(!empty($taxAmountInWords) && (float) $taxAmount > 0)
+            <div style="margin-top: 6px;">
+                <span class="muted">Tax amount (in words)</span><br>
+                <strong>{{ $taxAmountInWords }}</strong>
+            </div>
+        @endif
     </div>
 
     <table class="sign" style="margin-top: 28px;">
         <tr>
-            <td style="width: 55%;"></td>
+            <td style="width: 55%; vertical-align: bottom;">
+                <span class="muted" style="font-size: 9px;">
+                    This is a computer generated invoice.<br>
+                    Subject to Gautam Budh Nagar jurisdiction.
+                </span>
+            </td>
             <td style="width: 45%; text-align: right;">
                 For <strong>{{ $sellerName }}</strong>
                 <table style="width: 190px; margin-left: auto; margin-top: 36px;" cellpadding="0" cellspacing="0">
@@ -252,6 +272,9 @@
 
 <div class="footer">
     {{ $sellerName }}
+    @if($gstin !== '')
+        &nbsp;&nbsp;·&nbsp;&nbsp;GSTIN {{ $gstin }}
+    @endif
     @if($sellerAddress !== '')
         &nbsp;&nbsp;·&nbsp;&nbsp;{{ $sellerAddress }}
     @endif

@@ -153,9 +153,18 @@ class GstInvoice
         ];
     }
 
-    public static function formatHsn(?string $hsn): string
+    public static function formatHsn(?string $hsn, ?string $fallback = null): string
     {
         $raw = strtoupper(preg_replace('/\s+/', '', (string) $hsn) ?? '');
+        // Ignore placeholders like HSN1234 — use the configured ceiling-fan HSN.
+        if ($raw === '' || !preg_match('/^\d{4,8}$/', $raw)) {
+            $fallbackRaw = strtoupper(preg_replace(
+                '/\s+/',
+                '',
+                (string) ($fallback ?? config('shipping.default_hsn', '841451'))
+            ) ?? '');
+            $raw = preg_match('/^\d{4,8}$/', $fallbackRaw) ? $fallbackRaw : '';
+        }
         if ($raw === '') {
             return '—';
         }
@@ -166,7 +175,7 @@ class GstInvoice
             return substr($raw, 0, 4).' '.substr($raw, 4, 2);
         }
 
-        return trim((string) $hsn) !== '' ? trim((string) $hsn) : '—';
+        return $raw;
     }
 
     public static function statusLabel(?string $orderStatus, ?string $deliveryStatus): string

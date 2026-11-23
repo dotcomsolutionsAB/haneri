@@ -464,15 +464,25 @@ class InvoiceController extends Controller
         $seller = SettingController::sellerDetails();
         $sellerAddress = $seller['address'];
         if ($sellerAddress === '' || stripos($sellerAddress, 'your full warehouse') !== false) {
-            $sellerAddress = trim((string) config('blade_static_data.company.address'));
+            $sellerAddress = trim((string) config(
+                'shipping.seller_address',
+                config('blade_static_data.company.address')
+            ));
         }
-        $sellerState = GstInvoice::sellerState($seller['gstin'], $seller['state'], $sellerAddress);
+        $sellerGstin = trim((string) $seller['gstin']);
+        if ($sellerGstin === '') {
+            $sellerGstin = strtoupper(trim((string) config('shipping.seller_gstin', '09ABZFA2370D1Z8')));
+        }
+        $sellerState = GstInvoice::sellerState($sellerGstin, $seller['state'], $sellerAddress);
         $ship = GstInvoice::shippingBlock((string) ($order->shipping_address ?? ''));
         $taxSplit = GstInvoice::taxSplit($taxAmount, $sellerState, $ship['state']);
         $logo = storage_path('app/public/upload/logo/Haneri_Logo.png');
         if (!is_file($logo)) {
             $logo = public_path('storage/upload/logo/Haneri_Logo.png');
         }
+        $boxCount = (int) $order->items->sum(function ($item) {
+            return max(1, (int) ($item->quantity ?? 0));
+        });
 
         try {
             $tempDir = storage_path('app/mpdf');
@@ -502,13 +512,16 @@ class InvoiceController extends Controller
                 'couponCode' => $order->coupon_code,
                 'grandTotal' => $grandTotal,
                 'totalAmount' => $total,
+                'boxCount' => max(1, $boxCount),
+                'defaultHsn' => (string) config('shipping.default_hsn', '841451'),
                 'sellerName' => $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP',
                 'sellerAddress' => $sellerAddress,
-                'sellerGstin' => $seller['gstin'],
+                'sellerGstin' => $sellerGstin,
                 'sellerState' => $sellerState,
                 'ship' => $ship,
                 'statusLabel' => GstInvoice::statusLabel($order->status, $order->delivery_status),
                 'amountInWords' => GstInvoice::amountInWords($total),
+                'taxAmountInWords' => GstInvoice::amountInWords($taxAmount),
                 'logoPath' => is_file($logo) ? $logo : null,
             ])->render();
 
