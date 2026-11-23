@@ -1932,7 +1932,7 @@ class OrderController extends Controller
                 'pickup_pin'         => $shipment->pickup_pin,
                 'shipping_pin'       => $shipment->shipping_pin,
             ] : null,
-            'invoice'           => $order->invoice_id ? [
+            'invoice'           => ($order->invoice_id || $invoiceUrl) ? [
                 'id'     => $order->invoice_id,
                 'number' => $invoiceNumber !== '' ? $invoiceNumber : null,
                 'url'    => $invoiceUrl,

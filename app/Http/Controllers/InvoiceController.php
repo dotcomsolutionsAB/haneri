@@ -106,6 +106,7 @@ class InvoiceController extends Controller
                 ], 422);
             }
 
+            // PDF only — do not email or WhatsApp the customer from this action.
             $this->generateOrderInvoice($order, true);
             $order->refresh();
 
@@ -133,7 +134,7 @@ class InvoiceController extends Controller
             return response()->json([
                 'code' => 200,
                 'success' => true,
-                'message' => 'Invoice regenerated successfully.',
+                'message' => 'Invoice generated successfully.',
                 'data' => [
                     'invoice' => $invoice,
                 ],
@@ -228,10 +229,11 @@ class InvoiceController extends Controller
         $invoice = null;
         if ($order->invoice_id) {
             $upload = UploadModel::find($order->invoice_id);
-            if ($upload) {
+            if ($upload && $upload->file_path) {
                 $invoice = [
-                    'id'  => $upload->id,
-                    'url' => asset('storage/' . $upload->file_path),
+                    'id'     => $upload->id,
+                    'number' => trim((string) ($upload->alt_text ?? '')) ?: null,
+                    'url'    => asset('storage/' . ltrim($upload->file_path, '/')),
                 ];
             }
         }
