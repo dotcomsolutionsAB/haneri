@@ -57,7 +57,7 @@
         .words {
             margin-top: 10px;
             background: #f4f8f7;
-            padding: 8px 12px;
+            padding: 10px 14px;
             font-size: 11px;
         }
         .total-bar {
@@ -68,6 +68,13 @@
             font-size: 14px;
             font-weight: bold;
             padding: 10px 12px;
+        }
+        .hsn-wrap {
+            width: 50%;
+            margin-top: 18px;
+        }
+        .hsn-wrap .label {
+            margin-bottom: 6px;
         }
         .sign-block {
             position: fixed;
@@ -264,12 +271,6 @@
     <div class="words">
         <span class="muted">Amount chargeable (in words)</span><br>
         <strong>{{ $amountInWords }}</strong>
-        @if(!empty($taxAmountInWords) && (float) $taxAmount > 0)
-            <div style="margin-top: 6px;">
-                <span class="muted">Tax amount (in words)</span><br>
-                <strong>{{ $taxAmountInWords }}</strong>
-            </div>
-        @endif
     </div>
 
     @if(!empty($hsnRows))
@@ -290,53 +291,55 @@
             }
             $showIntra = !empty($taxSplit['intra']);
         @endphp
-        <div class="label" style="margin-top: 16px;">HSN wise summary</div>
-        <table class="hsn-table">
-            <thead>
-                <tr>
-                    <th>HSN/SAC</th>
-                    <th class="center" style="width: 48px;">Qty</th>
-                    <th class="right" style="width: 88px;">Taxable value</th>
-                    @if($showIntra)
-                        <th class="right" style="width: 72px;">CGST 9%</th>
-                        <th class="right" style="width: 72px;">SGST 9%</th>
-                    @else
-                        <th class="right" style="width: 72px;">IGST 18%</th>
-                    @endif
-                    <th class="right" style="width: 88px;">Tax amount</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($hsnRows as $hsnRow)
+        <div class="hsn-wrap">
+            <div class="label">HSN wise summary</div>
+            <table class="hsn-table">
+                <thead>
                     <tr>
-                        <td>{{ $hsnRow['hsn_label'] }}</td>
-                        <td class="center">{{ $hsnRow['qty'] }}</td>
-                        <td class="right">{{ number_format($hsnRow['taxable'], 2) }}</td>
+                        <th>HSN/SAC</th>
+                        <th class="center" style="width: 36px;">Qty</th>
+                        <th class="right" style="width: 78px;">Taxable</th>
                         @if($showIntra)
-                            <td class="right">{{ number_format($hsnRow['cgst'], 2) }}</td>
-                            <td class="right">{{ number_format($hsnRow['sgst'], 2) }}</td>
+                            <th class="right" style="width: 62px;">CGST 9%</th>
+                            <th class="right" style="width: 62px;">SGST 9%</th>
                         @else
-                            <td class="right">{{ number_format($hsnRow['igst'], 2) }}</td>
+                            <th class="right" style="width: 62px;">IGST 18%</th>
                         @endif
-                        <td class="right">{{ number_format($hsnRow['tax'], 2) }}</td>
+                        <th class="right" style="width: 72px;">Tax</th>
                     </tr>
-                @endforeach
-            </tbody>
-            <tfoot>
-                <tr>
-                    <td>Total</td>
-                    <td class="center">{{ $hsnQtyTotal }}</td>
-                    <td class="right">{{ number_format($hsnTaxableTotal, 2) }}</td>
-                    @if($showIntra)
-                        <td class="right">{{ number_format($hsnCgstTotal, 2) }}</td>
-                        <td class="right">{{ number_format($hsnSgstTotal, 2) }}</td>
-                    @else
-                        <td class="right">{{ number_format($hsnIgstTotal, 2) }}</td>
-                    @endif
-                    <td class="right">{{ number_format($hsnTaxTotal, 2) }}</td>
-                </tr>
-            </tfoot>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach($hsnRows as $hsnRow)
+                        <tr>
+                            <td>{{ $hsnRow['hsn_label'] }}</td>
+                            <td class="center">{{ $hsnRow['qty'] }}</td>
+                            <td class="right">{{ number_format($hsnRow['taxable'], 2) }}</td>
+                            @if($showIntra)
+                                <td class="right">{{ number_format($hsnRow['cgst'], 2) }}</td>
+                                <td class="right">{{ number_format($hsnRow['sgst'], 2) }}</td>
+                            @else
+                                <td class="right">{{ number_format($hsnRow['igst'], 2) }}</td>
+                            @endif
+                            <td class="right">{{ number_format($hsnRow['tax'], 2) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td>Total</td>
+                        <td class="center">{{ $hsnQtyTotal }}</td>
+                        <td class="right">{{ number_format($hsnTaxableTotal, 2) }}</td>
+                        @if($showIntra)
+                            <td class="right">{{ number_format($hsnCgstTotal, 2) }}</td>
+                            <td class="right">{{ number_format($hsnSgstTotal, 2) }}</td>
+                        @else
+                            <td class="right">{{ number_format($hsnIgstTotal, 2) }}</td>
+                        @endif
+                        <td class="right">{{ number_format($hsnTaxTotal, 2) }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
     @endif
 
 </div>
