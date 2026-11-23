@@ -79,7 +79,7 @@
         .sign-block {
             position: fixed;
             right: 36px;
-            bottom: 52px;
+            bottom: 58px;
             width: 200px;
             text-align: right;
         }
@@ -87,21 +87,25 @@
             position: fixed;
             left: 36px;
             right: 36px;
-            bottom: 36px;
+            bottom: 34px;
             text-align: center;
             font-size: 8.5px;
             color: #5c6b69;
+            line-height: 1.3;
         }
         .footer {
             position: fixed;
             left: 0;
             right: 0;
             bottom: 0;
+            height: 26px;
             background: #1f4e4a;
             color: #ffffff;
             font-size: 8.5px;
             text-align: center;
-            padding: 8px 36px;
+            line-height: 26px;
+            padding: 0 36px;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -357,12 +361,6 @@
 
 <div class="footer">
     {{ $sellerName }}
-    @if($gstin !== '')
-        &nbsp;&nbsp;·&nbsp;&nbsp;GSTIN {{ $gstin }}
-    @endif
-    @if($sellerAddress !== '')
-        &nbsp;&nbsp;·&nbsp;&nbsp;{{ $sellerAddress }}
-    @endif
     &nbsp;&nbsp;·&nbsp;&nbsp;{{ config('blade_static_data.company.phone') }}
     &nbsp;&nbsp;·&nbsp;&nbsp;{{ strtolower((string) config('blade_static_data.company.support_email')) }}
 </div>
