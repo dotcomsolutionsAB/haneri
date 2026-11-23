@@ -11,15 +11,7 @@
             margin: 0;
             padding: 0;
         }
-        .page-frame {
-            width: 100%;
-            height: 262mm;
-            border-collapse: collapse;
-        }
-        .sheet-pad { padding: 28px 36px 0 36px; }
-        .sheet-end {
-            padding: 0 36px 6px 36px;
-        }
+        .sheet { padding: 28px 36px 8px 36px; }
         .rule { border: 0; border-top: 1px solid #d7e3e1; margin: 14px 0; }
         .brand { color: #1f4e4a; }
         .muted { color: #5c6b69; }
@@ -31,15 +23,11 @@
             text-transform: uppercase;
             margin-bottom: 4px;
         }
-        .meta-table, .party-table, .items, .totals, .sign {
+        .meta-table, .party-table, .items, .totals {
             width: 100%;
             border-collapse: collapse;
         }
-        .hsn-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .items th, .hsn-table th {
+        .items th {
             background: #1f4e4a;
             color: #ffffff;
             font-size: 9px;
@@ -48,64 +36,40 @@
             text-align: left;
             padding: 8px 8px;
         }
-        .items td, .hsn-table td {
+        .items td {
             padding: 9px 8px;
             border-bottom: 1px solid #e6eeec;
             vertical-align: top;
             font-size: 11px;
         }
-        .hsn-table th { padding: 7px 8px; }
-        .hsn-table td { padding: 7px 8px; font-size: 10px; }
-        .hsn-table tfoot td {
-            border-bottom: 0;
-            border-top: 1px solid #1f4e4a;
-            font-weight: bold;
-            padding-top: 8px;
-        }
         .right { text-align: right; }
         .center { text-align: center; }
         .totals td { padding: 3px 0; font-size: 11px; }
-        .words {
-            margin-top: 10px;
-            background: #f4f8f7;
-            padding: 10px 14px;
-            font-size: 11px;
+        .closing {
+            margin-top: 14px;
+            border-top: 1px solid #d7e3e1;
+            padding-top: 12px;
         }
         .total-bar {
-            margin-top: 8px;
             background: #1f4e4a;
             color: #ffffff;
             text-align: right;
-            font-size: 14px;
+            font-size: 13px;
+            letter-spacing: 0.3px;
             font-weight: bold;
-            padding: 10px 12px;
+            padding: 11px 14px;
         }
-        .bottom-row {
-            width: 100%;
-            border-collapse: collapse;
+        .words {
+            margin-top: 0;
+            background: #f4f8f7;
+            border-left: 3px solid #1f4e4a;
+            padding: 10px 14px;
+            font-size: 11px;
         }
-        .hsn-wrap .label {
-            margin-bottom: 6px;
-        }
-        .sign-card {
-            width: 180px;
-            border-collapse: collapse;
-        }
-        .sign-card td {
-            text-align: right;
-            font-size: 10.5px;
-            padding: 0;
-            vertical-align: bottom;
-        }
-        .sign-card .sign-img {
-            padding: 6px 8px 0 0;
-            height: 36px;
-        }
-        .sign-card .sign-line {
-            border-top: 1px solid #1f4e4a;
-            padding-top: 5px;
-            font-size: 9.5px;
-            color: #5c6b69;
+        .words .muted {
+            font-size: 9px;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
         }
     </style>
 </head>
@@ -124,10 +88,7 @@
     ];
 @endphp
 @foreach($copyLabels as $copyLabel)
-<div {!! !$loop->last ? 'style="page-break-after: always;"' : '' !!}>
-<table class="page-frame">
-<tr>
-<td class="sheet-pad" valign="top">
+<div class="sheet" {!! !$loop->last ? 'style="page-break-after: always;"' : '' !!}>
     <table class="meta-table">
         <tr>
             <td style="width: 55%; vertical-align: middle;">
@@ -283,115 +244,15 @@
         @endif
     </table>
 
-    <div class="total-bar">
-        Grand total&nbsp;&nbsp;₹{{ number_format($totalAmount, 2) }}
+    <div class="closing">
+        <div class="total-bar">
+            Grand total&nbsp;&nbsp;₹{{ number_format($totalAmount, 2) }}
+        </div>
+        <div class="words">
+            <span class="muted">Amount chargeable (in words)</span><br>
+            <strong>{{ $amountInWords }}</strong>
+        </div>
     </div>
-    <div class="words">
-        <span class="muted">Amount chargeable (in words)</span><br>
-        <strong>{{ $amountInWords }}</strong>
-    </div>
-</td>
-</tr>
-<tr>
-<td class="sheet-end" valign="bottom">
-    @php
-        $hsnTaxableTotal = 0.0;
-        $hsnCgstTotal = 0.0;
-        $hsnSgstTotal = 0.0;
-        $hsnIgstTotal = 0.0;
-        $hsnTaxTotal = 0.0;
-        $hsnQtyTotal = 0;
-        $showIntra = !empty($taxSplit['intra']);
-        if (!empty($hsnRows)) {
-            foreach ($hsnRows as $hsnRow) {
-                $hsnTaxableTotal += (float) $hsnRow['taxable'];
-                $hsnCgstTotal += (float) $hsnRow['cgst'];
-                $hsnSgstTotal += (float) $hsnRow['sgst'];
-                $hsnIgstTotal += (float) $hsnRow['igst'];
-                $hsnTaxTotal += (float) $hsnRow['tax'];
-                $hsnQtyTotal += (int) $hsnRow['qty'];
-            }
-        }
-    @endphp
-    <table class="bottom-row" width="100%">
-        <tr>
-            <td width="50%" valign="bottom" style="padding-right: 12px;">
-                @if(!empty($hsnRows))
-                    <div class="hsn-wrap">
-                        <div class="label">HSN wise summary</div>
-                        <table class="hsn-table" width="100%">
-                            <thead>
-                                <tr>
-                                    <th>HSN/SAC</th>
-                                    <th class="center" style="width: 52px;">Qty</th>
-                                    <th class="right" style="width: 78px;">Taxable</th>
-                                    @if($showIntra)
-                                        <th class="right" style="width: 62px;">CGST 9%</th>
-                                        <th class="right" style="width: 62px;">SGST 9%</th>
-                                    @else
-                                        <th class="right" style="width: 62px;">IGST 18%</th>
-                                    @endif
-                                    <th class="right" style="width: 72px;">Tax</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($hsnRows as $hsnRow)
-                                    <tr>
-                                        <td>{{ $hsnRow['hsn_label'] }}</td>
-                                        <td class="center">{{ $hsnRow['qty'] }} NOS</td>
-                                        <td class="right">{{ number_format($hsnRow['taxable'], 2) }}</td>
-                                        @if($showIntra)
-                                            <td class="right">{{ number_format($hsnRow['cgst'], 2) }}</td>
-                                            <td class="right">{{ number_format($hsnRow['sgst'], 2) }}</td>
-                                        @else
-                                            <td class="right">{{ number_format($hsnRow['igst'], 2) }}</td>
-                                        @endif
-                                        <td class="right">{{ number_format($hsnRow['tax'], 2) }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td>Total</td>
-                                    <td class="center">{{ $hsnQtyTotal }} NOS</td>
-                                    <td class="right">{{ number_format($hsnTaxableTotal, 2) }}</td>
-                                    @if($showIntra)
-                                        <td class="right">{{ number_format($hsnCgstTotal, 2) }}</td>
-                                        <td class="right">{{ number_format($hsnSgstTotal, 2) }}</td>
-                                    @else
-                                        <td class="right">{{ number_format($hsnIgstTotal, 2) }}</td>
-                                    @endif
-                                    <td class="right">{{ number_format($hsnTaxTotal, 2) }}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                @endif
-            </td>
-            <td width="50%" valign="bottom" align="right">
-                <table class="sign-card" align="right">
-                    <tr>
-                        <td>For <strong>{{ $sellerName }}</strong></td>
-                    </tr>
-                    <tr>
-                        <td class="sign-img" align="right">
-                            @if(!empty($signPath))
-                                <img src="{{ $signPath }}" alt="Authorised signature" width="70" height="28">
-                            @else
-                                &nbsp;
-                            @endif
-                        </td>
-                    </tr>
-                    <tr>
-                        <td class="sign-line">Authorised signatory</td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</td>
-</tr>
-</table>
 </div>
 @endforeach
 </body>
