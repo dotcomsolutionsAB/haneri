@@ -60,4 +60,23 @@ class GstInvoiceTest extends TestCase
         $this->assertSame('Confirmed', GstInvoice::statusLabel('completed', 'pending'));
         $this->assertSame('Delivered', GstInvoice::statusLabel('completed', 'completed'));
     }
+
+    public function test_hsn_summary_groups_taxable_value_for_igst(): void
+    {
+        $items = [
+            (object) [
+                'price' => 8495,
+                'quantity' => 2,
+                'variant' => (object) ['hsn' => '841451'],
+            ],
+        ];
+        $rows = GstInvoice::hsnSummary($items, 16990.0, 0.0, false, '841451');
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('841451', $rows[0]['hsn']);
+        $this->assertSame(2, $rows[0]['qty']);
+        $this->assertEqualsWithDelta(14398.31, $rows[0]['taxable'], 0.01);
+        $this->assertEqualsWithDelta(2591.69, $rows[0]['igst'], 0.01);
+        $this->assertSame(0.0, $rows[0]['cgst']);
+    }
 }

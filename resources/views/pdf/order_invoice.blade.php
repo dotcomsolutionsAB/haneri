@@ -12,7 +12,7 @@
             margin: 0;
             padding: 0;
         }
-        .sheet { padding: 28px 36px 56px 36px; }
+        .sheet { padding: 28px 36px 130px 36px; }
         .rule { border: 0; border-top: 1px solid #d7e3e1; margin: 14px 0; }
         .brand { color: #1f4e4a; }
         .muted { color: #5c6b69; }
@@ -24,11 +24,11 @@
             text-transform: uppercase;
             margin-bottom: 4px;
         }
-        .meta-table, .party-table, .items, .totals, .sign {
+        .meta-table, .party-table, .items, .totals, .sign, .hsn-table {
             width: 100%;
             border-collapse: collapse;
         }
-        .items th {
+        .items th, .hsn-table th {
             background: #1f4e4a;
             color: #ffffff;
             font-size: 9px;
@@ -37,11 +37,19 @@
             text-align: left;
             padding: 8px 8px;
         }
-        .items td {
+        .items td, .hsn-table td {
             padding: 9px 8px;
             border-bottom: 1px solid #e6eeec;
             vertical-align: top;
             font-size: 11px;
+        }
+        .hsn-table th { padding: 7px 8px; }
+        .hsn-table td { padding: 7px 8px; font-size: 10px; }
+        .hsn-table tfoot td {
+            border-bottom: 0;
+            border-top: 1px solid #1f4e4a;
+            font-weight: bold;
+            padding-top: 8px;
         }
         .right { text-align: right; }
         .center { text-align: center; }
@@ -60,6 +68,22 @@
             font-size: 14px;
             font-weight: bold;
             padding: 10px 12px;
+        }
+        .sign-block {
+            position: fixed;
+            right: 36px;
+            bottom: 52px;
+            width: 200px;
+            text-align: right;
+        }
+        .disclaimer {
+            position: fixed;
+            left: 36px;
+            right: 36px;
+            bottom: 36px;
+            text-align: center;
+            font-size: 8.5px;
+            color: #5c6b69;
         }
         .footer {
             position: fixed;
@@ -248,26 +272,84 @@
         @endif
     </div>
 
-    <table class="sign" style="margin-top: 28px;">
-        <tr>
-            <td style="width: 55%; vertical-align: bottom;">
-                <span class="muted" style="font-size: 9px;">
-                    This is a computer generated invoice.<br>
-                    Subject to Gautam Budh Nagar jurisdiction.
-                </span>
-            </td>
-            <td style="width: 45%; text-align: right;">
-                For <strong>{{ $sellerName }}</strong>
-                <table style="width: 190px; margin-left: auto; margin-top: 36px;" cellpadding="0" cellspacing="0">
+    @if(!empty($hsnRows))
+        @php
+            $hsnTaxableTotal = 0.0;
+            $hsnCgstTotal = 0.0;
+            $hsnSgstTotal = 0.0;
+            $hsnIgstTotal = 0.0;
+            $hsnTaxTotal = 0.0;
+            $hsnQtyTotal = 0;
+            foreach ($hsnRows as $hsnRow) {
+                $hsnTaxableTotal += (float) $hsnRow['taxable'];
+                $hsnCgstTotal += (float) $hsnRow['cgst'];
+                $hsnSgstTotal += (float) $hsnRow['sgst'];
+                $hsnIgstTotal += (float) $hsnRow['igst'];
+                $hsnTaxTotal += (float) $hsnRow['tax'];
+                $hsnQtyTotal += (int) $hsnRow['qty'];
+            }
+            $showIntra = !empty($taxSplit['intra']);
+        @endphp
+        <div class="label" style="margin-top: 16px;">HSN wise summary</div>
+        <table class="hsn-table">
+            <thead>
+                <tr>
+                    <th>HSN/SAC</th>
+                    <th class="center" style="width: 48px;">Qty</th>
+                    <th class="right" style="width: 88px;">Taxable value</th>
+                    @if($showIntra)
+                        <th class="right" style="width: 72px;">CGST 9%</th>
+                        <th class="right" style="width: 72px;">SGST 9%</th>
+                    @else
+                        <th class="right" style="width: 72px;">IGST 18%</th>
+                    @endif
+                    <th class="right" style="width: 88px;">Tax amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($hsnRows as $hsnRow)
                     <tr>
-                        <td style="border-top: 1px solid #1f4e4a; padding-top: 6px; text-align: right;">
-                            Authorised signatory
-                        </td>
+                        <td>{{ $hsnRow['hsn_label'] }}</td>
+                        <td class="center">{{ $hsnRow['qty'] }}</td>
+                        <td class="right">{{ number_format($hsnRow['taxable'], 2) }}</td>
+                        @if($showIntra)
+                            <td class="right">{{ number_format($hsnRow['cgst'], 2) }}</td>
+                            <td class="right">{{ number_format($hsnRow['sgst'], 2) }}</td>
+                        @else
+                            <td class="right">{{ number_format($hsnRow['igst'], 2) }}</td>
+                        @endif
+                        <td class="right">{{ number_format($hsnRow['tax'], 2) }}</td>
                     </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
+                @endforeach
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total</td>
+                    <td class="center">{{ $hsnQtyTotal }}</td>
+                    <td class="right">{{ number_format($hsnTaxableTotal, 2) }}</td>
+                    @if($showIntra)
+                        <td class="right">{{ number_format($hsnCgstTotal, 2) }}</td>
+                        <td class="right">{{ number_format($hsnSgstTotal, 2) }}</td>
+                    @else
+                        <td class="right">{{ number_format($hsnIgstTotal, 2) }}</td>
+                    @endif
+                    <td class="right">{{ number_format($hsnTaxTotal, 2) }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    @endif
+
+</div>
+
+<div class="sign-block">
+    For <strong>{{ $sellerName }}</strong>
+    <div style="margin-top: 40px; border-top: 1px solid #1f4e4a; padding-top: 6px;">
+        Authorised signatory
+    </div>
+</div>
+
+<div class="disclaimer">
+    This is a computer generated invoice. &nbsp;·&nbsp; Subject to Gautam Budh Nagar jurisdiction.
 </div>
 
 <div class="footer">

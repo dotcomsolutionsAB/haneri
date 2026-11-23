@@ -468,6 +468,14 @@ class InvoiceController extends Controller
         $sellerState = GstInvoice::sellerState($sellerGstin, $seller['state'], $sellerAddress);
         $ship = GstInvoice::shippingBlock((string) ($order->shipping_address ?? ''));
         $taxSplit = GstInvoice::taxSplit($taxAmount, $sellerState, $ship['state']);
+        $defaultHsn = (string) config('shipping.default_hsn', '841451');
+        $hsnRows = GstInvoice::hsnSummary(
+            $order->items,
+            $itemsSubtotal,
+            $discount,
+            (bool) ($taxSplit['intra'] ?? false),
+            $defaultHsn
+        );
         $logo = storage_path('app/public/upload/logo/Haneri_Logo.png');
         if (!is_file($logo)) {
             $logo = public_path('storage/upload/logo/Haneri_Logo.png');
@@ -505,7 +513,8 @@ class InvoiceController extends Controller
                 'grandTotal' => $grandTotal,
                 'totalAmount' => $total,
                 'boxCount' => max(1, $boxCount),
-                'defaultHsn' => (string) config('shipping.default_hsn', '841451'),
+                'defaultHsn' => $defaultHsn,
+                'hsnRows' => $hsnRows,
                 'sellerName' => $seller['name'] !== '' ? $seller['name'] : 'Haneri Electricals LLP',
                 'sellerAddress' => $sellerAddress,
                 'sellerGstin' => $sellerGstin,

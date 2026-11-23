@@ -155,16 +155,7 @@ class GstInvoice
 
     public static function formatHsn(?string $hsn, ?string $fallback = null): string
     {
-        $raw = strtoupper(preg_replace('/\s+/', '', (string) $hsn) ?? '');
-        // Ignore placeholders like HSN1234 — use the configured ceiling-fan HSN.
-        if ($raw === '' || !preg_match('/^\d{4,8}$/', $raw)) {
-            $fallbackRaw = strtoupper(preg_replace(
-                '/\s+/',
-                '',
-                (string) ($fallback ?? config('shipping.default_hsn', '841451'))
-            ) ?? '');
-            $raw = preg_match('/^\d{4,8}$/', $fallbackRaw) ? $fallbackRaw : '';
-        }
+        $raw = self::normalizeHsn($hsn, $fallback);
         if ($raw === '') {
             return '—';
         }
@@ -176,6 +167,132 @@ class GstInvoice
         }
 
         return $raw;
+    }
+
+    public static function normalizeHsn(?string $hsn, ?string $fallback = null): string
+    {
+        $raw = strtoupper(preg_replace('/\s+/', '', (string) $hsn) ?? '');
+        if ($raw === '' || !preg_match('/^\d{4,8}$/', $raw)) {
+            $fallbackRaw = strtoupper(preg_replace(
+                '/\s+/',
+                '',
+                (string) ($fallback ?? config('shipping.default_hsn', '841451'))
+            ) ?? '');
+            $raw = preg_match('/^\d{4,8}$/', $fallbackRaw) ? $fallbackRaw : '';
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Build an HSN-wise taxable / tax breakdown (GST-inclusive line prices).
+     *
+     * @param  iterable<int, object>  $items
+     * @return array<int, array{
+     *   hsn: string,
+     *   hsn_label: string,
+     *   qty: int,
+     *   taxable: float,
+     *   cgst: float,
+     *   sgst: float,
+     *   igst: float,
+     *   tax: float
+     * }>
+     */
+    public static function hsnSummary(
+        iterable $items,
+        float $itemsSubtotal,
+        float $discount,
+        bool $intra,
+        ?string $defaultHsn = null
+    ): array {
+        $itemsSubtotal = max(0, round($itemsSubtotal, 2));
+        $discount = max(0, round($discount, 2));
+        $merchandiseIncl = max(0, round($itemsSubtotal - $discount, 2));
+        $taxRate = 0.18;
+        $defaultHsn = $defaultHsn ?? (string) config('shipping.default_hsn', '841451');
+
+        $buckets = [];
+        foreach ($items as $item) {
+            $lineIncl = round(((float) ($item->price ?? 0)) * max(0, (int) ($item->quantity ?? 0)), 2);
+            if ($lineIncl <= 0) {
+                continue;
+            }
+            $share = $itemsSubtotal > 0
+                ? round($merchandiseIncl * ($lineIncl / $itemsSubtotal), 2)
+                : 0.0;
+            $taxable = $share > 0 ? round($share / (1 + $taxRate), 2) : 0.0;
+            $tax = round($share - $taxable, 2);
+            $variantHsn = null;
+            if (is_object($item) && isset($item->variant) && is_object($item->variant)) {
+                $variantHsn = $item->variant->hsn ?? null;
+            }
+            $hsn = self::normalizeHsn(is_string($variantHsn) ? $variantHsn : null, $defaultHsn);
+            if ($hsn === '') {
+                $hsn = '0000';
+            }
+            if (!isset($buckets[$hsn])) {
+                $buckets[$hsn] = [
+                    'hsn' => $hsn,
+                    'hsn_label' => self::formatHsn($hsn, $defaultHsn),
+                    'qty' => 0,
+                    'taxable' => 0.0,
+                    'tax' => 0.0,
+                ];
+            }
+            $buckets[$hsn]['qty'] += max(0, (int) ($item->quantity ?? 0));
+            $buckets[$hsn]['taxable'] = round($buckets[$hsn]['taxable'] + $taxable, 2);
+            $buckets[$hsn]['tax'] = round($buckets[$hsn]['tax'] + $tax, 2);
+        }
+
+        if ($buckets === []) {
+            return [];
+        }
+
+        // Fix rounding so HSN rows match invoice taxable / tax totals.
+        $expectedTaxable = $merchandiseIncl > 0
+            ? round($merchandiseIncl / (1 + $taxRate), 2)
+            : 0.0;
+        $expectedTax = round($merchandiseIncl - $expectedTaxable, 2);
+        $keys = array_keys($buckets);
+        $last = $keys[count($keys) - 1];
+        $sumTaxable = round(array_sum(array_column($buckets, 'taxable')), 2);
+        $sumTax = round(array_sum(array_column($buckets, 'tax')), 2);
+        $buckets[$last]['taxable'] = round(
+            $buckets[$last]['taxable'] + ($expectedTaxable - $sumTaxable),
+            2
+        );
+        $buckets[$last]['tax'] = round(
+            $buckets[$last]['tax'] + ($expectedTax - $sumTax),
+            2
+        );
+
+        $rows = [];
+        foreach ($buckets as $row) {
+            $tax = max(0, round((float) $row['tax'], 2));
+            if ($intra) {
+                $half = round($tax / 2, 2);
+                $cgst = $half;
+                $sgst = round($tax - $half, 2);
+                $igst = 0.0;
+            } else {
+                $cgst = 0.0;
+                $sgst = 0.0;
+                $igst = $tax;
+            }
+            $rows[] = [
+                'hsn' => $row['hsn'],
+                'hsn_label' => $row['hsn_label'],
+                'qty' => (int) $row['qty'],
+                'taxable' => max(0, round((float) $row['taxable'], 2)),
+                'cgst' => $cgst,
+                'sgst' => $sgst,
+                'igst' => $igst,
+                'tax' => $tax,
+            ];
+        }
+
+        return $rows;
     }
 
     public static function statusLabel(?string $orderStatus, ?string $deliveryStatus): string
