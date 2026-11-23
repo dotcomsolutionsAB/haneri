@@ -12,7 +12,7 @@
             margin: 0;
             padding: 0;
         }
-        .sheet { padding: 28px 36px 130px 36px; }
+        .sheet { padding: 28px 36px 0 36px; }
         .rule { border: 0; border-top: 1px solid #d7e3e1; margin: 14px 0; }
         .brand { color: #1f4e4a; }
         .muted { color: #5c6b69; }
@@ -76,34 +76,41 @@
         .hsn-wrap .label {
             margin-bottom: 6px;
         }
+        .sheet-end {
+            margin-top: 28px;
+        }
         .sign-block {
-            position: fixed;
-            right: 36px;
-            bottom: 58px;
             width: 200px;
+            margin-left: auto;
             text-align: right;
         }
+        .sign-block img {
+            display: block;
+            margin: 6px 0 2px auto;
+            height: 42px;
+            width: auto;
+        }
+        .sign-line {
+            border-top: 1px solid #1f4e4a;
+            padding-top: 6px;
+        }
         .disclaimer {
-            position: fixed;
-            left: 36px;
-            right: 36px;
-            bottom: 34px;
+            margin-top: 22px;
             text-align: center;
             font-size: 8.5px;
             color: #5c6b69;
             line-height: 1.3;
         }
         .footer {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: 26px;
+            margin-top: 10px;
+            margin-left: -36px;
+            margin-right: -36px;
             background: #1f4e4a;
             color: #ffffff;
             font-size: 8.5px;
             text-align: center;
             line-height: 26px;
+            height: 26px;
             padding: 0 36px;
             overflow: hidden;
         }
@@ -357,24 +364,26 @@
         </div>
     @endif
 
-</div>
-@endforeach
-
-<div class="sign-block">
-    For <strong>{{ $sellerName }}</strong>
-    <div style="margin-top: 40px; border-top: 1px solid #1f4e4a; padding-top: 6px;">
-        Authorised signatory
+    <div class="sheet-end">
+        <div class="sign-block">
+            For <strong>{{ $sellerName }}</strong>
+            @if(!empty($signPath))
+                <img src="{{ $signPath }}" alt="Authorised signature">
+            @else
+                <div style="height: 42px;"></div>
+            @endif
+            <div class="sign-line">Authorised signatory</div>
+        </div>
+        <div class="disclaimer">
+            This is a computer generated invoice. &nbsp;·&nbsp; Subject to Gautam Budh Nagar jurisdiction.
+        </div>
+        <div class="footer">
+            {{ $sellerName }}
+            &nbsp;&nbsp;·&nbsp;&nbsp;{{ config('blade_static_data.company.phone') }}
+            &nbsp;&nbsp;·&nbsp;&nbsp;{{ strtolower((string) config('blade_static_data.company.support_email')) }}
+        </div>
     </div>
 </div>
-
-<div class="disclaimer">
-    This is a computer generated invoice. &nbsp;·&nbsp; Subject to Gautam Budh Nagar jurisdiction.
-</div>
-
-<div class="footer">
-    {{ $sellerName }}
-    &nbsp;&nbsp;·&nbsp;&nbsp;{{ config('blade_static_data.company.phone') }}
-    &nbsp;&nbsp;·&nbsp;&nbsp;{{ strtolower((string) config('blade_static_data.company.support_email')) }}
-</div>
+@endforeach
 </body>
 </html>

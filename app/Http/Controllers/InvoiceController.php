@@ -487,6 +487,13 @@ class InvoiceController extends Controller
         if (!is_file($logo)) {
             $logo = public_path('storage/upload/logo/Haneri_Logo.png');
         }
+        $sign = public_path('invoice/sign.png');
+        if (!is_file($sign)) {
+            $sign = storage_path('app/public/upload/logo/sign.png');
+        }
+        if (!is_file($sign)) {
+            $sign = public_path('storage/upload/logo/sign.png');
+        }
         $boxCount = (int) $order->items->sum(function ($item) {
             return max(1, (int) ($item->quantity ?? 0));
         });
@@ -531,6 +538,7 @@ class InvoiceController extends Controller
                 'amountInWords' => GstInvoice::amountInWords($total),
                 'taxAmountInWords' => GstInvoice::amountInWords($taxAmount),
                 'logoPath' => is_file($logo) ? $logo : null,
+                'signPath' => is_file($sign) ? $sign : null,
             ])->render();
 
             $mpdf->WriteHTML($html);
