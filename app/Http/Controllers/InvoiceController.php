@@ -93,17 +93,8 @@ class InvoiceController extends Controller
                 ], 404);
             }
 
-            $status = strtolower((string) $order->status);
-            $paymentStatus = strtolower((string) $order->payment_status);
-
-            // Paid orders can invoice before status becomes "completed" (needed for Delhivery punch).
-            if (in_array($status, ['cancelled', 'refunded'], true) || $paymentStatus !== 'paid') {
-                return response()->json([
-                    'code' => 422,
-                    'success' => false,
-                    'message' => 'Invoice can only be generated for paid orders that are not cancelled.',
-                    'data' => [],
-                ], 422);
+            if ($deny = $this->invoiceAccessDenied($order)) {
+                return $deny;
             }
 
             // PDF only — do not email or WhatsApp the customer from this action.
@@ -152,6 +143,85 @@ class InvoiceController extends Controller
                 'data' => [],
             ], 500);
         }
+    }
+
+    /**
+     * Stream a tax-invoice PDF for review. Does not allocate a sales number or save.
+     */
+    public function previewOrderInvoice(int $id)
+    {
+        try {
+            $order = OrderModel::with(['user', 'items.product', 'items.variant', 'invoiceFile'])
+                ->find($id);
+
+            if (!$order) {
+                return response()->json([
+                    'code' => 404,
+                    'success' => false,
+                    'message' => 'Order not found.',
+                    'data' => [],
+                ], 404);
+            }
+
+            if ($deny = $this->invoiceAccessDenied($order)) {
+                return $deny;
+            }
+
+            // If a final invoice already exists on disk, stream that.
+            if ($order->invoiceFile && $order->invoiceFile->file_path) {
+                $existing = storage_path('app/public/' . ltrim((string) $order->invoiceFile->file_path, '/'));
+                if (is_file($existing)) {
+                    $name = trim((string) ($order->invoiceFile->alt_text ?: ('order-'.$order->id)));
+                    $safe = str_replace(['/', '\\'], '-', $name);
+
+                    return response()->file($existing, [
+                        'Content-Type' => 'application/pdf',
+                        'Content-Disposition' => 'inline; filename="'.$safe.'.pdf"',
+                    ]);
+                }
+            }
+
+            // Draft preview — no counter bump, no upload row.
+            $binary = $this->renderOrderInvoicePdf($order, 'DRAFT-'.$order->id);
+            $filename = 'draft-invoice-order-'.$order->id.'.pdf';
+
+            return response($binary, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="'.$filename.'"',
+                'Cache-Control' => 'no-store, private',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('previewOrderInvoice failed: '.$e->getMessage(), [
+                'order_id' => $id,
+            ]);
+
+            return response()->json([
+                'code' => 500,
+                'success' => false,
+                'message' => 'Failed to preview invoice: '.$e->getMessage(),
+                'data' => [],
+            ], 500);
+        }
+    }
+
+    /**
+     * @return \Illuminate\Http\JsonResponse|null
+     */
+    private function invoiceAccessDenied(OrderModel $order)
+    {
+        $status = strtolower((string) $order->status);
+        $paymentStatus = strtolower((string) $order->payment_status);
+
+        if (in_array($status, ['cancelled', 'refunded'], true) || $paymentStatus !== 'paid') {
+            return response()->json([
+                'code' => 422,
+                'success' => false,
+                'message' => 'Invoice can only be generated for paid orders that are not cancelled.',
+                'data' => [],
+            ], 422);
+        }
+
+        return null;
     }
 
     public function updateOrderStatus(Request $request, int $id)
@@ -285,6 +355,64 @@ class InvoiceController extends Controller
 
         $order->loadMissing(['user', 'items.product', 'items.variant']);
 
+        $existingUpload = $order->invoice_id
+            ? UploadModel::find($order->invoice_id)
+            : null;
+
+        if ($existingUpload && $existingUpload->alt_text) {
+            $invoiceNumber = $existingUpload->alt_text;
+            $relativePath = $existingUpload->file_path
+                ?: ('upload/order_invoice/' . $invoiceNumber . '.pdf');
+        } else {
+            $invoiceNumber = SettingController::allocateSalesInvoiceNumber();
+            $safeName = str_replace(['/', '\\'], '-', $invoiceNumber);
+            $relativePath = 'upload/order_invoice/' . $safeName . '.pdf';
+        }
+
+        $relativePath = ltrim(str_replace('\\', '/', (string) $relativePath), '/');
+        $fullPath = storage_path('app/public/' . $relativePath);
+
+        if (!File::isDirectory(dirname($fullPath))) {
+            File::makeDirectory(dirname($fullPath), 0755, true, true);
+        }
+
+        $binary = $this->renderOrderInvoicePdf($order, $invoiceNumber);
+        File::put($fullPath, $binary);
+
+        if (!File::exists($fullPath)) {
+            throw new \RuntimeException('Invoice PDF was not created on disk.');
+        }
+
+        $size = File::size($fullPath);
+
+        if ($existingUpload) {
+            $existingUpload->update([
+                'file_path' => $relativePath,
+                'type' => 'order_invoice',
+                'size' => $size,
+                'alt_text' => $invoiceNumber,
+            ]);
+            return;
+        }
+
+        $upload = UploadModel::create([
+            'file_path' => $relativePath,
+            'type' => 'order_invoice',
+            'size' => $size,
+            'alt_text' => $invoiceNumber,
+        ]);
+
+        $order->invoice_id = $upload->id;
+        $order->save();
+    }
+
+    /**
+     * Build the tax-invoice PDF bytes (no disk write, no sales-number allocation).
+     */
+    private function renderOrderInvoicePdf(OrderModel $order, string $invoiceNumber): string
+    {
+        $order->loadMissing(['user', 'items.product', 'items.variant']);
+
         $fallbackLogo = storage_path('app/public/upload/logo/Haneri_Favicon.jpg');
         if (!is_file($fallbackLogo)) {
             $fallbackLogo = public_path('storage/upload/logo/Haneri_Favicon.jpg');
@@ -309,23 +437,6 @@ class InvoiceController extends Controller
             }
         }
 
-        $existingUpload = $order->invoice_id
-            ? UploadModel::find($order->invoice_id)
-            : null;
-
-        if ($existingUpload && $existingUpload->alt_text) {
-            $invoiceNumber = $existingUpload->alt_text;
-            $relativePath = $existingUpload->file_path
-                ?: ('upload/order_invoice/' . $invoiceNumber . '.pdf');
-        } else {
-            $invoiceNumber = SettingController::allocateSalesInvoiceNumber();
-            $safeName = str_replace(['/', '\\'], '-', $invoiceNumber);
-            $relativePath = 'upload/order_invoice/' . $safeName . '.pdf';
-        }
-
-        $relativePath = ltrim(str_replace('\\', '/', (string) $relativePath), '/');
-        $fullPath = storage_path('app/public/' . $relativePath);
-
         $itemsSubtotal = (float) $order->items->sum(function ($item) {
             return ((float) $item->price) * ((int) $item->quantity);
         });
@@ -337,7 +448,6 @@ class InvoiceController extends Controller
         );
         $discount = $storedDiscount > 0 ? $storedDiscount : $inferredDiscount;
 
-        // Merchandise after coupon is tax-inclusive; split for display
         $merchandiseIncl = max(0, round($itemsSubtotal - $discount, 2));
         $taxRate = 0.18;
         if ($merchandiseIncl > 0) {
@@ -362,10 +472,6 @@ class InvoiceController extends Controller
         $logo = storage_path('app/public/upload/logo/Haneri_Logo.png');
         if (!is_file($logo)) {
             $logo = public_path('storage/upload/logo/Haneri_Logo.png');
-        }
-
-        if (!File::isDirectory(dirname($fullPath))) {
-            File::makeDirectory(dirname($fullPath), 0755, true, true);
         }
 
         try {
@@ -407,7 +513,8 @@ class InvoiceController extends Controller
             ])->render();
 
             $mpdf->WriteHTML($html);
-            $mpdf->Output($fullPath, \Mpdf\Output\Destination::FILE);
+
+            return $mpdf->Output('', \Mpdf\Output\Destination::STRING_RETURN);
         } catch (\Throwable $e) {
             Log::error('mPDF order invoice error: '.$e->getMessage(), [
                 'order_id' => $order->id,
@@ -418,32 +525,6 @@ class InvoiceController extends Controller
                 $e
             );
         }
-
-        if (!File::exists($fullPath)) {
-            throw new \RuntimeException('Invoice PDF was not created on disk.');
-        }
-
-        $size = File::size($fullPath);
-
-        if ($existingUpload) {
-            $existingUpload->update([
-                'file_path' => $relativePath,
-                'type' => 'order_invoice',
-                'size' => $size,
-                'alt_text' => $invoiceNumber,
-            ]);
-            return;
-        }
-
-        $upload = UploadModel::create([
-            'file_path' => $relativePath,
-            'type' => 'order_invoice',
-            'size' => $size,
-            'alt_text' => $invoiceNumber,
-        ]);
-
-        $order->invoice_id = $upload->id;
-        $order->save();
     }
 
 }
