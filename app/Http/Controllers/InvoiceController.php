@@ -96,11 +96,12 @@ class InvoiceController extends Controller
             $status = strtolower((string) $order->status);
             $paymentStatus = strtolower((string) $order->payment_status);
 
-            if ($status !== 'completed' || $paymentStatus === 'pending') {
+            // Paid orders can invoice before status becomes "completed" (needed for Delhivery punch).
+            if (in_array($status, ['cancelled', 'refunded'], true) || $paymentStatus !== 'paid') {
                 return response()->json([
                     'code' => 422,
                     'success' => false,
-                    'message' => 'Invoice can only be regenerated for completed, paid orders.',
+                    'message' => 'Invoice can only be generated for paid orders that are not cancelled.',
                     'data' => [],
                 ], 422);
             }
@@ -114,6 +115,7 @@ class InvoiceController extends Controller
                 if ($upload && $upload->file_path) {
                     $invoice = [
                         'id' => $upload->id,
+                        'number' => trim((string) ($upload->alt_text ?? '')) ?: null,
                         'url' => asset('storage/' . ltrim($upload->file_path, '/')),
                     ];
                 }
@@ -207,13 +209,12 @@ class InvoiceController extends Controller
         }
 
         /**
-         * Invoice generation / refresh
-         * - Completed + payment not pending
-         * - Create if missing; regenerate when an invoice already exists so coupon/discount fixes apply
+         * Invoice generation / refresh for paid orders (including Processing).
+         * Create if missing; regenerate when payment/status just changed so discounts apply.
          */
         if (
-            $order->status === 'completed' &&
-            $order->payment_status !== 'pending' &&
+            $order->payment_status === 'paid' &&
+            !in_array(strtolower((string) $order->status), ['cancelled', 'refunded'], true) &&
             (
                 !$order->invoice_id ||
                 ($oldStatus === 'pending' || array_key_exists('payment_status', $validated))
