@@ -118,7 +118,7 @@
     ];
 @endphp
 @foreach($copyLabels as $copyLabel)
-<div@if(!$loop->last) style="page-break-after: always;"@endif>
+<div {!! !$loop->last ? 'style="page-break-after: always;"' : '' !!}>
 <table class="page-frame">
 <tr>
 <td class="sheet-pad" valign="top">
